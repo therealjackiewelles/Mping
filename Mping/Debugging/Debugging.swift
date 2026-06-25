@@ -1461,6 +1461,32 @@ final class ConsoleOutputStore: ObservableObject {
         entries.removeAll(keepingCapacity: true)
     }
 
+    func exportFilteredEntriesAsCSV() {
+        let iso = ISO8601DateFormatter()
+        var lines = ["Timestamp,Subsystem,Direction,Device,IP Address,Message"]
+        for entry in filteredEntries {
+            let cols = [
+                iso.string(from: entry.timestamp),
+                entry.subsystem,
+                entry.direction.label,
+                entry.displayDeviceName,
+                entry.ipAddress ?? "",
+                entry.message.replacingOccurrences(of: "\"", with: "\"\"")
+            ].map { "\"\($0)\"" }
+            lines.append(cols.joined(separator: ","))
+        }
+        let csv = lines.joined(separator: "\n")
+
+        #if os(macOS)
+        let panel = NSSavePanel()
+        panel.title = "Export Event Log"
+        panel.nameFieldStringValue = "Mping Event Log \(DateFormatter.localizedString(from: Date(), dateStyle: .short, timeStyle: .short).replacingOccurrences(of: "/", with: "-").replacingOccurrences(of: ":", with: "-")).csv"
+        panel.allowedContentTypes = [.commaSeparatedText]
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        try? csv.write(to: url, atomically: true, encoding: .utf8)
+        #endif
+    }
+
     var availableDevices: [(key: String, name: String)] {
         var seen: Set<String> = []
         var devices: [(key: String, name: String)] = []
@@ -1570,6 +1596,10 @@ struct ConsoleOutputView: View {
             Text("\(store.filteredEntries.count) / \(store.entries.count) entries")
                 .font(.system(size: 12, weight: .regular, design: .monospaced))
                 .foregroundStyle(.secondary)
+
+            Button("Export CSV") {
+                store.exportFilteredEntriesAsCSV()
+            }
 
             Button("Clear") {
                 store.clear()

@@ -65,6 +65,7 @@ final class DeviceStore: ObservableObject {
     private static let switchTemperatureAlertThresholdKey = "Mping.alerting.switchTemperatureThresholdCelsius"
     private static let sfpTemperatureAlertThresholdKey = "Mping.alerting.sfpTemperatureThresholdCelsius"
     private static let fibreLossAlertThresholdKey = "Mping.alerting.fibreLossThresholdDb"
+    private static let jitterAlertThresholdKey = "Mping.alerting.jitterThresholdMilliseconds"
 
     @Published var pingAlertThresholdMilliseconds: Double = DeviceStore.persistedAlertThreshold(
         key: DeviceStore.pingAlertThresholdKey,
@@ -90,6 +91,13 @@ final class DeviceStore: ObservableObject {
     @Published var fibreLossAlertThresholdDb: Double = DeviceStore.persistedAlertThreshold(
         key: DeviceStore.fibreLossAlertThresholdKey,
         defaultValue: 4.0
+    ) {
+        didSet { alertThresholdDidChange() }
+    }
+
+    @Published var jitterAlertThresholdMilliseconds: Double = DeviceStore.persistedAlertThreshold(
+        key: DeviceStore.jitterAlertThresholdKey,
+        defaultValue: 2.0
     ) {
         didSet { alertThresholdDidChange() }
     }
@@ -294,6 +302,7 @@ final class DeviceStore: ObservableObject {
                     self.updateDeviceRuntime(id: item.id) { device in
                         let wasOffline = device.status == .offline
                         device.recordPingResult(result.rtt)
+                        device.recordPingAttempt(success: result.status != .offline)
                         device.lastChecked = checkedAt
                         if result.status != .offline {
                             device.lastSeenOnline = checkedAt
@@ -316,6 +325,9 @@ final class DeviceStore: ObservableObject {
                             device.verificationFailures.removeAll(keepingCapacity: false)
                             self.pingVerificationFailuresByDeviceID[item.id] = nil
                             device.status = self.effectiveRuntimeStatus(for: device, pingStatus: result.status)
+                            if device.currentOnlineSince == nil {
+                                device.currentOnlineSince = checkedAt
+                            }
                             updatedDevice = device
                         }
                     }
@@ -344,6 +356,40 @@ final class DeviceStore: ObservableObject {
                 }
             }
         }
+    }
+
+    func lookupMACAddress(for deviceID: UUID, ip: String) {
+        Task { [weak self] in
+            guard let self else { return }
+            guard let mac = await Self.arpLookup(ip: ip) else { return }
+            updateDeviceRuntime(id: deviceID) { device in
+                device.macAddress = mac
+            }
+        }
+    }
+
+    private static func arpLookup(ip: String) async -> String? {
+        await Task.detached(priority: .background) {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/sbin/arp")
+            process.arguments = ["-n", ip]
+            let outputPipe = Pipe()
+            process.standardOutput = outputPipe
+            process.standardError = Pipe()
+            guard (try? process.run()) != nil else { return nil }
+            process.waitUntilExit()
+            let output = String(data: outputPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+            guard let range = output.range(of: #"\b([0-9a-fA-F]{1,2}:){5}[0-9a-fA-F]{1,2}\b"#, options: .regularExpression) else { return nil }
+            return String(output[range]).uppercased()
+        }.value
+    }
+
+    func updateDeviceZoneName(id: UUID, zoneName: String?) {
+        updateDeviceRuntime(id: id) { device in
+            let trimmed = zoneName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            device.zoneName = trimmed.isEmpty ? nil : trimmed
+        }
+        markWorkspaceDirty()
     }
 
     private func startOfflinePingVerification(
@@ -393,6 +439,7 @@ final class DeviceStore: ObservableObject {
                         device.status = .offline
                         device.lastChecked = failures.last?.timestamp ?? Date()
                         device.isPinging = false
+                        device.currentOnlineSince = nil
                         updatedDevice = device
                     }
 
@@ -411,6 +458,9 @@ final class DeviceStore: ObservableObject {
                         device.status = self.effectiveRuntimeStatus(for: device, pingStatus: success.result.status)
                         device.lastChecked = success.timestamp
                         device.isPinging = false
+                        if device.currentOnlineSince == nil {
+                            device.currentOnlineSince = success.timestamp
+                        }
                         updatedDevice = device
                     }
 
@@ -465,6 +515,7 @@ final class DeviceStore: ObservableObject {
                         device.status = self.effectiveRuntimeStatus(for: device, pingStatus: success.result.status)
                         device.lastChecked = success.timestamp
                         device.isPinging = false
+                        device.currentOnlineSince = success.timestamp
                         updatedDevice = device
                     }
 
@@ -768,6 +819,7 @@ final class DeviceStore: ObservableObject {
         UserDefaults.standard.set(switchTemperatureAlertThresholdCelsius, forKey: Self.switchTemperatureAlertThresholdKey)
         UserDefaults.standard.set(sfpTemperatureAlertThresholdCelsius, forKey: Self.sfpTemperatureAlertThresholdKey)
         UserDefaults.standard.set(fibreLossAlertThresholdDb, forKey: Self.fibreLossAlertThresholdKey)
+        UserDefaults.standard.set(jitterAlertThresholdMilliseconds, forKey: Self.jitterAlertThresholdKey)
         reevaluateAllAlerts()
         markWorkspaceDirty()
     }
@@ -777,6 +829,7 @@ final class DeviceStore: ObservableObject {
         switchTemperatureAlertThresholdCelsius = 70.0
         sfpTemperatureAlertThresholdCelsius = 75.0
         fibreLossAlertThresholdDb = 4.0
+        jitterAlertThresholdMilliseconds = 2.0
     }
 
     func fibreLabelOffset(for result: FibreLossResult, endpoint: String) -> CGSize {
@@ -914,6 +967,22 @@ final class DeviceStore: ObservableObject {
             )
         } else {
             resolveAlert(conditionKey: pingKey)
+        }
+
+        let jitterKey = alertKey(.pingThreshold, deviceID: device.id, suffix: "jitter")
+        if device.status != .offline,
+           let jitter = device.jitter,
+           jitter >= jitterAlertThresholdMilliseconds {
+            raiseAlert(
+                category: .pingThreshold,
+                conditionKey: jitterKey,
+                deviceID: device.id,
+                deviceName: device.displayName,
+                location: device.ipAddress,
+                detail: String(format: "%.2f ms jitter over %.1f ms threshold", jitter, jitterAlertThresholdMilliseconds)
+            )
+        } else {
+            resolveAlert(conditionKey: jitterKey)
         }
     }
 
@@ -2186,7 +2255,11 @@ final class DeviceStore: ObservableObject {
             sourceIPAddress: device.sourceIPAddress,
             deviceType: device.deviceType,
             snmpCommunity: device.snmpCommunity,
-            switchTelemetry: SwitchTelemetry()
+            switchTelemetry: SwitchTelemetry(),
+            pingLossHistory: [],
+            currentOnlineSince: nil,
+            macAddress: device.macAddress,
+            zoneName: device.zoneName
         )
     }
 

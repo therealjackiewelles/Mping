@@ -522,6 +522,20 @@ private struct AlertThresholdsPopover: View {
                 decimals: 2
             )
 
+            CompactAlertThresholdControl(
+                title: "Jitter",
+                suffix: "ms",
+                value: $store.jitterAlertThresholdMilliseconds,
+                range: 0.5...20.0,
+                step: 0.5,
+                decimals: 1
+            )
+
+            Text("Jitter guide (AVB/Milan): < 0.5 ms excellent · 0.5–2 ms normal · > 2 ms elevated · > 5 ms critical. Alert default: 2.0 ms.")
+                .font(.system(size: 9, weight: .semibold, design: .rounded))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
             Text("Saved locally. Changes re-check current monitoring state.")
                 .font(.system(size: 9, weight: .semibold, design: .rounded))
                 .foregroundStyle(.secondary)

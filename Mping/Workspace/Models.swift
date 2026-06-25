@@ -175,6 +175,10 @@ struct MonitoredDevice: Identifiable, Codable, Equatable, Sendable {
     var snmpCommunity: String
     var webInterfacePath: String
     var switchTelemetry: SwitchTelemetry
+    var pingLossHistory: [Bool]
+    var currentOnlineSince: Date?
+    var macAddress: String?
+    var zoneName: String?
 
     init(
         id: UUID = UUID(),
@@ -198,7 +202,11 @@ struct MonitoredDevice: Identifiable, Codable, Equatable, Sendable {
         deviceType: MonitoredDeviceType = .pingOnly,
         snmpCommunity: String = "public",
         webInterfacePath: String = "",
-        switchTelemetry: SwitchTelemetry = SwitchTelemetry()
+        switchTelemetry: SwitchTelemetry = SwitchTelemetry(),
+        pingLossHistory: [Bool] = [],
+        currentOnlineSince: Date? = nil,
+        macAddress: String? = nil,
+        zoneName: String? = nil
     ) {
         self.id = id
         self.name = name
@@ -222,6 +230,10 @@ struct MonitoredDevice: Identifiable, Codable, Equatable, Sendable {
         self.snmpCommunity = snmpCommunity
         self.webInterfacePath = webInterfacePath
         self.switchTelemetry = switchTelemetry
+        self.pingLossHistory = pingLossHistory
+        self.currentOnlineSince = currentOnlineSince
+        self.macAddress = macAddress
+        self.zoneName = zoneName
     }
 
     enum CodingKeys: String, CodingKey {
@@ -247,6 +259,10 @@ struct MonitoredDevice: Identifiable, Codable, Equatable, Sendable {
         case snmpCommunity
         case webInterfacePath
         case switchTelemetry
+        case pingLossHistory
+        case currentOnlineSince
+        case macAddress
+        case zoneName
     }
 
     init(from decoder: Decoder) throws {
@@ -279,6 +295,10 @@ struct MonitoredDevice: Identifiable, Codable, Equatable, Sendable {
             webInterfacePath = MonitoredDevice.defaultNetgearWebInterfacePath
         }
         switchTelemetry = try c.decodeIfPresent(SwitchTelemetry.self, forKey: .switchTelemetry) ?? SwitchTelemetry()
+        pingLossHistory = try c.decodeIfPresent([Bool].self, forKey: .pingLossHistory) ?? []
+        currentOnlineSince = try c.decodeIfPresent(Date.self, forKey: .currentOnlineSince)
+        macAddress = try c.decodeIfPresent(String.self, forKey: .macAddress)
+        zoneName = try c.decodeIfPresent(String.self, forKey: .zoneName)
     }
 
 
@@ -294,11 +314,40 @@ struct MonitoredDevice: Identifiable, Codable, Equatable, Sendable {
         }
     }
 
+    mutating func recordPingAttempt(success: Bool) {
+        pingLossHistory.append(success)
+        if pingLossHistory.count > Self.maximumLossHistorySamples {
+            pingLossHistory.removeFirst(pingLossHistory.count - Self.maximumLossHistorySamples)
+        }
+    }
+
     mutating func resetPingStatistics() {
         lastRTT = nil
         pingRTTHistory.removeAll(keepingCapacity: false)
+        pingLossHistory.removeAll(keepingCapacity: false)
+        currentOnlineSince = nil
         verificationState = .online
         verificationFailures.removeAll(keepingCapacity: false)
+    }
+
+    var packetLossPercent: Double? {
+        guard pingLossHistory.count >= 3 else { return nil }
+        let failures = pingLossHistory.filter { !$0 }.count
+        return Double(failures) / Double(pingLossHistory.count) * 100.0
+    }
+
+    var jitter: Double? {
+        guard pingRTTHistory.count >= 2 else { return nil }
+        var total = 0.0
+        for i in 1..<pingRTTHistory.count {
+            total += abs(pingRTTHistory[i] - pingRTTHistory[i - 1])
+        }
+        return total / Double(pingRTTHistory.count - 1)
+    }
+
+    var uptimeDuration: TimeInterval? {
+        guard let since = currentOnlineSince else { return nil }
+        return Date().timeIntervalSince(since)
     }
 
     var minimumRTT: Double? {
@@ -315,6 +364,7 @@ struct MonitoredDevice: Identifiable, Codable, Equatable, Sendable {
     }
 
     private static let maximumPingHistorySamples = 120
+    private static let maximumLossHistorySamples = 50
 
     private static func sanitisedPingHistory(_ values: [Double]) -> [Double] {
         let clean = values.filter { $0.isFinite && $0 >= 0 }

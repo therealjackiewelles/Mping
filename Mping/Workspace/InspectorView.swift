@@ -85,6 +85,7 @@ private struct DeviceInspector: View {
     @State private var selectedInterfaceID: String = "AUTO"
     @State private var selectedDeviceType: MonitoredDeviceType = .pingOnly
     @State private var snmpCommunity: String = "public"
+    @State private var zoneName: String = ""
     @FocusState private var focusedField: DeviceInspectorField?
 
     var body: some View {
@@ -164,6 +165,8 @@ private struct DeviceInspector: View {
                     fibreLossSection
                 }
 
+                zoneSection
+
                 nicSection
 
                 Text("Text changes apply when you press Return or click away.")
@@ -195,6 +198,7 @@ private struct DeviceInspector: View {
         }
         .onDisappear {
             commitDeviceTextFields()
+            commitZoneName()
         }
         .onChange(of: device.id) { _, _ in
             syncFromDevice()
@@ -212,31 +216,70 @@ private struct DeviceInspector: View {
 
     private var pingStatusSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Ping")
-                .font(.headline)
-                .foregroundStyle(.white)
+            HStack {
+                Text("Ping")
+                    .font(.headline)
+                    .foregroundStyle(.white)
+                Spacer()
+                Text(device.status.label)
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .foregroundStyle(statusColor)
+            }
+
+            if device.pingRTTHistory.count >= 2 {
+                PingSparklineView(values: Array(device.pingRTTHistory.suffix(60)))
+                    .frame(height: 36)
+            }
+
+            HStack(spacing: 6) {
+                pingStatCard(title: "Current", value: formattedPingValue(device.lastRTT))
+                pingStatCard(title: "Min",     value: formattedPingValue(device.minimumRTT))
+                pingStatCard(title: "Avg",     value: formattedPingValue(device.averageRTT))
+                pingStatCard(title: "Max",     value: formattedPingValue(device.maximumRTT))
+            }
+
+            HStack(spacing: 6) {
+                pingStatCard(
+                    title: "Loss",
+                    value: device.packetLossPercent.map { String(format: "%.1f%%", $0) } ?? "—",
+                    valueColor: lossColor
+                )
+                pingStatCard(
+                    title: "Jitter",
+                    value: device.jitter.map { String(format: "%.2g ms", $0) } ?? "—",
+                    valueColor: jitterColor
+                )
+                pingStatCard(
+                    title: "Uptime",
+                    value: device.uptimeDuration.map { formattedUptime($0) } ?? "—"
+                )
+                pingStatCard(
+                    title: "Samples",
+                    value: "\(device.pingLossHistory.count)"
+                )
+            }
 
             HStack {
-                Text("Status")
-                    .foregroundStyle(.white.opacity(0.62))
-
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("MAC Address")
+                        .font(.system(size: 9, weight: .medium, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.46))
+                        .textCase(.uppercase)
+                    Text(device.macAddress ?? "—")
+                        .font(.system(size: 11, weight: .medium, design: .monospaced))
+                        .foregroundStyle(.white.opacity(0.78))
+                        .textSelection(.enabled)
+                }
                 Spacer()
-
-                Text(device.status.label)
-                    .foregroundStyle(.white.opacity(0.86))
+                Button("Lookup") {
+                    store.lookupMACAddress(for: device.id, ip: device.ipAddress)
+                }
+                .font(.system(size: 11, weight: .medium, design: .rounded))
             }
-
-            HStack(spacing: 8) {
-                pingStatCard(title: "Current", value: formattedPingValue(device.lastRTT))
-                pingStatCard(title: "Min", value: formattedPingValue(device.minimumRTT))
-                pingStatCard(title: "Avg", value: formattedPingValue(device.averageRTT))
-                pingStatCard(title: "Max", value: formattedPingValue(device.maximumRTT))
-            }
-
-            Text("Statistics are calculated from the current rolling ping history.")
-                .font(.system(size: 10, weight: .medium, design: .rounded))
-                .foregroundStyle(.white.opacity(0.38))
-                .fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 7)
+            .background(Color.black.opacity(0.18), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 9, style: .continuous).stroke(Color.white.opacity(0.08), lineWidth: 1))
         }
         .padding(10)
         .background(
@@ -245,7 +288,38 @@ private struct DeviceInspector: View {
         )
     }
 
-    private func pingStatCard(title: String, value: String) -> some View {
+    private var statusColor: Color {
+        switch device.status {
+        case .healthy: return .green
+        case .slow:    return .yellow
+        case .offline: return .red
+        case .unknown: return .gray
+        }
+    }
+
+    private var lossColor: Color {
+        guard let loss = device.packetLossPercent else { return .white.opacity(0.88) }
+        if loss >= 10 { return .red }
+        if loss >= 2  { return .orange }
+        return .green
+    }
+
+    private var jitterColor: Color {
+        guard let jitter = device.jitter else { return .white.opacity(0.88) }
+        let threshold = store.jitterAlertThresholdMilliseconds
+        if jitter >= threshold        { return .red }
+        if jitter >= threshold * 0.70 { return .orange }
+        return .green
+    }
+
+    private func formattedUptime(_ interval: TimeInterval) -> String {
+        let s = Int(interval)
+        if s < 60   { return "\(s)s" }
+        if s < 3600 { return "\(s / 60)m \(s % 60)s" }
+        return "\(s / 3600)h \(s % 3600 / 60)m"
+    }
+
+    private func pingStatCard(title: String, value: String, valueColor: Color = .white.opacity(0.88)) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title.uppercased())
                 .font(.system(size: 9, weight: .medium, design: .rounded))
@@ -253,11 +327,11 @@ private struct DeviceInspector: View {
                 .lineLimit(1)
 
             Text(value)
-                .font(.system(size: 15, weight: .semibold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.88))
+                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                .foregroundStyle(valueColor)
                 .monospacedDigit()
                 .lineLimit(1)
-                .minimumScaleFactor(0.72)
+                .minimumScaleFactor(0.65)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 8)
@@ -540,6 +614,22 @@ private struct DeviceInspector: View {
         return .green
     }
 
+    private var zoneSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Zone").foregroundStyle(.white.opacity(0.7))
+            TextField("Zone name (optional)", text: $zoneName)
+                .textFieldStyle(.roundedBorder)
+                .onSubmit { commitZoneName() }
+        }
+    }
+
+    private func commitZoneName() {
+        let trimmed = zoneName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let newZone: String? = trimmed.isEmpty ? nil : trimmed
+        guard newZone != device.zoneName else { return }
+        store.updateDeviceZoneName(id: device.id, zoneName: newZone)
+    }
+
     private var nicSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
@@ -595,6 +685,7 @@ private struct DeviceInspector: View {
         ip = device.ipAddress
         selectedDeviceType = device.deviceType
         snmpCommunity = device.snmpCommunity
+        zoneName = device.zoneName ?? ""
         syncInterfaceSelection()
     }
 
@@ -623,6 +714,47 @@ private struct DeviceInspector: View {
         if cleanedCommunity != device.snmpCommunity {
             store.updateDeviceSNMPCommunity(id: device.id, community: cleanedCommunity)
             snmpCommunity = cleanedCommunity
+        }
+    }
+}
+
+private struct PingSparklineView: View {
+    let values: [Double]
+
+    var body: some View {
+        GeometryReader { geo in
+            let w = geo.size.width
+            let h = geo.size.height
+            let minV = values.min() ?? 0
+            let maxV = values.max() ?? 1
+            let range = max(0.1, maxV - minV)
+            let count = values.count
+
+            ZStack(alignment: .topLeading) {
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(Color.black.opacity(0.18))
+
+                Path { path in
+                    for (i, v) in values.enumerated() {
+                        let x = w * CGFloat(i) / CGFloat(max(1, count - 1))
+                        let y = h - (h * CGFloat((v - minV) / range)) * 0.85 - h * 0.075
+                        if i == 0 { path.move(to: CGPoint(x: x, y: y)) }
+                        else { path.addLine(to: CGPoint(x: x, y: y)) }
+                    }
+                }
+                .stroke(Color.green.opacity(0.75), style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
+
+                HStack {
+                    Text(String(format: "%.1f", minV))
+                    Spacer()
+                    Text(String(format: "%.1f ms", maxV))
+                }
+                .font(.system(size: 8, weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.35))
+                .padding(.horizontal, 5)
+                .padding(.vertical, 3)
+                .frame(maxHeight: .infinity, alignment: .bottom)
+            }
         }
     }
 }

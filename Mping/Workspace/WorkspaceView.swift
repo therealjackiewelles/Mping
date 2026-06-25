@@ -3,6 +3,7 @@ import AppKit
 
 struct WorkspaceView: View {
     @ObservedObject var store: DeviceStore
+    var searchText: String = ""
 
     @State private var deviceDragStart: [UUID: CGPoint] = [:]
     @State private var shapeDragStart: [UUID: CGPoint] = [:]
@@ -102,6 +103,7 @@ struct WorkspaceView: View {
                             shouldShowSecondaryDetail: store.workspaceScale >= 0.52
                         )
                         .equatable()
+                        .opacity(deviceMatchesSearch(device) ? 1.0 : 0.22)
                         .position(x: device.x, y: device.y)
                         .onTapGesture(count: 2) {
                             store.openWebInterface(for: device.id)
@@ -422,6 +424,13 @@ struct WorkspaceView: View {
             }
     }
 
+    private func deviceMatchesSearch(_ device: MonitoredDevice) -> Bool {
+        guard !searchText.isEmpty else { return true }
+        let q = searchText.lowercased()
+        return device.displayName.lowercased().contains(q)
+            || device.ipAddress.contains(q)
+            || (device.zoneName?.lowercased().contains(q) ?? false)
+    }
 }
 
 
@@ -453,6 +462,7 @@ private struct MpingMapDeviceTileView: View, Equatable {
             && lhs.device.switchTelemetry.temperatureCelsius == rhs.device.switchTelemetry.temperatureCelsius
             && lhs.device.lastSeenOnline == rhs.device.lastSeenOnline
             && lhs.device.verificationState == rhs.device.verificationState
+            && lhs.device.zoneName == rhs.device.zoneName
             && lhs.isSelected == rhs.isSelected
             && lhs.shouldShowSecondaryDetail == rhs.shouldShowSecondaryDetail
     }
@@ -585,6 +595,14 @@ private struct MpingMapDeviceTileView: View, Equatable {
                 .allowsHitTesting(false)
         }
         .frame(width: tileWidth, height: tileHeight)
+        .overlay(alignment: .leading) {
+            if let zone = device.zoneName, !zone.isEmpty {
+                RoundedRectangle(cornerRadius: 2, style: .continuous)
+                    .fill(zoneColor(for: zone))
+                    .frame(width: 3)
+                    .padding(.vertical, 6)
+            }
+        }
         .contentShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         .animation(.easeOut(duration: 0.16), value: isSelected)
         .animation(.easeOut(duration: 0.16), value: device.status)
@@ -792,6 +810,12 @@ private struct MpingMapDeviceTileView: View, Equatable {
                 .stroke(Color.white.opacity(tileStyle.pingBorderOpacity), lineWidth: 1)
         )
         .accessibilityLabel("Ping latency \(latencyText)")
+    }
+
+    private static let zoneColors: [Color] = [.cyan, .purple, .orange, .mint, .pink, .indigo, .yellow, .teal]
+
+    private func zoneColor(for name: String) -> Color {
+        Self.zoneColors[abs(name.hashValue) % Self.zoneColors.count]
     }
 
     private var temperatureColor: Color {

@@ -9,6 +9,7 @@ struct ContentView: View {
     @Binding var showingDevicePortsView: Bool
     @State private var openAlertCategory: MpingAlertCategory? = nil
     @AppStorage("mping.showMinimap") private var showMinimap: Bool = true
+    @State private var workspaceSearch: String = ""
     @EnvironmentObject private var preferences: AppPreferences
     @State private var sidebarWidth: CGFloat = 230
     @State private var hasLoadedSavedSidebarWidth: Bool = false
@@ -38,7 +39,7 @@ struct ContentView: View {
             )
 
             ZStack(alignment: .topTrailing) {
-                WorkspaceView(store: store)
+                WorkspaceView(store: store, searchText: workspaceSearch)
                     .contextMenu {
                         Toggle("Snap to Grid", isOn: $store.snapToGridEnabled)
 
@@ -153,6 +154,29 @@ struct ContentView: View {
                         store.fibreBoxStyleDidChange()
                     }
             }
+
+            HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.45))
+                TextField("Search devices…", text: $workspaceSearch)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 12, design: .rounded))
+                    .foregroundStyle(.white)
+                if !workspaceSearch.isEmpty {
+                    Button {
+                        workspaceSearch = ""
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.white.opacity(0.45))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
 
             VStack(alignment: .leading, spacing: 8) {
                 Text("Ping Interval: \(String(format: "%.1f", store.pingInterval))s")
