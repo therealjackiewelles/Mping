@@ -451,6 +451,8 @@ private struct MpingMapDeviceTileView: View, Equatable {
             && lhs.device.pingPulseID == rhs.device.pingPulseID
             && lhs.device.deviceType == rhs.device.deviceType
             && lhs.device.switchTelemetry.temperatureCelsius == rhs.device.switchTelemetry.temperatureCelsius
+            && lhs.device.lastSeenOnline == rhs.device.lastSeenOnline
+            && lhs.device.verificationState == rhs.device.verificationState
             && lhs.isSelected == rhs.isSelected
             && lhs.shouldShowSecondaryDetail == rhs.shouldShowSecondaryDetail
     }
@@ -494,22 +496,30 @@ private struct MpingMapDeviceTileView: View, Equatable {
         }
     }
 
+    private var shouldShowLastSeen: Bool {
+        device.status == .offline || device.verificationState == .offline
+    }
+
+    private var latestValidRTT: Double? {
+        if let rtt = device.lastRTT, rtt.isFinite, rtt >= 0 { return rtt }
+        return device.pingRTTHistory.last(where: { $0.isFinite && $0 >= 0 })
+    }
+
+    private var lastSeenDisplayText: String {
+        if let t = device.lastSeenOnline { return "Last Seen\n" + Self.lastSeenFormatter.string(from: t) }
+        return "Never Seen"
+    }
+
+    private static let lastSeenFormatter: DateFormatter = {
+        let f = DateFormatter(); f.dateFormat = "HH:mm:ss"; return f
+    }()
+
     private var latencyText: String {
-        switch device.status {
-        case .offline:
-            return "Timeout"
-        case .unknown:
-            return "—"
-        case .healthy, .slow:
-            if let rtt = device.lastRTT {
-                if rtt < 10 {
-                    return String(format: "%.1f ms", rtt)
-                } else {
-                    return "\(Int(rtt.rounded())) ms"
-                }
-            }
-            return "—"
+        if shouldShowLastSeen { return lastSeenDisplayText }
+        if let rtt = latestValidRTT {
+            return rtt < 10 ? String(format: "%.1f", rtt) : "\(Int(rtt.rounded()))"
         }
+        return "—"
     }
 
     private var pingMinText: String {
@@ -747,20 +757,32 @@ private struct MpingMapDeviceTileView: View, Equatable {
     }
 
     private var pingBadge: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 3) {
-            Text(latencyText)
-                .font(.system(size: tileStyle.pingValueSize, weight: tileStyle.pingValueBold ? .semibold : .regular, design: .rounded))
-                .italicIf(tileStyle.pingValueItalic)
-                .foregroundStyle(.white.opacity(tileStyle.pingValueOpacity))
-                .monospacedDigit()
-                .lineLimit(1)
-                .minimumScaleFactor(0.72)
+        Group {
+            if shouldShowLastSeen {
+                Text(latencyText)
+                    .font(.system(size: max(7, tileStyle.pingValueSize * 0.78), weight: tileStyle.pingValueBold ? .semibold : .regular, design: .monospaced))
+                    .italicIf(tileStyle.pingValueItalic)
+                    .foregroundStyle(.white.opacity(tileStyle.pingValueOpacity))
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                    .minimumScaleFactor(0.58)
+            } else {
+                HStack(alignment: .firstTextBaseline, spacing: 3) {
+                    Text(latencyText)
+                        .font(.system(size: tileStyle.pingValueSize, weight: tileStyle.pingValueBold ? .semibold : .regular, design: .rounded))
+                        .italicIf(tileStyle.pingValueItalic)
+                        .foregroundStyle(.white.opacity(tileStyle.pingValueOpacity))
+                        .monospacedDigit()
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.72)
 
-            Text("ms")
-                .font(.system(size: tileStyle.pingHeaderSize, weight: tileStyle.pingHeaderBold ? .semibold : .regular, design: .rounded))
-                .italicIf(tileStyle.pingHeaderItalic)
-                .foregroundStyle(.white.opacity(tileStyle.pingHeaderOpacity))
-                .lineLimit(1)
+                    Text("ms")
+                        .font(.system(size: tileStyle.pingHeaderSize, weight: tileStyle.pingHeaderBold ? .semibold : .regular, design: .rounded))
+                        .italicIf(tileStyle.pingHeaderItalic)
+                        .foregroundStyle(.white.opacity(tileStyle.pingHeaderOpacity))
+                        .lineLimit(1)
+                }
+            }
         }
         .padding(.horizontal, tileStyle.pingBoxHorizontalPadding)
         .padding(.vertical, tileStyle.pingBoxVerticalPadding)
@@ -769,7 +791,7 @@ private struct MpingMapDeviceTileView: View, Equatable {
             RoundedRectangle(cornerRadius: tileStyle.pingBoxCornerRadius, style: .continuous)
                 .stroke(Color.white.opacity(tileStyle.pingBorderOpacity), lineWidth: 1)
         )
-        .accessibilityLabel("Ping latency \(latencyText) milliseconds")
+        .accessibilityLabel("Ping latency \(latencyText)")
     }
 
     private var temperatureColor: Color {

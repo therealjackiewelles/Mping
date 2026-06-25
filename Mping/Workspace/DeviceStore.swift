@@ -2178,7 +2178,7 @@ final class DeviceStore: ObservableObject {
             lastRTT: nil,
             pingRTTHistory: [],
             lastChecked: nil,
-            lastSeenOnline: device.lastSeenOnline,
+            lastSeenOnline: nil,
             isPinging: false,
             pingPulseID: 0,
             sourceInterfaceName: device.sourceInterfaceName,

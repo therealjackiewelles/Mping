@@ -406,15 +406,8 @@ struct DeviceTileView: View {
     }
 
     private var lastSeenDisplayText: String {
-        if let lastSeenOnline = device.lastSeenOnline {
-            return "Last Seen\n" + Self.lastSeenFormatter.string(from: lastSeenOnline)
-        }
-
-        if let lastChecked = device.lastChecked {
-            return "Last Seen\n" + Self.lastSeenFormatter.string(from: lastChecked)
-        }
-
-        return "Last Seen\nNever"
+        if let t = device.lastSeenOnline { return "Last Seen\n" + Self.lastSeenFormatter.string(from: t) }
+        return "Never Seen"
     }
 
     private static let lastSeenFormatter: DateFormatter = {
