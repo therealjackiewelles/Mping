@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/icon.png" width="128" alt="Mping icon" />
+  <img src="https://raw.githubusercontent.com/therealjackiewelles/Mping/main/docs/icon.png" width="128" alt="Mping icon" />
 </p>
 
 <h1 align="center">Mping</h1>
@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/logo.png" width="72" alt="Mping network topology logo" />
+  <img src="https://raw.githubusercontent.com/therealjackiewelles/Mping/main/docs/logo.png" width="72" alt="Mping network topology logo" />
 </p>
 
 ---
