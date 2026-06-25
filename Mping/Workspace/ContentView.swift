@@ -8,7 +8,7 @@ struct ContentView: View {
     @Binding var showingDeviceView: Bool
     @Binding var showingDevicePortsView: Bool
     @State private var openAlertCategory: MpingAlertCategory? = nil
-    @State private var showMinimap: Bool = true
+    @AppStorage("mping.showMinimap") private var showMinimap: Bool = true
     @EnvironmentObject private var preferences: AppPreferences
     @State private var sidebarWidth: CGFloat = 230
     @State private var hasLoadedSavedSidebarWidth: Bool = false
@@ -87,10 +87,12 @@ struct ContentView: View {
             sidebarWidth = clamped
             preferences.setSidebarWidth(clamped)
             hasLoadedSavedSidebarWidth = true
+
         }
     }
 
     private var leftToolbar: some View {
+        ScrollView(.vertical, showsIndicators: false) {
         VStack(alignment: .leading, spacing: 18) {
             HStack(alignment: .center, spacing: 10) {
                 Image("MpingLogo")
@@ -189,9 +191,10 @@ struct ContentView: View {
                 store.clearSelection()
             }
 
-            Spacer()
+            Spacer(minLength: 0)
         }
         .padding(18)
+        } // ScrollView
     }
 }
 

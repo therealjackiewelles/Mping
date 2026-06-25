@@ -108,8 +108,9 @@ final class DeviceStore: ObservableObject {
 
     @Published var networkInterfaces: [NetworkInterfaceInfo] = []
 
-    @Published var monitoringEnabled: Bool = true {
+    @Published var monitoringEnabled: Bool = UserDefaults.standard.object(forKey: "mping.monitoringEnabled") as? Bool ?? true {
         didSet {
+            UserDefaults.standard.set(monitoringEnabled, forKey: "mping.monitoringEnabled")
             monitoringEnabled ? startMonitoring() : stopMonitoring()
             monitoringEnabled ? startSNMPMonitoring() : stopSNMPMonitoring()
             markWorkspaceDirty()
