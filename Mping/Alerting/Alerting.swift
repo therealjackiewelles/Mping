@@ -214,8 +214,8 @@ private struct AlertIconButton: View {
     @Binding var openCategory: MpingAlertCategory?
     let sidebarScale: CGFloat
 
-    private var newCount: Int { store.newAlertCount(for: category) }
-    private var isActive: Bool { newCount > 0 }
+    private var count: Int { store.newAlertCount(for: category) }
+    private var isActive: Bool { count > 0 }
     private var clampedScale: CGFloat { min(1.65, max(1.0, sidebarScale)) }
 
     var body: some View {
