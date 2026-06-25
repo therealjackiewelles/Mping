@@ -1697,6 +1697,358 @@ private struct ConsoleOutputRow: View {
     }
 }
 
+// MARK: - Device Debug
+
+struct DeviceDebugView: View {
+    @ObservedObject var store: DeviceStore
+
+    @State private var snapshot: [MonitoredDevice] = []
+    @State private var monitoringEnabled: Bool = true
+    @State private var lastRefreshed: Date = Date()
+    @State private var expandedIDs: Set<UUID> = []
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            header
+            Divider()
+            content
+        }
+        .frame(width: 740, height: 840)
+        .background(Color(NSColor.windowBackgroundColor))
+        .onAppear { takeSnapshot() }
+    }
+
+    private var header: some View {
+        HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Device Debug")
+                    .font(.title2)
+                Text("Snapshot of internal monitoring state for all devices. Expand a device to inspect ping engine, verification, telemetry, and interface data.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer()
+
+            VStack(alignment: .trailing, spacing: 6) {
+                Button("Refresh") { takeSnapshot() }
+                Text("Updated \(timeFormatter.string(from: lastRefreshed))")
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(18)
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if snapshot.isEmpty {
+            VStack {
+                Spacer()
+                Text("No devices in workspace")
+                    .foregroundStyle(.secondary)
+                Spacer()
+            }
+            .frame(maxWidth: .infinity)
+        } else {
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 6) {
+                    ForEach(snapshot) { device in
+                        let id = device.id
+                        DeviceDebugRow(
+                            device: device,
+                            monitoringEnabled: monitoringEnabled,
+                            isExpanded: expandedIDs.contains(id),
+                            onToggle: {
+                                if expandedIDs.contains(id) {
+                                    expandedIDs.remove(id)
+                                } else {
+                                    expandedIDs.insert(id)
+                                }
+                            }
+                        )
+                    }
+                }
+                .padding(18)
+            }
+        }
+    }
+
+    private func takeSnapshot() {
+        snapshot = store.devices.sorted {
+            $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending
+        }
+        monitoringEnabled = store.monitoringEnabled
+        lastRefreshed = Date()
+    }
+
+    private let timeFormatter: DateFormatter = {
+        let f = DateFormatter(); f.dateFormat = "HH:mm:ss"; return f
+    }()
+}
+
+private struct DeviceDebugRow: View {
+    let device: MonitoredDevice
+    let monitoringEnabled: Bool
+    let isExpanded: Bool
+    let onToggle: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            headerRow
+            if isExpanded {
+                VStack(alignment: .leading, spacing: 8) {
+                    pingSection
+                    if !device.verificationFailures.isEmpty { verificationSection }
+                    identitySection
+                    if device.sourceInterfaceName != nil || device.sourceIPAddress != nil { interfaceSection }
+                    if device.deviceType == .netgearSwitch { snmpSection }
+                    if !device.switchTelemetry.lldpNeighbours.isEmpty || !device.switchTelemetry.devicePorts.isEmpty { topologySection }
+                }
+                .padding(.horizontal, 12)
+                .padding(.bottom, 12)
+            }
+        }
+        .background(.black.opacity(0.10), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(statusColor.opacity(isExpanded ? 0.30 : 0.12), lineWidth: 1)
+        )
+    }
+
+    private var headerRow: some View {
+        Button(action: onToggle) {
+            HStack(spacing: 10) {
+                Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 12)
+
+                Circle()
+                    .fill(statusColor)
+                    .frame(width: 8, height: 8)
+                    .shadow(color: statusColor.opacity(0.6), radius: 3)
+
+                Text(device.displayName)
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+
+                Text(device.ipAddress)
+                    .font(.system(size: 12, design: .monospaced))
+                    .foregroundStyle(.secondary)
+
+                Spacer()
+
+                Text(verificationStateLabel)
+                    .font(.system(size: 10, weight: .medium, design: .rounded))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
+                    .background(.white.opacity(0.06), in: Capsule())
+
+                Text(device.status.label.uppercased())
+                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                    .foregroundStyle(statusColor)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
+                    .background(statusColor.opacity(0.15), in: Capsule())
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Sections
+
+    private var pingSection: some View {
+        debugSection(title: "Ping & Monitoring") {
+            row("Monitoring Active",     value: monitoringEnabled ? "Yes" : "No", valueColor: monitoringEnabled ? .green : .secondary)
+            row("Status",                value: device.status.label, valueColor: statusColor)
+            row("Verification State",    value: verificationStateLabel)
+            row("Ping Pulse ID",         value: "\(device.pingPulseID)")
+            row("Last RTT",              value: device.lastRTT.map { String(format: "%.3f ms", $0) } ?? "—")
+            row("Min RTT",               value: device.minimumRTT.map { String(format: "%.3f ms", $0) } ?? "—")
+            row("Avg RTT",               value: device.averageRTT.map { String(format: "%.3f ms", $0) } ?? "—")
+            row("Max RTT",               value: device.maximumRTT.map { String(format: "%.3f ms", $0) } ?? "—")
+            row("RTT History Samples",   value: "\(device.pingRTTHistory.count)")
+            row("Last Checked",          value: device.lastChecked.map { timeFormatter.string(from: $0) } ?? "Never")
+            row("Last Seen Online",      value: device.lastSeenOnline.map { timeFormatter.string(from: $0) } ?? "Never Seen")
+        }
+    }
+
+    private var verificationSection: some View {
+        debugSection(title: "Recent Verification Failures (\(device.verificationFailures.count))") {
+            ForEach(Array(device.verificationFailures.enumerated()), id: \.offset) { index, failure in
+                row(
+                    "#\(index + 1)  \(timeFormatter.string(from: failure.timestamp))",
+                    value: "Timeout \(failure.timeoutMilliseconds) ms  •  \(failure.sourceDisplayText)"
+                )
+            }
+        }
+    }
+
+    private var identitySection: some View {
+        debugSection(title: "Identity") {
+            row("Display Name",   value: device.displayName)
+            row("Stored Name",    value: device.name)
+            row("Name Source",    value: device.nameSource.label)
+            if let discovered = device.discoveredName {
+                row("Discovered Name", value: discovered)
+            }
+            row("Device Type",    value: device.deviceType.label)
+            row("IP Address",     value: device.ipAddress)
+            row("Device ID",      value: device.id.uuidString, mono: true)
+        }
+    }
+
+    private var interfaceSection: some View {
+        debugSection(title: "Source Interface") {
+            row("Interface Name", value: device.sourceInterfaceName ?? "Auto")
+            row("Source IP",      value: device.sourceIPAddress ?? "Auto")
+        }
+    }
+
+    private var snmpSection: some View {
+        debugSection(title: "SNMP / Telemetry") {
+            row("Community",       value: device.snmpCommunity)
+            row("Last SNMP Poll",  value: device.switchTelemetry.lastSNMPChecked.map { timeFormatter.string(from: $0) } ?? "Never")
+            row("SNMP Status",     value: device.switchTelemetry.snmpStatusText ?? "—")
+            row("Temperature",     value: device.switchTelemetry.temperatureCelsius.map { String(format: "%.1f°C", $0) } ?? "—")
+            row("Fibre Ports",     value: "\(device.switchTelemetry.fibrePorts.count)")
+        }
+    }
+
+    private var topologySection: some View {
+        debugSection(title: "Topology") {
+            row("LLDP Neighbours", value: "\(device.switchTelemetry.lldpNeighbours.count)")
+            row("Device Ports",    value: "\(device.switchTelemetry.devicePorts.count)")
+            let upCount = device.switchTelemetry.devicePorts.filter { $0.isUp }.count
+            row("Ports Up",        value: "\(upCount) / \(device.switchTelemetry.devicePorts.count)")
+        }
+    }
+
+    // MARK: - Helpers
+
+    private func debugSection<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(title)
+                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                .foregroundStyle(.secondary)
+                .textCase(.uppercase)
+            content()
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.black.opacity(0.08), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
+    private func row(_ label: String, value: String, valueColor: Color = .primary, mono: Bool = false) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Text(label)
+                .font(.system(size: 12, weight: .regular, design: .rounded))
+                .foregroundStyle(.secondary)
+                .frame(width: 170, alignment: .leading)
+            Text(value)
+                .font(.system(size: 12, weight: mono ? .regular : .medium, design: mono ? .monospaced : .rounded))
+                .foregroundStyle(valueColor)
+                .textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+    }
+
+    private var statusColor: Color {
+        switch device.status {
+        case .healthy: return .green
+        case .slow:    return .yellow
+        case .offline: return .red
+        case .unknown: return .gray
+        }
+    }
+
+    private var verificationStateLabel: String {
+        switch device.verificationState {
+        case .online:           return "Online"
+        case .verifyingOffline: return "Verifying Offline"
+        case .offline:          return "Offline"
+        case .verifyingOnline:  return "Verifying Online"
+        }
+    }
+
+    private let timeFormatter: DateFormatter = {
+        let f = DateFormatter(); f.dateFormat = "HH:mm:ss"; return f
+    }()
+}
+
+#if os(macOS)
+final class DeviceDebugWindowController {
+    static let shared = DeviceDebugWindowController()
+
+    private var window: NSWindow?
+    private weak var store: DeviceStore?
+    private let password = "4512360"
+
+    private init() { }
+
+    func configure(store: DeviceStore) {
+        self.store = store
+    }
+
+    func showPasswordPromptAndOpen() {
+        let alert = NSAlert()
+        alert.messageText = "Device Debug"
+        alert.informativeText = "Enter password to open the device debug view."
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "Open")
+        alert.addButton(withTitle: "Cancel")
+
+        let secureField = NSSecureTextField(frame: NSRect(x: 0, y: 0, width: 240, height: 24))
+        secureField.placeholderString = "Password"
+        alert.accessoryView = secureField
+
+        let response = alert.runModal()
+        guard response == .alertFirstButtonReturn else { return }
+        guard secureField.stringValue == password else {
+            let denied = NSAlert()
+            denied.messageText = "Incorrect Password"
+            denied.informativeText = "The device debug view was not opened."
+            denied.alertStyle = .warning
+            denied.addButton(withTitle: "OK")
+            denied.runModal()
+            return
+        }
+
+        openWindow()
+    }
+
+    private func openWindow() {
+        guard let store else { return }
+
+        if let window {
+            window.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
+
+        let hostingController = NSHostingController(rootView: DeviceDebugView(store: store))
+        let newWindow = NSWindow(contentViewController: hostingController)
+        newWindow.title = "Device Debug"
+        newWindow.styleMask = [.titled, .closable, .miniaturizable, .resizable]
+        newWindow.setContentSize(NSSize(width: 740, height: 840))
+        newWindow.center()
+        newWindow.isReleasedWhenClosed = false
+        newWindow.makeKeyAndOrderFront(nil)
+
+        self.window = newWindow
+        NSApp.activate(ignoringOtherApps: true)
+    }
+}
+#endif
+
+// MARK: - Console Output Debugging
+
 #if os(macOS)
 final class ConsoleOutputWindowController {
     static let shared = ConsoleOutputWindowController()

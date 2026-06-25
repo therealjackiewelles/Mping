@@ -136,6 +136,14 @@ private struct MpingMenuCommands: Commands {
                 ConsoleOutputWindowController.shared.showPasswordPromptAndOpen()
             }
             .keyboardShortcut("c", modifiers: [.command, .option])
+
+            Divider()
+
+            Button("Device Debug") {
+                DeviceDebugWindowController.shared.configure(store: store)
+                DeviceDebugWindowController.shared.showPasswordPromptAndOpen()
+            }
+            .keyboardShortcut("d", modifiers: [.command, .option])
         }
     }
 }
