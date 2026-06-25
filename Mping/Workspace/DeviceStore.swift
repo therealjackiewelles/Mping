@@ -108,6 +108,7 @@ final class DeviceStore: ObservableObject {
 
     private var copiedDevices: [MonitoredDevice] = []
     private var copiedShapes: [WorkspaceShape] = []
+    var hasClipboardContent: Bool { !copiedDevices.isEmpty || !copiedShapes.isEmpty }
 
     @Published var selectedDeviceID: UUID? = nil
     @Published var selectedShapeID: UUID? = nil
@@ -265,7 +266,7 @@ final class DeviceStore: ObservableObject {
         let timeout = effectivePingTimeoutMilliseconds()
 
         let snapshot = devices
-            .filter { !$0.isPinging && pingVerificationTasks[$0.id] == nil }
+            .filter { $0.pingMonitoringEnabled && !$0.isPinging && pingVerificationTasks[$0.id] == nil }
             .map { device in
                 (
                     id: device.id,
@@ -382,6 +383,57 @@ final class DeviceStore: ObservableObject {
             guard let range = output.range(of: #"\b([0-9a-fA-F]{1,2}:){5}[0-9a-fA-F]{1,2}\b"#, options: .regularExpression) else { return nil }
             return String(output[range]).uppercased()
         }.value
+    }
+
+    struct BulkDeviceEdit {
+        var zoneName: String? = nil          // nil = no change, "" = clear, "value" = set
+        var snmpCommunity: String? = nil     // nil = no change
+        var deviceType: MonitoredDeviceType? = nil  // nil = no change
+        var pingMonitoringEnabled: Bool? = nil      // nil = no change
+        var snmpMonitoringEnabled: Bool? = nil      // nil = no change
+    }
+
+    func bulkUpdateDevices(ids: Set<UUID>, edit: BulkDeviceEdit) {
+        for id in ids {
+            if let zone = edit.zoneName {
+                updateDeviceZoneName(id: id, zoneName: zone.isEmpty ? nil : zone)
+            }
+            if let community = edit.snmpCommunity, !community.isEmpty {
+                updateDeviceSNMPCommunity(id: id, community: community)
+            }
+            if let type = edit.deviceType {
+                updateDeviceType(id: id, type: type)
+            }
+            if let pingEnabled = edit.pingMonitoringEnabled {
+                updateDevicePingMonitoring(id: id, enabled: pingEnabled)
+            }
+            if let snmpEnabled = edit.snmpMonitoringEnabled {
+                updateDeviceSNMPMonitoring(id: id, enabled: snmpEnabled)
+            }
+        }
+    }
+
+    func updateDevicePingMonitoring(id: UUID, enabled: Bool) {
+        updateDeviceRuntime(id: id) { device in
+            device.pingMonitoringEnabled = enabled
+            if !enabled {
+                device.status = .unknown
+                device.lastRTT = nil
+                device.pingRTTHistory.removeAll(keepingCapacity: false)
+                device.pingLossHistory.removeAll(keepingCapacity: false)
+                device.currentOnlineSince = nil
+                device.verificationState = .online
+                device.isPinging = false
+            }
+        }
+        markWorkspaceDirty()
+    }
+
+    func updateDeviceSNMPMonitoring(id: UUID, enabled: Bool) {
+        updateDeviceRuntime(id: id) { device in
+            device.snmpMonitoringEnabled = enabled
+        }
+        markWorkspaceDirty()
     }
 
     func updateDeviceZoneName(id: UUID, zoneName: String?) {
@@ -671,7 +723,7 @@ final class DeviceStore: ObservableObject {
 
     private func pollSwitchTelemetry() async {
         let switches = devices
-            .filter { $0.deviceType == .netgearSwitch }
+            .filter { $0.deviceType == .netgearSwitch && $0.snmpMonitoringEnabled }
             .map {
                 (
                     id: $0.id,
@@ -1366,8 +1418,13 @@ final class DeviceStore: ObservableObject {
     func updateDeviceType(id: UUID, type: MonitoredDeviceType) {
         guard let index = devices.firstIndex(where: { $0.id == id }) else { return }
         devices[index].deviceType = type
-        if type == .netgearSwitch && devices[index].webInterfacePath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            devices[index].webInterfacePath = MonitoredDevice.defaultNetgearWebInterfacePath
+        if type == .netgearSwitch {
+            if devices[index].webInterfacePath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                devices[index].webInterfacePath = MonitoredDevice.defaultNetgearWebInterfacePath
+            }
+            if devices[index].webInterfacePrefix.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                devices[index].webInterfacePrefix = "http://"
+            }
         }
         markWorkspaceDirty()
         startSNMPMonitoring()
@@ -1396,26 +1453,27 @@ final class DeviceStore: ObservableObject {
         let ip = device.ipAddress.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !ip.isEmpty else { return }
 
+        let prefix = device.webInterfacePrefix.trimmingCharacters(in: .whitespacesAndNewlines)
         let suffix = device.effectiveWebInterfacePath
-        let target: String
-
-        if suffix.lowercased().hasPrefix("http://") || suffix.lowercased().hasPrefix("https://") {
-            target = suffix
+        let normalisedSuffix: String
+        if suffix.isEmpty {
+            normalisedSuffix = ""
+        } else if suffix.hasPrefix(":") || suffix.hasPrefix("/") {
+            normalisedSuffix = suffix
         } else {
-            let normalisedSuffix: String
-            if suffix.isEmpty {
-                normalisedSuffix = ""
-            } else if suffix.hasPrefix(":") || suffix.hasPrefix("/") {
-                normalisedSuffix = suffix
-            } else {
-                normalisedSuffix = "/" + suffix
-            }
-
-            target = "http://\(ip)\(normalisedSuffix)"
+            normalisedSuffix = "/" + suffix
         }
 
+        let target = "\(prefix)\(ip)\(normalisedSuffix)"
         guard let url = URL(string: target) else { return }
         NSWorkspace.shared.open(url)
+    }
+
+    func updateDeviceWebInterfacePrefix(id: UUID, prefix: String) {
+        updateDeviceRuntime(id: id) { device in
+            device.webInterfacePrefix = prefix.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        markWorkspaceDirty()
     }
 
     func addShape() {
@@ -2255,11 +2313,14 @@ final class DeviceStore: ObservableObject {
             sourceIPAddress: device.sourceIPAddress,
             deviceType: device.deviceType,
             snmpCommunity: device.snmpCommunity,
+            webInterfacePrefix: device.webInterfacePrefix,
             switchTelemetry: SwitchTelemetry(),
             pingLossHistory: [],
             currentOnlineSince: nil,
             macAddress: device.macAddress,
-            zoneName: device.zoneName
+            zoneName: device.zoneName,
+            pingMonitoringEnabled: device.pingMonitoringEnabled,
+            snmpMonitoringEnabled: device.snmpMonitoringEnabled
         )
     }
 

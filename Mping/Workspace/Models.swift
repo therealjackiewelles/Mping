@@ -173,12 +173,15 @@ struct MonitoredDevice: Identifiable, Codable, Equatable, Sendable {
 
     var deviceType: MonitoredDeviceType
     var snmpCommunity: String
+    var webInterfacePrefix: String
     var webInterfacePath: String
     var switchTelemetry: SwitchTelemetry
     var pingLossHistory: [Bool]
     var currentOnlineSince: Date?
     var macAddress: String?
     var zoneName: String?
+    var pingMonitoringEnabled: Bool
+    var snmpMonitoringEnabled: Bool
 
     init(
         id: UUID = UUID(),
@@ -201,12 +204,15 @@ struct MonitoredDevice: Identifiable, Codable, Equatable, Sendable {
         sourceIPAddress: String? = nil,
         deviceType: MonitoredDeviceType = .pingOnly,
         snmpCommunity: String = "public",
+        webInterfacePrefix: String = "http://",
         webInterfacePath: String = "",
         switchTelemetry: SwitchTelemetry = SwitchTelemetry(),
         pingLossHistory: [Bool] = [],
         currentOnlineSince: Date? = nil,
         macAddress: String? = nil,
-        zoneName: String? = nil
+        zoneName: String? = nil,
+        pingMonitoringEnabled: Bool = true,
+        snmpMonitoringEnabled: Bool = true
     ) {
         self.id = id
         self.name = name
@@ -228,12 +234,15 @@ struct MonitoredDevice: Identifiable, Codable, Equatable, Sendable {
         self.sourceIPAddress = sourceIPAddress
         self.deviceType = deviceType
         self.snmpCommunity = snmpCommunity
+        self.webInterfacePrefix = webInterfacePrefix
         self.webInterfacePath = webInterfacePath
         self.switchTelemetry = switchTelemetry
         self.pingLossHistory = pingLossHistory
         self.currentOnlineSince = currentOnlineSince
         self.macAddress = macAddress
         self.zoneName = zoneName
+        self.pingMonitoringEnabled = pingMonitoringEnabled
+        self.snmpMonitoringEnabled = snmpMonitoringEnabled
     }
 
     enum CodingKeys: String, CodingKey {
@@ -257,12 +266,15 @@ struct MonitoredDevice: Identifiable, Codable, Equatable, Sendable {
         case sourceIPAddress
         case deviceType
         case snmpCommunity
+        case webInterfacePrefix
         case webInterfacePath
         case switchTelemetry
         case pingLossHistory
         case currentOnlineSince
         case macAddress
         case zoneName
+        case pingMonitoringEnabled
+        case snmpMonitoringEnabled
     }
 
     init(from decoder: Decoder) throws {
@@ -290,6 +302,7 @@ struct MonitoredDevice: Identifiable, Codable, Equatable, Sendable {
         sourceIPAddress = try c.decodeIfPresent(String.self, forKey: .sourceIPAddress)
         deviceType = try c.decodeIfPresent(MonitoredDeviceType.self, forKey: .deviceType) ?? .pingOnly
         snmpCommunity = try c.decodeIfPresent(String.self, forKey: .snmpCommunity) ?? "public"
+        webInterfacePrefix = try c.decodeIfPresent(String.self, forKey: .webInterfacePrefix) ?? "http://"
         webInterfacePath = try c.decodeIfPresent(String.self, forKey: .webInterfacePath) ?? ""
         if deviceType == .netgearSwitch && webInterfacePath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             webInterfacePath = MonitoredDevice.defaultNetgearWebInterfacePath
@@ -299,6 +312,8 @@ struct MonitoredDevice: Identifiable, Codable, Equatable, Sendable {
         currentOnlineSince = try c.decodeIfPresent(Date.self, forKey: .currentOnlineSince)
         macAddress = try c.decodeIfPresent(String.self, forKey: .macAddress)
         zoneName = try c.decodeIfPresent(String.self, forKey: .zoneName)
+        pingMonitoringEnabled = try c.decodeIfPresent(Bool.self, forKey: .pingMonitoringEnabled) ?? true
+        snmpMonitoringEnabled = try c.decodeIfPresent(Bool.self, forKey: .snmpMonitoringEnabled) ?? true
     }
 
 

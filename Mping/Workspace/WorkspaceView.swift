@@ -105,12 +105,11 @@ struct WorkspaceView: View {
                         .equatable()
                         .opacity(deviceMatchesSearch(device) ? 1.0 : 0.22)
                         .position(x: device.x, y: device.y)
-                        .onTapGesture(count: 2) {
-                            store.openWebInterface(for: device.id)
-                        }
                         .onTapGesture {
                             if isMultiSelectModifierPressed {
                                 store.toggleDeviceSelection(device.id)
+                            } else if store.selectedDeviceIDs == [device.id] {
+                                store.clearSelection()
                             } else {
                                 store.selectOnlyDevice(device.id)
                             }
@@ -161,6 +160,7 @@ struct WorkspaceView: View {
                     isSnapToGridEnabled: store.snapToGridEnabled,
                     gridSize: store.snapGridSize,
                     hasSelection: store.hasSelection,
+                    hasClipboardContent: store.hasClipboardContent,
                     onScroll: { delta in
                         let point = hoverPoint ?? CGPoint(x: proxy.size.width / 2, y: proxy.size.height / 2)
                         queueWorkspaceZoom(delta: delta, around: point)
@@ -180,7 +180,29 @@ struct WorkspaceView: View {
                     },
                     onPaste: {
                         store.pasteSelection()
-                    }
+                    },
+                    deviceAt: { swiftUIPoint in
+                        let scale = store.workspaceScale
+                        let offset = store.workspaceOffset
+                        let canvasX = (swiftUIPoint.x - offset.width) / scale
+                        let canvasY = (swiftUIPoint.y - offset.height) / scale
+                        let halfW = DeviceTileEditorSettings.shared.tileWidth / 2
+                        let halfH = DeviceTileEditorSettings.shared.tileHeight / 2
+                        return store.devices.first {
+                            abs(CGFloat($0.x) - canvasX) <= halfW &&
+                            abs(CGFloat($0.y) - canvasY) <= halfH
+                        }
+                    },
+                    onOpenWebInterface: { id in store.openWebInterface(for: id) },
+                    onSelectDevice: { id in store.selectOnlyDevice(id) },
+                    onCopyDevice: { id in store.selectOnlyDevice(id); store.copySelection() },
+                    onCutDevice: { id in store.selectOnlyDevice(id); store.cutSelection() },
+                    onDuplicateDevice: { id in
+                        store.selectOnlyDevice(id)
+                        store.copySelection()
+                        store.pasteSelection()
+                    },
+                    onDeleteDevice: { id in store.selectOnlyDevice(id); store.deleteSelection() }
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .allowsHitTesting(false)
@@ -877,12 +899,20 @@ private struct WorkspaceEventCatcher: NSViewRepresentable {
     let isSnapToGridEnabled: Bool
     let gridSize: CGFloat
     let hasSelection: Bool
+    let hasClipboardContent: Bool
     let onScroll: (Double) -> Void
     let onRightPan: (CGSize) -> Void
     let onToggleSnapToGrid: () -> Void
     let onSetGridSize: (CGFloat) -> Void
     let onCopySelection: () -> Void
     let onPaste: () -> Void
+    var deviceAt: ((CGPoint) -> MonitoredDevice?)?
+    var onOpenWebInterface: ((UUID) -> Void)?
+    var onSelectDevice: ((UUID) -> Void)?
+    var onCopyDevice: ((UUID) -> Void)?
+    var onCutDevice: ((UUID) -> Void)?
+    var onDuplicateDevice: ((UUID) -> Void)?
+    var onDeleteDevice: ((UUID) -> Void)?
 
     func makeNSView(context: Context) -> WorkspaceEventNSView {
         let view = WorkspaceEventNSView()
@@ -898,24 +928,40 @@ private struct WorkspaceEventCatcher: NSViewRepresentable {
         view.isSnapToGridEnabled = isSnapToGridEnabled
         view.gridSize = gridSize
         view.hasSelection = hasSelection
+        view.hasClipboardContent = hasClipboardContent
         view.onScroll = onScroll
         view.onRightPan = onRightPan
         view.onToggleSnapToGrid = onToggleSnapToGrid
         view.onSetGridSize = onSetGridSize
         view.onCopySelection = onCopySelection
         view.onPaste = onPaste
+        view.deviceAt = deviceAt
+        view.onOpenWebInterface = onOpenWebInterface
+        view.onSelectDevice = onSelectDevice
+        view.onCopyDevice = onCopyDevice
+        view.onCutDevice = onCutDevice
+        view.onDuplicateDevice = onDuplicateDevice
+        view.onDeleteDevice = onDeleteDevice
     }
 
     final class WorkspaceEventNSView: NSView {
         var isSnapToGridEnabled: Bool = false
         var gridSize: CGFloat = 40
         var hasSelection: Bool = false
+        var hasClipboardContent: Bool = false
         var onScroll: ((Double) -> Void)?
         var onRightPan: ((CGSize) -> Void)?
         var onToggleSnapToGrid: (() -> Void)?
         var onSetGridSize: ((CGFloat) -> Void)?
         var onCopySelection: (() -> Void)?
         var onPaste: (() -> Void)?
+        var deviceAt: ((CGPoint) -> MonitoredDevice?)?
+        var onOpenWebInterface: ((UUID) -> Void)?
+        var onSelectDevice: ((UUID) -> Void)?
+        var onCopyDevice: ((UUID) -> Void)?
+        var onCutDevice: ((UUID) -> Void)?
+        var onDuplicateDevice: ((UUID) -> Void)?
+        var onDeleteDevice: ((UUID) -> Void)?
 
         private var monitor: Any?
         private var lastRightPoint: NSPoint?
@@ -1015,6 +1061,70 @@ private struct WorkspaceEventCatcher: NSViewRepresentable {
         private func showWorkspaceMenu(for event: NSEvent) {
             menuTargets.removeAll()
 
+            let localPoint = convert(event.locationInWindow, from: nil)
+            let swiftUIPoint = CGPoint(x: localPoint.x, y: bounds.height - localPoint.y)
+
+            if let device = deviceAt?(swiftUIPoint) {
+                showDeviceMenu(for: device, with: event)
+            } else {
+                showCanvasMenu(for: event)
+            }
+        }
+
+        private func showDeviceMenu(for device: MonitoredDevice, with event: NSEvent) {
+            let menu = NSMenu()
+
+            addMenuItem(
+                to: menu,
+                title: "Open Web Interface",
+                isEnabled: !device.effectiveWebInterfacePath.isEmpty,
+                action: { [weak self] in self?.onOpenWebInterface?(device.id) }
+            )
+
+            menu.addItem(.separator())
+
+            addMenuItem(to: menu, title: "Select",
+                action: { [weak self] in self?.onSelectDevice?(device.id) }
+            )
+
+            menu.addItem(.separator())
+
+            addMenuItem(to: menu, title: "Copy",
+                action: { [weak self] in self?.onCopyDevice?(device.id) }
+            )
+
+            addMenuItem(to: menu, title: "Cut",
+                action: { [weak self] in self?.onCutDevice?(device.id) }
+            )
+
+            addMenuItem(to: menu, title: "Duplicate",
+                action: { [weak self] in self?.onDuplicateDevice?(device.id) }
+            )
+
+            menu.addItem(.separator())
+
+            addMenuItem(to: menu, title: "Paste",
+                isEnabled: hasClipboardContent,
+                action: { [weak self] in self?.onPaste?() }
+            )
+
+            menu.addItem(.separator())
+
+            let deleteItem = NSMenuItem(title: "Delete", action: nil, keyEquivalent: "")
+            deleteItem.attributedTitle = NSAttributedString(
+                string: "Delete",
+                attributes: [.foregroundColor: NSColor.systemRed]
+            )
+            let deleteTarget = MenuActionTarget { [weak self] in self?.onDeleteDevice?(device.id) }
+            menuTargets.append(deleteTarget)
+            deleteItem.target = deleteTarget
+            deleteItem.action = #selector(MenuActionTarget.runMenuAction)
+            menu.addItem(deleteItem)
+
+            NSMenu.popUpContextMenu(menu, with: event, for: self)
+        }
+
+        private func showCanvasMenu(for event: NSEvent) {
             let menu = NSMenu()
 
             addMenuItem(

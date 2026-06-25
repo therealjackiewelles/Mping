@@ -26,6 +26,14 @@ final class AppPreferences: ObservableObject {
         didSet { save() }
     }
 
+    @Published var deviceManagerColumnOrder: [String] {
+        didSet { save() }
+    }
+
+    @Published var deviceManagerColumnWidths: [String: Double] {
+        didSet { save() }
+    }
+
     private let fileURL: URL
 
     private struct Payload: Codable {
@@ -34,6 +42,8 @@ final class AppPreferences: ObservableObject {
         var devicePortsSelectedDeviceID: String?
         var devicePortsColumnOrder: [String]?
         var devicePortsColumnWidths: [String: Double]?
+        var deviceManagerColumnOrder: [String]?
+        var deviceManagerColumnWidths: [String: Double]?
     }
 
     private init() {
@@ -48,6 +58,8 @@ final class AppPreferences: ObservableObject {
         devicePortsSelectedDeviceID = payload.devicePortsSelectedDeviceID
         devicePortsColumnOrder = payload.devicePortsColumnOrder ?? []
         devicePortsColumnWidths = payload.devicePortsColumnWidths ?? [:]
+        deviceManagerColumnOrder = payload.deviceManagerColumnOrder ?? []
+        deviceManagerColumnWidths = payload.deviceManagerColumnWidths ?? [:]
     }
 
     func setSidebarWidth(_ width: CGFloat) {
@@ -63,7 +75,9 @@ final class AppPreferences: ObservableObject {
             devicePortsShowDisconnectedPorts: devicePortsShowDisconnectedPorts,
             devicePortsSelectedDeviceID: devicePortsSelectedDeviceID,
             devicePortsColumnOrder: devicePortsColumnOrder,
-            devicePortsColumnWidths: devicePortsColumnWidths
+            devicePortsColumnWidths: devicePortsColumnWidths,
+            deviceManagerColumnOrder: deviceManagerColumnOrder,
+            deviceManagerColumnWidths: deviceManagerColumnWidths
         )
 
         do {
@@ -108,7 +122,9 @@ final class AppPreferences: ObservableObject {
                 devicePortsShowDisconnectedPorts: decoded.devicePortsShowDisconnectedPorts,
                 devicePortsSelectedDeviceID: decoded.devicePortsSelectedDeviceID,
                 devicePortsColumnOrder: decoded.devicePortsColumnOrder,
-                devicePortsColumnWidths: decoded.devicePortsColumnWidths
+                devicePortsColumnWidths: decoded.devicePortsColumnWidths,
+                deviceManagerColumnOrder: decoded.deviceManagerColumnOrder,
+                deviceManagerColumnWidths: decoded.deviceManagerColumnWidths
             )
         } catch {
             return defaultPayload

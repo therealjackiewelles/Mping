@@ -3,40 +3,37 @@ import SwiftUI
 struct InspectorView: View {
     @ObservedObject var store: DeviceStore
 
+    @State private var lastDeviceID: UUID? = nil
+    @State private var lastShapeID: UUID? = nil
+
+    private var displayDevice: MonitoredDevice? {
+        let id = store.selectedDeviceID ?? lastDeviceID
+        return id.flatMap { id in store.devices.first { $0.id == id } }
+    }
+
+    private var displayShape: WorkspaceShape? {
+        let id = store.selectedShapeID ?? lastShapeID
+        return id.flatMap { id in store.shapes.first { $0.id == id } }
+    }
+
     var body: some View {
-        Group {
+        ZStack {
+            Color(red: 0.075, green: 0.075, blue: 0.085)
+            PanelInteractionBlocker(id: "inspector")
+
             if store.selectedItemCount > 1 {
                 MultiSelectionInspector(store: store)
-                    .frame(width: 280)
-                    .background(
-                        ZStack {
-                            Color(red: 0.075, green: 0.075, blue: 0.085)
-                            PanelInteractionBlocker(id: "inspector")
-                        }
-                    )
-            } else if let id = store.selectedDeviceID,
-                      let device = store.devices.first(where: { $0.id == id }) {
+            } else if let device = displayDevice {
                 DeviceInspector(store: store, device: device)
-                    .id(device.id)
-                    .frame(width: 280)
-                    .background(
-                        ZStack {
-                            Color(red: 0.075, green: 0.075, blue: 0.085)
-                            PanelInteractionBlocker(id: "inspector")
-                        }
-                    )
-            } else if let id = store.selectedShapeID,
-                      let shape = store.shapes.first(where: { $0.id == id }) {
+            } else if let shape = displayShape {
                 ShapeInspector(store: store, shape: shape)
-                    .id(shape.id)
-                    .frame(width: 280)
-                    .background(
-                        ZStack {
-                            Color(red: 0.075, green: 0.075, blue: 0.085)
-                            PanelInteractionBlocker(id: "inspector")
-                        }
-                    )
             }
+        }
+        .onChange(of: store.selectedDeviceID) { _, id in
+            if let id { lastDeviceID = id; lastShapeID = nil }
+        }
+        .onChange(of: store.selectedShapeID) { _, id in
+            if let id { lastShapeID = id; lastDeviceID = nil }
         }
     }
 }
@@ -44,35 +41,202 @@ struct InspectorView: View {
 private struct MultiSelectionInspector: View {
     @ObservedObject var store: DeviceStore
 
+    @State private var zoneField: String = ""
+    @State private var zoneFieldDirty: Bool = false
+    @State private var snmpField: String = ""
+    @State private var snmpFieldDirty: Bool = false
+    @State private var deviceTypeSelection: MonitoredDeviceType? = nil
+    @State private var pingMonitoringSelection: Bool? = nil
+    @State private var snmpMonitoringSelection: Bool? = nil
+    @State private var applied: Bool = false
+
+    private var selectedDevices: [MonitoredDevice] {
+        store.selectedDeviceIDs.compactMap { id in store.devices.first { $0.id == id } }
+    }
+
+    private var hasNetgearInSelection: Bool {
+        selectedDevices.contains { $0.deviceType == .netgearSwitch }
+    }
+
+    private var sharedZoneName: String? {
+        let zones = Set(selectedDevices.map { $0.zoneName ?? "" })
+        return zones.count == 1 ? zones.first : nil
+    }
+
+    private var anyFieldDirty: Bool {
+        zoneFieldDirty || snmpFieldDirty || deviceTypeSelection != nil
+        || pingMonitoringSelection != nil || snmpMonitoringSelection != nil
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text("Selection")
-                .font(.title2.bold())
-                .foregroundStyle(.white)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Group Edit")
+                        .font(.title2.bold())
+                        .foregroundStyle(.white)
+                    Text("\(store.selectedDeviceIDs.count) devices selected\(store.selectedShapeIDs.isEmpty ? "" : ", \(store.selectedShapeIDs.count) boxes")")
+                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.55))
+                }
 
-            Text("\(store.selectedItemCount) items selected")
-                .foregroundStyle(.white.opacity(0.75))
+                Divider()
 
-            Text("\(store.selectedDeviceIDs.count) devices")
+                Text("Only fields you edit will be applied. Empty fields are ignored.")
+                    .font(.system(size: 10, weight: .medium, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.42))
+                    .fixedSize(horizontal: false, vertical: true)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text("Zone")
+                            .foregroundStyle(.white.opacity(0.7))
+                        Spacer()
+                        if let shared = sharedZoneName {
+                            Text(shared.isEmpty ? "None" : shared)
+                                .font(.system(size: 10, design: .rounded))
+                                .foregroundStyle(.white.opacity(0.35))
+                        } else {
+                            Text("Mixed")
+                                .font(.system(size: 10, design: .rounded))
+                                .foregroundStyle(.white.opacity(0.35))
+                        }
+                    }
+                    TextField("Type to set zone on all selected…", text: $zoneField)
+                        .textFieldStyle(.roundedBorder)
+                        .onChange(of: zoneField) { _, _ in zoneFieldDirty = true }
+                    if zoneFieldDirty {
+                        Text(zoneField.isEmpty ? "Will clear zone on all selected devices." : "Will set zone to \"\(zoneField)\" on all selected devices.")
+                            .font(.system(size: 10, design: .rounded))
+                            .foregroundStyle(zoneField.isEmpty ? .orange : .green)
+                    }
+                }
+
+                if hasNetgearInSelection {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("SNMP Community")
+                            .foregroundStyle(.white.opacity(0.7))
+                        TextField("Type to set community on all selected…", text: $snmpField)
+                            .textFieldStyle(.roundedBorder)
+                            .onChange(of: snmpField) { _, _ in snmpFieldDirty = true }
+                        if snmpFieldDirty && !snmpField.isEmpty {
+                            Text("Will set SNMP community to \"\(snmpField)\" on all selected Netgear switches.")
+                                .font(.system(size: 10, design: .rounded))
+                                .foregroundStyle(.green)
+                        }
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Ping Monitoring")
+                        .foregroundStyle(.white.opacity(0.7))
+                    Picker("Ping Monitoring", selection: $pingMonitoringSelection) {
+                        Text("No change").tag(Bool?.none)
+                        Text("Enabled").tag(Bool?.some(true))
+                        Text("Disabled").tag(Bool?.some(false))
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.segmented)
+                    if let v = pingMonitoringSelection {
+                        Text("Will \(v ? "enable" : "disable") ping monitoring on all selected devices.")
+                            .font(.system(size: 10, design: .rounded))
+                            .foregroundStyle(v ? .green : .orange)
+                    }
+                }
+
+                if selectedDevices.contains(where: { $0.deviceType == .netgearSwitch }) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("SNMP / LLDP")
+                            .foregroundStyle(.white.opacity(0.7))
+                        Picker("SNMP Monitoring", selection: $snmpMonitoringSelection) {
+                            Text("No change").tag(Bool?.none)
+                            Text("Enabled").tag(Bool?.some(true))
+                            Text("Disabled").tag(Bool?.some(false))
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.segmented)
+                        if let v = snmpMonitoringSelection {
+                            Text("Will \(v ? "enable" : "disable") SNMP/LLDP on all selected Netgear switches.")
+                                .font(.system(size: 10, design: .rounded))
+                                .foregroundStyle(v ? .green : .orange)
+                        }
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Device Type")
+                        .foregroundStyle(.white.opacity(0.7))
+                    Picker("Device Type", selection: Binding(
+                        get: { deviceTypeSelection },
+                        set: { deviceTypeSelection = $0 }
+                    )) {
+                        Text("No change").tag(MonitoredDeviceType?.none)
+                        ForEach(MonitoredDeviceType.allCases, id: \.self) { type in
+                            Text(type.label).tag(MonitoredDeviceType?.some(type))
+                        }
+                    }
+                    .labelsHidden()
+                    if deviceTypeSelection != nil {
+                        Text("Will set device type on all selected devices.")
+                            .font(.system(size: 10, design: .rounded))
+                            .foregroundStyle(.green)
+                    }
+                }
+
+                HStack(spacing: 10) {
+                    Button("Apply") {
+                        var edit = DeviceStore.BulkDeviceEdit()
+                        if zoneFieldDirty { edit.zoneName = zoneField }
+                        if snmpFieldDirty && !snmpField.isEmpty { edit.snmpCommunity = snmpField }
+                        edit.deviceType = deviceTypeSelection
+                        edit.pingMonitoringEnabled = pingMonitoringSelection
+                        edit.snmpMonitoringEnabled = snmpMonitoringSelection
+                        store.bulkUpdateDevices(ids: store.selectedDeviceIDs, edit: edit)
+                        applied = true
+                        resetFields()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(!anyFieldDirty)
+
+                    if applied {
+                        Text("Applied")
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .foregroundStyle(.green)
+                            .transition(.opacity)
+                    }
+                }
+
+                Divider()
+
+                Button("Clear Selection") {
+                    store.clearSelection()
+                }
                 .foregroundStyle(.white.opacity(0.6))
 
-            Text("\(store.selectedShapeIDs.count) boxes")
-                .foregroundStyle(.white.opacity(0.6))
-
-            Button("Clear Selection") {
-                store.clearSelection()
+                Spacer(minLength: 12)
             }
-
-            Spacer()
+            .padding(18)
         }
-        .padding(18)
+        .onChange(of: store.selectedDeviceIDs) { _, _ in
+            resetFields()
+        }
+    }
+
+    private func resetFields() {
+        zoneField = ""
+        zoneFieldDirty = false
+        snmpField = ""
+        snmpFieldDirty = false
+        deviceTypeSelection = nil
+        pingMonitoringSelection = nil
+        snmpMonitoringSelection = nil
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { applied = false }
     }
 }
 
 private enum DeviceInspectorField: Hashable {
     case name
     case ipAddress
-    case snmpCommunity
 }
 
 private struct DeviceInspector: View {
@@ -84,7 +248,6 @@ private struct DeviceInspector: View {
     @State private var ip: String = ""
     @State private var selectedInterfaceID: String = "AUTO"
     @State private var selectedDeviceType: MonitoredDeviceType = .pingOnly
-    @State private var snmpCommunity: String = "public"
     @State private var zoneName: String = ""
     @FocusState private var focusedField: DeviceInspectorField?
 
@@ -94,6 +257,8 @@ private struct DeviceInspector: View {
                 Text("Device")
                     .font(.title2.bold())
                     .foregroundStyle(.white)
+
+                monitoringControlsSection
 
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
@@ -160,7 +325,6 @@ private struct DeviceInspector: View {
                 }
 
                 if selectedDeviceType == .netgearSwitch {
-                    switchSection
                     temperatureHistorySection
                     fibreLossSection
                 }
@@ -194,7 +358,6 @@ private struct DeviceInspector: View {
         }
         .onAppear {
             syncFromDevice()
-            store.refreshNetworkInterfaces()
         }
         .onDisappear {
             commitDeviceTextFields()
@@ -213,6 +376,48 @@ private struct DeviceInspector: View {
         }
     }
 
+
+    private var monitoringControlsSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Toggle(isOn: Binding(
+                get: { device.pingMonitoringEnabled },
+                set: { store.updateDevicePingMonitoring(id: device.id, enabled: $0) }
+            )) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Ping Monitoring")
+                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                        .foregroundStyle(.white)
+                    if !device.pingMonitoringEnabled {
+                        Text("Device is excluded from all ping cycles.")
+                            .font(.system(size: 10, design: .rounded))
+                            .foregroundStyle(.orange)
+                    }
+                }
+            }
+            .toggleStyle(.switch)
+
+            if device.deviceType == .netgearSwitch {
+                Toggle(isOn: Binding(
+                    get: { device.snmpMonitoringEnabled },
+                    set: { store.updateDeviceSNMPMonitoring(id: device.id, enabled: $0) }
+                )) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("SNMP / LLDP")
+                            .font(.system(size: 13, weight: .medium, design: .rounded))
+                            .foregroundStyle(.white)
+                        if !device.snmpMonitoringEnabled {
+                            Text("Device is excluded from telemetry polling.")
+                                .font(.system(size: 10, design: .rounded))
+                                .foregroundStyle(.orange)
+                        }
+                    }
+                }
+                .toggleStyle(.switch)
+            }
+        }
+        .padding(10)
+        .background(RoundedRectangle(cornerRadius: 12).fill(Color.white.opacity(0.045)))
+    }
 
     private var pingStatusSection: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -355,56 +560,6 @@ private struct DeviceInspector: View {
         }
 
         return "\(Int(value.rounded())) ms"
-    }
-
-    private var switchSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Switch SNMP")
-                .font(.headline)
-                .foregroundStyle(.white)
-
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Community")
-                    .foregroundStyle(.white.opacity(0.7))
-
-                TextField("public", text: $snmpCommunity)
-                    .textFieldStyle(.roundedBorder)
-                    .focused($focusedField, equals: .snmpCommunity)
-                    .onSubmit {
-                        commitDeviceTextFields()
-                    }
-            }
-
-            HStack {
-                Text(device.temperatureDisplayText)
-                    .font(.system(size: 18, weight: .bold, design: .rounded))
-                    .foregroundStyle(temperatureColor)
-
-                Spacer()
-            }
-
-            if let status = device.switchTelemetry.snmpStatusText {
-                Text(status)
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.55))
-            }
-
-            if let last = device.switchTelemetry.lastSNMPChecked {
-                Text("SNMP checked: \(last.formatted(date: .omitted, time: .standard))")
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.55))
-            }
-
-            Text("This creates the SNMP layer we can reuse for fibre DDM later.")
-                .font(.system(size: 10, weight: .medium, design: .rounded))
-                .foregroundStyle(.white.opacity(0.38))
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(10)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.white.opacity(0.045))
-        )
     }
 
     private var temperatureHistorySection: some View {
@@ -684,7 +839,6 @@ private struct DeviceInspector: View {
         selectedNameSource = device.nameSource
         ip = device.ipAddress
         selectedDeviceType = device.deviceType
-        snmpCommunity = device.snmpCommunity
         zoneName = device.zoneName ?? ""
         syncInterfaceSelection()
     }
@@ -702,18 +856,11 @@ private struct DeviceInspector: View {
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         let finalName = trimmedName.isEmpty ? device.name : trimmedName
         let finalIP = ip.trimmingCharacters(in: .whitespacesAndNewlines)
-        let finalCommunity = snmpCommunity.trimmingCharacters(in: .whitespacesAndNewlines)
 
         if finalName != device.name || finalIP != device.ipAddress {
             store.updateDevice(id: device.id, name: finalName, ipAddress: finalIP)
             name = finalName
             ip = finalIP
-        }
-
-        let cleanedCommunity = finalCommunity.isEmpty ? "public" : finalCommunity
-        if cleanedCommunity != device.snmpCommunity {
-            store.updateDeviceSNMPCommunity(id: device.id, community: cleanedCommunity)
-            snmpCommunity = cleanedCommunity
         }
     }
 }

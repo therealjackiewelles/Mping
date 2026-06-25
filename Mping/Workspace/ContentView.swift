@@ -40,26 +40,6 @@ struct ContentView: View {
 
             ZStack(alignment: .topTrailing) {
                 WorkspaceView(store: store, searchText: workspaceSearch)
-                    .contextMenu {
-                        Toggle("Snap to Grid", isOn: $store.snapToGridEnabled)
-
-                        Picker("Grid Size", selection: $store.snapGridSize) {
-                            Text("20 px").tag(CGFloat(20))
-                            Text("40 px").tag(CGFloat(40))
-                            Text("80 px").tag(CGFloat(80))
-                        }
-
-                        Divider()
-
-                        Button("Copy Selection") {
-                            store.copySelection()
-                        }
-                        .disabled(!store.hasSelection)
-
-                        Button("Paste") {
-                            store.pasteSelection()
-                        }
-                    }
 
                 if showMinimap && !store.hasSelection {
                     MiniMapView(store: store)
@@ -68,10 +48,14 @@ struct ContentView: View {
                         .zIndex(9999)
                         .allowsHitTesting(false)
                 }
-            }
 
-            if store.hasSelection {
-                InspectorView(store: store)
+                HStack(spacing: 0) {
+                    Spacer(minLength: 0)
+                    InspectorView(store: store)
+                        .frame(width: 280)
+                        .opacity(store.hasSelection ? 1 : 0)
+                        .allowsHitTesting(store.hasSelection)
+                }
             }
         }
         .frame(minWidth: 1100, minHeight: 700)
@@ -272,9 +256,55 @@ private struct SidebarResizeHandle: View {
     }
 }
 
+// MARK: - Device Manager Column
+
+private enum DeviceManagerColumn: String, CaseIterable {
+    case name, nameSource, ipAddress, deviceType, snmpCommunity, urlPrefix, webUIPath, pingNIC
+
+    var title: String {
+        switch self {
+        case .name: return "Name"
+        case .nameSource: return "SNMP/LLDP Name"
+        case .ipAddress: return "IP Address"
+        case .deviceType: return "Device Type"
+        case .snmpCommunity: return "SNMP Community"
+        case .urlPrefix: return "URL Prefix"
+        case .webUIPath: return "URL Suffix"
+        case .pingNIC: return "Ping NIC"
+        }
+    }
+
+    var defaultWidth: CGFloat {
+        switch self {
+        case .name: return 200
+        case .nameSource: return 110
+        case .ipAddress: return 150
+        case .deviceType: return 160
+        case .snmpCommunity: return 130
+        case .urlPrefix: return 100
+        case .webUIPath: return 240
+        case .pingNIC: return 280
+        }
+    }
+
+    var minWidth: CGFloat {
+        switch self {
+        case .nameSource: return 90
+        case .urlPrefix: return 80
+        default: return 80
+        }
+    }
+
+    static var defaultOrder: [String] { allCases.map(\.rawValue) }
+    static var totalDefaultWidth: CGFloat { allCases.reduce(0) { $0 + $1.defaultWidth } }
+}
+
+// MARK: - Device Manager Sheet
+
 private struct DeviceViewSheet: View {
     @ObservedObject var store: DeviceStore
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var preferences: AppPreferences
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -282,177 +312,381 @@ private struct DeviceViewSheet: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Device Manager")
                         .font(.title2.bold())
-
-                    Text("Edit all monitored devices from one place.")
+                    Text("Drag column headers to reorder. Drag dividers to resize. All settings are saved.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
-
                 Spacer()
-
-                Button("Done") {
-                    dismiss()
-                }
-                .keyboardShortcut(.defaultAction)
+                Button("Done") { dismiss() }
+                    .keyboardShortcut(.defaultAction)
             }
 
             Divider()
 
-            DeviceViewHeader()
-
-            ScrollView {
-                LazyVStack(spacing: 8) {
-                    ForEach(store.devices) { device in
-                        DeviceViewRow(store: store, deviceID: device.id)
-                    }
-                }
-                .padding(.vertical, 4)
-            }
+            DeviceManagerTableView(store: store, preferences: preferences)
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(Color.white.opacity(0.08), lineWidth: 1))
         }
         .padding(20)
-        .frame(minWidth: 1380, minHeight: 520)
+        .frame(minWidth: 900, idealWidth: idealWidth, minHeight: 500, idealHeight: idealHeight)
+        .background(DeviceManagerWindowSizer(idealWidth: idealWidth, idealHeight: idealHeight))
     }
-}
 
-private struct DeviceViewHeader: View {
-    var body: some View {
-        HStack(spacing: 10) {
-            Text("Name")
-                .frame(width: 220, alignment: .leading)
-            Text("Name Source")
-                .frame(width: 120, alignment: .leading)
-            Text("IP Address")
-                .frame(width: 170, alignment: .leading)
-            Text("Device Type")
-                .frame(width: 180, alignment: .leading)
-            Text("Web UI Path")
-                .frame(width: 280, alignment: .leading)
-            Text("Ping NIC")
-                .frame(minWidth: 300, alignment: .leading)
+    private var idealWidth: CGFloat {
+        let screen = NSScreen.main?.visibleFrame.width ?? 1440
+        let total = DeviceManagerColumn.allCases.reduce(CGFloat(0)) { sum, col in
+            let saved = preferences.deviceManagerColumnWidths[col.rawValue].map { CGFloat($0) }
+            return sum + (saved ?? col.defaultWidth)
         }
-        .font(.system(size: 12, weight: .bold, design: .rounded))
-        .foregroundStyle(.secondary)
-        .padding(.horizontal, 10)
+        return min(screen * 0.97, total + 48)
+    }
+
+    private var idealHeight: CGFloat {
+        let screen = NSScreen.main?.visibleFrame.height ?? 900
+        let rowH = CGFloat(store.devices.count) * 28 + 160
+        return min(screen * 0.90, max(500, rowH))
     }
 }
 
-private struct DeviceViewRow: View {
+private struct DeviceManagerWindowSizer: NSViewRepresentable {
+    let idealWidth: CGFloat
+    let idealHeight: CGFloat
+
+    func makeNSView(context: Context) -> NSView {
+        let v = NSView(); DispatchQueue.main.async { resize(v) }; return v
+    }
+    func updateNSView(_ v: NSView, context: Context) { DispatchQueue.main.async { resize(v) } }
+
+    private func resize(_ view: NSView) {
+        guard let window = view.window else { return }
+        let screen = window.screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? NSRect(x:0,y:0,width:1440,height:900)
+        let w = min(idealWidth, screen.width * 0.97)
+        let h = min(idealHeight, screen.height * 0.90)
+        let cur = window.frame
+        guard abs(cur.width - w) > 8 || abs(cur.height - h) > 8 else { return }
+        var f = NSRect(x: cur.midX - w/2, y: cur.midY - h/2, width: w, height: h)
+        if f.minX < screen.minX { f.origin.x = screen.minX }
+        if f.maxX > screen.maxX { f.origin.x = screen.maxX - f.width }
+        if f.minY < screen.minY { f.origin.y = screen.minY }
+        if f.maxY > screen.maxY { f.origin.y = screen.maxY - f.height }
+        window.setFrame(f, display: true, animate: false)
+        window.minSize = NSSize(width: 900, height: 500)
+    }
+}
+
+// MARK: - Device Manager NSTableView
+
+private struct DeviceManagerTableView: NSViewRepresentable {
     @ObservedObject var store: DeviceStore
-    let deviceID: UUID
+    @ObservedObject var preferences: AppPreferences
 
-    private var device: MonitoredDevice? {
-        store.devices.first { $0.id == deviceID }
+    func makeCoordinator() -> Coordinator { Coordinator(store: store, preferences: preferences) }
+
+    func makeNSView(context: Context) -> NSScrollView {
+        let scroll = NSScrollView()
+        scroll.hasVerticalScroller = true
+        scroll.hasHorizontalScroller = true
+        scroll.autohidesScrollers = true
+        scroll.borderType = .noBorder
+        scroll.drawsBackground = false
+
+        let table = NSTableView()
+        table.usesAlternatingRowBackgroundColors = true
+        table.allowsColumnResizing = true
+        table.allowsColumnReordering = true
+        table.allowsColumnSelection = false
+        table.rowHeight = 28
+        table.columnAutoresizingStyle = .noColumnAutoresizing
+        table.style = .fullWidth
+        table.dataSource = context.coordinator
+        table.delegate = context.coordinator
+        context.coordinator.tableView = table
+
+        context.coordinator.configureColumns(on: table)
+        scroll.documentView = table
+        return scroll
     }
 
-    var body: some View {
-        if let device {
-            HStack(spacing: 10) {
-                TextField("Name", text: nameBinding(for: device))
-                    .textFieldStyle(.roundedBorder)
-                    .disabled((currentDevice() ?? device).nameSource == .automatic)
-                    .opacity((currentDevice() ?? device).nameSource == .automatic ? 0.48 : 1.0)
-                    .frame(width: 220)
+    func updateNSView(_ scroll: NSScrollView, context: Context) {
+        guard let table = scroll.documentView as? NSTableView else { return }
+        context.coordinator.store = store
+        context.coordinator.preferences = preferences
+        context.coordinator.configureColumns(on: table)
+        table.reloadData()
+    }
 
-                Toggle("SNMP/LLDP", isOn: automaticNameBinding(for: device))
-                    .toggleStyle(.checkbox)
-                    .frame(width: 120, alignment: .leading)
+    // MARK: Coordinator
 
-                TextField("IP Address", text: ipAddressBinding(for: device))
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: 170)
+    final class Coordinator: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSTextFieldDelegate {
+        var store: DeviceStore
+        var preferences: AppPreferences
+        weak var tableView: NSTableView?
+        private var isConfiguringColumns = false
 
-                Picker("Device Type", selection: deviceTypeBinding(for: device)) {
-                    ForEach(MonitoredDeviceType.allCases, id: \.self) { type in
-                        Text(type.label).tag(type)
-                    }
-                }
-                .labelsHidden()
-                .frame(width: 180)
-
-                TextField("Web UI path", text: webInterfacePathBinding(for: device))
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: 280)
-                    .help("Double-click the device on the workspace to open http://<IP><path>. Netgear switches default to :49152/v1/base/cheetah_login.html.")
-
-                Picker("Ping NIC", selection: interfaceBinding(for: device)) {
-                    Text("Auto").tag("AUTO")
-
-                    ForEach(store.networkInterfaces) { nic in
-                        Text(nic.pickerTitle).tag(nic.id)
-                    }
-                }
-                .labelsHidden()
-                .frame(minWidth: 300, alignment: .leading)
-            }
-            .padding(10)
-            .background(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(Color.white.opacity(0.06))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
-            )
+        init(store: DeviceStore, preferences: AppPreferences) {
+            self.store = store
+            self.preferences = preferences
         }
-    }
 
-    private func nameBinding(for device: MonitoredDevice) -> Binding<String> {
-        Binding(
-            get: { currentDevice()?.name ?? device.name },
-            set: { store.updateDeviceName(id: deviceID, name: $0) }
-        )
-    }
+        // MARK: Column setup
 
+        func configureColumns(on table: NSTableView) {
+            guard !isConfiguringColumns else { return }
+            isConfiguringColumns = true
+            defer { isConfiguringColumns = false }
 
-    private func automaticNameBinding(for device: MonitoredDevice) -> Binding<Bool> {
-        Binding(
-            get: { (currentDevice() ?? device).nameSource == .automatic },
-            set: { useAutomaticName in
-                store.updateDeviceNameSource(id: deviceID, source: useAutomaticName ? .automatic : .manual)
+            let savedOrder = preferences.deviceManagerColumnOrder
+            let order: [DeviceManagerColumn] = savedOrder.isEmpty
+                ? DeviceManagerColumn.allCases
+                : savedOrder.compactMap { DeviceManagerColumn(rawValue: $0) }
+            let allCovered = DeviceManagerColumn.allCases.allSatisfy { col in order.contains(col) }
+            let finalOrder = allCovered ? order : DeviceManagerColumn.allCases
+
+            let existing = table.tableColumns.map { $0.identifier.rawValue }
+            let desired  = finalOrder.map { $0.rawValue }
+            if existing == desired { return }
+
+            table.tableColumns.forEach { table.removeTableColumn($0) }
+
+            for col in finalOrder {
+                let tc = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(col.rawValue))
+                tc.title = col.title
+                let saved = preferences.deviceManagerColumnWidths[col.rawValue].map { CGFloat($0) }
+                tc.width = max(col.minWidth, saved ?? col.defaultWidth)
+                tc.minWidth = col.minWidth
+                tc.maxWidth = 600
+                table.addTableColumn(tc)
             }
-        )
-    }
+        }
 
-    private func ipAddressBinding(for device: MonitoredDevice) -> Binding<String> {
-        Binding(
-            get: { currentDevice()?.ipAddress ?? device.ipAddress },
-            set: { store.updateDeviceIPAddress(id: deviceID, ipAddress: $0) }
-        )
-    }
+        // MARK: Data source
 
-    private func deviceTypeBinding(for device: MonitoredDevice) -> Binding<MonitoredDeviceType> {
-        Binding(
-            get: { currentDevice()?.deviceType ?? device.deviceType },
-            set: { store.updateDeviceType(id: deviceID, type: $0) }
-        )
-    }
+        func numberOfRows(in tableView: NSTableView) -> Int { store.devices.count }
 
-    private func webInterfacePathBinding(for device: MonitoredDevice) -> Binding<String> {
-        Binding(
-            get: { currentDevice()?.webInterfacePath ?? device.webInterfacePath },
-            set: { store.updateDeviceWebInterfacePath(id: deviceID, path: $0) }
-        )
-    }
+        func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
+            guard row < store.devices.count,
+                  let id = tableColumn?.identifier.rawValue,
+                  let col = DeviceManagerColumn(rawValue: id) else { return nil }
 
-    private func interfaceBinding(for device: MonitoredDevice) -> Binding<String> {
-        Binding(
-            get: {
-                guard let current = currentDevice() else { return "AUTO" }
-                guard let interfaceName = current.sourceInterfaceName,
-                      let sourceIP = current.sourceIPAddress else {
-                    return "AUTO"
+            let device = store.devices[row]
+            let cellID = NSUserInterfaceItemIdentifier("DevMgrCell-\(id)")
+
+            switch col {
+            case .nameSource:
+                let cell = tableView.makeView(withIdentifier: NSUserInterfaceItemIdentifier("DevMgrCheck-\(id)"), owner: self) as? NSTableCellView ?? NSTableCellView()
+                cell.identifier = NSUserInterfaceItemIdentifier("DevMgrCheck-\(id)")
+                let btn: NSButton
+                if let existing = cell.subviews.first as? NSButton {
+                    btn = existing
+                } else {
+                    btn = NSButton(checkboxWithTitle: "Auto", target: nil, action: nil)
+                    btn.translatesAutoresizingMaskIntoConstraints = false
+                    cell.addSubview(btn)
+                    NSLayoutConstraint.activate([
+                        btn.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 6),
+                        btn.centerYAnchor.constraint(equalTo: cell.centerYAnchor)
+                    ])
+                }
+                btn.state = device.nameSource == .automatic ? .on : .off
+                btn.tag = row
+                btn.target = self
+                btn.action = #selector(toggleNameSource(_:))
+                return cell
+
+            case .deviceType:
+                let cell = tableView.makeView(withIdentifier: NSUserInterfaceItemIdentifier("DevMgrPopup-deviceType-\(row)"), owner: self) as? NSTableCellView ?? NSTableCellView()
+                cell.identifier = NSUserInterfaceItemIdentifier("DevMgrPopup-deviceType-\(row)")
+                let popup: NSPopUpButton
+                if let existing = cell.subviews.first as? NSPopUpButton {
+                    popup = existing
+                } else {
+                    popup = NSPopUpButton()
+                    popup.translatesAutoresizingMaskIntoConstraints = false
+                    popup.isBordered = false
+                    cell.addSubview(popup)
+                    NSLayoutConstraint.activate([
+                        popup.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 2),
+                        popup.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -2),
+                        popup.centerYAnchor.constraint(equalTo: cell.centerYAnchor)
+                    ])
+                }
+                popup.removeAllItems()
+                MonitoredDeviceType.allCases.forEach { popup.addItem(withTitle: $0.label) }
+                popup.selectItem(withTitle: device.deviceType.label)
+                popup.tag = row
+                popup.target = self
+                popup.action = #selector(deviceTypeChanged(_:))
+                return cell
+
+            case .pingNIC:
+                let cell = tableView.makeView(withIdentifier: NSUserInterfaceItemIdentifier("DevMgrPopup-nic-\(row)"), owner: self) as? NSTableCellView ?? NSTableCellView()
+                cell.identifier = NSUserInterfaceItemIdentifier("DevMgrPopup-nic-\(row)")
+                let popup: NSPopUpButton
+                if let existing = cell.subviews.first as? NSPopUpButton {
+                    popup = existing
+                } else {
+                    popup = NSPopUpButton()
+                    popup.translatesAutoresizingMaskIntoConstraints = false
+                    popup.isBordered = false
+                    cell.addSubview(popup)
+                    NSLayoutConstraint.activate([
+                        popup.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 2),
+                        popup.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -2),
+                        popup.centerYAnchor.constraint(equalTo: cell.centerYAnchor)
+                    ])
+                }
+                popup.removeAllItems()
+                popup.addItem(withTitle: "Auto")
+                store.networkInterfaces.forEach { popup.addItem(withTitle: $0.pickerTitle) }
+                let currentNIC: String
+                if let bsd = device.sourceInterfaceName, let ip = device.sourceIPAddress,
+                   let match = store.networkInterfaces.first(where: { $0.bsdName == bsd && $0.ipv4Address == ip }) {
+                    currentNIC = match.pickerTitle
+                } else {
+                    currentNIC = "Auto"
+                }
+                popup.selectItem(withTitle: currentNIC)
+                popup.tag = row
+                popup.target = self
+                popup.action = #selector(nicChanged(_:))
+                return cell
+
+            default:
+                let editable: Bool
+                switch col {
+                case .name:          editable = device.nameSource != .automatic
+                case .snmpCommunity: editable = device.deviceType == .netgearSwitch
+                case .ipAddress, .urlPrefix, .webUIPath: editable = true
+                default:             editable = false
                 }
 
-                return store.networkInterfaces.first {
-                    $0.bsdName == interfaceName && $0.ipv4Address == sourceIP
-                }?.id ?? "AUTO"
-            },
-            set: { store.updateDeviceInterface(id: deviceID, interfaceID: $0) }
-        )
-    }
+                let cell = tableView.makeView(withIdentifier: cellID, owner: self) as? NSTableCellView ?? NSTableCellView()
+                cell.identifier = cellID
+                let tf: NSTextField
+                if let existing = cell.textField {
+                    tf = existing
+                } else {
+                    tf = NSTextField(frame: .zero)
+                    tf.translatesAutoresizingMaskIntoConstraints = false
+                    tf.font = NSFont.systemFont(ofSize: 12)
+                    tf.cell?.wraps = false
+                    tf.cell?.isScrollable = true
+                    cell.addSubview(tf)
+                    cell.textField = tf
+                    NSLayoutConstraint.activate([
+                        tf.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 4),
+                        tf.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -4),
+                        tf.centerYAnchor.constraint(equalTo: cell.centerYAnchor)
+                    ])
+                }
+                tf.stringValue = cellText(col: col, device: device)
+                tf.isEditable = editable
+                tf.isSelectable = editable
+                tf.isBordered = editable
+                tf.isBezeled = editable
+                tf.bezelStyle = editable ? .roundedBezel : .squareBezel
+                tf.drawsBackground = editable
+                tf.alphaValue = editable ? 1.0 : 0.4
+                tf.textColor = editable ? .labelColor : .secondaryLabelColor
+                tf.delegate = self
+                tf.tag = row * 100 + columnTag(col)
+                return cell
+            }
+        }
 
-    private func currentDevice() -> MonitoredDevice? {
-        store.devices.first { $0.id == deviceID }
+        private func cellText(col: DeviceManagerColumn, device: MonitoredDevice) -> String {
+            switch col {
+            case .name: return device.displayName.isEmpty ? device.name : device.name
+            case .ipAddress: return device.ipAddress
+            case .snmpCommunity: return device.snmpCommunity
+            case .urlPrefix: return device.webInterfacePrefix
+            case .webUIPath: return device.webInterfacePath
+            default: return ""
+            }
+        }
+
+        private func columnTag(_ col: DeviceManagerColumn) -> Int {
+            switch col {
+            case .name: return 1
+            case .ipAddress: return 2
+            case .snmpCommunity: return 3
+            case .urlPrefix: return 4
+            case .webUIPath: return 5
+            default: return 0
+            }
+        }
+
+        // MARK: NSTextFieldDelegate
+
+        func controlTextDidEndEditing(_ obj: Notification) {
+            guard let tf = obj.object as? NSTextField else { return }
+            let row = tf.tag / 100
+            let colTag = tf.tag % 100
+            guard row >= 0, row < store.devices.count else { return }
+            let device = store.devices[row]
+            let value = tf.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                switch colTag {
+                case 1: self.store.updateDevice(id: device.id, name: value.isEmpty ? device.name : value, ipAddress: device.ipAddress)
+                case 2: self.store.updateDevice(id: device.id, name: device.name, ipAddress: value)
+                case 3: self.store.updateDeviceSNMPCommunity(id: device.id, community: value.isEmpty ? "public" : value)
+                case 4: self.store.updateDeviceWebInterfacePrefix(id: device.id, prefix: value)
+                case 5: self.store.updateDeviceWebInterfacePath(id: device.id, path: value)
+                default: break
+                }
+            }
+        }
+
+        // MARK: Popup actions
+
+        @objc private func toggleNameSource(_ sender: NSButton) {
+            let row = sender.tag
+            guard row < store.devices.count else { return }
+            let device = store.devices[row]
+            let newSource: DeviceNameSource = sender.state == .on ? .automatic : .manual
+            store.updateDeviceNameSource(id: device.id, source: newSource)
+        }
+
+        @objc private func deviceTypeChanged(_ sender: NSPopUpButton) {
+            let row = sender.tag
+            guard row < store.devices.count else { return }
+            let device = store.devices[row]
+            guard let title = sender.selectedItem?.title,
+                  let type = MonitoredDeviceType.allCases.first(where: { $0.label == title }) else { return }
+            store.updateDeviceType(id: device.id, type: type)
+            tableView?.reloadData(forRowIndexes: IndexSet(integer: row), columnIndexes: IndexSet(0..<(tableView?.numberOfColumns ?? 0)))
+        }
+
+        @objc private func nicChanged(_ sender: NSPopUpButton) {
+            let row = sender.tag
+            guard row < store.devices.count else { return }
+            let device = store.devices[row]
+            guard let title = sender.selectedItem?.title else { return }
+            if title == "Auto" {
+                store.updateDeviceInterface(id: device.id, interfaceID: "AUTO")
+            } else if let nic = store.networkInterfaces.first(where: { $0.pickerTitle == title }) {
+                store.updateDeviceInterface(id: device.id, interfaceID: nic.id)
+            }
+        }
+
+        // MARK: Column move / resize → save preferences
+
+        func tableViewColumnDidMove(_ notification: Notification) {
+            guard !isConfiguringColumns, let table = tableView else { return }
+            let order = table.tableColumns.map { $0.identifier.rawValue }
+            preferences.deviceManagerColumnOrder = order
+        }
+
+        func tableViewColumnDidResize(_ notification: Notification) {
+            guard !isConfiguringColumns, let table = tableView else { return }
+            var widths = preferences.deviceManagerColumnWidths
+            for col in table.tableColumns {
+                widths[col.identifier.rawValue] = Double(col.width)
+            }
+            preferences.deviceManagerColumnWidths = widths
+        }
     }
 }
 
