@@ -1,40 +1,40 @@
-Title,Body,Status,Priority
-Packet loss % per device,"Track success/fail per ping cycle with a rolling 50-sample window. Display in inspector with green/orange/red colour coding.",Done,High
-Jitter measurement,"Calculate average RTT variance between consecutive pings. Display in inspector with AVB/Milan-aware colour thresholds and alert integration.",Done,High
-Uptime counter,"Track how long a device has been continuously online since last recovery. Display in inspector.",Done,High
-RTT sparkline graph in inspector,"Display a live line graph of the last 60 RTT samples in the device inspector with min/max labels.",Done,High
-MAC address display,"ARP lookup per device displayed in inspector with on-demand Lookup button.",Done,High
-Zone system,"Colour-code devices by zone name with a persistent left-strip indicator on each tile. Zone field in inspector.",Done,High
-Workspace search bar,"Sidebar search field that filters devices by name, IP, or zone. Non-matching devices dim to 22% opacity.",Done,High
-Per-device ping monitoring toggle,"Allow individual devices to be excluded from all ping cycles via toggle in the inspector and group edit.",Done,High
-Per-device SNMP/LLDP toggle,"Allow individual Netgear switches to be excluded from telemetry polling via toggle in the inspector and group edit.",Done,High
-Device Debug window,"Password-protected debug window showing a snapshot of internal monitoring state per device including ping engine, verification, SNMP, and topology data.",Done,High
-Device Manager overhaul,"Rebuilt as NSTableView with resizable and reorderable columns. Column layout saved to preferences. Auto-scales to screen. Scrollable.",Done,High
-Group edit in inspector,"Select multiple devices to bulk-set zone, device type, SNMP community, ping monitoring, and SNMP monitoring in one action.",Done,High
-Last Seen display fix,"Offline tile badge shows Last Seen HH:mm:ss. Never Seen for devices not yet reached. Resets on boot.",Done,High
-Inspector responsiveness fix,"Inspector now renders as a permanent overlay with no layout shift on selection. Removed 500ms delay caused by refreshNetworkInterfaces on appear.",Done,High
-URL Prefix field per device,"Separate prefix field (e.g. http:// or https://) from the URL suffix in Device Manager. Netgear switches default to http://.",Done,Medium
-Alert export to CSV,"Export filtered Console Output entries as CSV via NSSavePanel from the Console Output debug window.",Done,Medium
-SNMP CPU usage per switch,"Poll CPU load OID on Netgear M4250/M4350 switches during the existing SNMP telemetry pass. Display in inspector and tile badge.",Backlog,High
-SNMP memory usage per switch,"Poll memory utilisation OID on Netgear switches during the existing SNMP pass. Display alongside CPU in inspector.",Backlog,High
-Port up/down visual indicator in Device Ports,"Colour-code each row in the Device Ports table based on the existing isUp field — green for up, red/grey for down.",Backlog,High
-Per-device ping interval override,"Allow individual devices to have a custom ping interval rather than inheriting the global setting.",Backlog,Medium
-STP alert detection,"Detect spanning tree topology changes via SNMP and raise an alert. STP changes cause AVB clock disruption.",Backlog,Medium
-AVB clock master alert,"Detect AVB clock domain changes via LLDP neighbour data and alert when the clock master changes unexpectedly.",Backlog,Medium
-Historical temperature graph,"Temperature history samples are already stored per device. Add a graph view in the inspector to show the trend over time.",Backlog,Medium
-Switch port utilisation %,"Show bandwidth in/out per port as a percentage of link speed, pulled from SNMP during the existing telemetry pass.",Backlog,Medium
-Historical RTT graph,"Expand the existing inspector sparkline into a full-size RTT history graph with min/avg/max overlays.",Backlog,Medium
-Device notes field,"Freetext notes field per device in the inspector. Useful for rack location, owner, or show-specific annotations.",Backlog,Medium
-Packet loss graph over time,"Store rolling packet loss history and display as a graph in the inspector, not just the current percentage.",Backlog,Medium
-Fibre loss trend alert,"Alert when fibre loss on a link is worsening over successive measurements rather than just crossing a static threshold.",Backlog,Low
-SFP temperature history,"Store SFP temperature samples over time and display as a graph, using the same pattern as switch temperature history.",Backlog,Low
-Jitter trend graph,"Store rolling jitter history per device and show as a graph in the inspector.",Backlog,Low
-Historical port statistics,"Track Tx/Rx counters over time per port in the Device Ports view.",Backlog,Low
-VLAN display per port,"Show the VLAN assignment for each port in the Device Ports table via SNMP.",Backlog,Low
-Auto-layout algorithm,"Automatically place devices on the workspace canvas based on LLDP topology data when first discovered.",Backlog,Low
-Multiple workspace layers,"Add a layer toggle (e.g. Physical / Logical / AVB) to show/hide different aspects of the network on the canvas.",Backlog,Low
-Device icon / custom image,"Allow engineers to assign a custom icon to a device to distinguish amps, switches, PCs, and other hardware on the canvas.",Backlog,Low
-Workspace templates,"Pre-built workspace layouts for common show configurations such as festival PA, theatre, or corporate AV.",Backlog,Low
-Fibre link persistence improvements,"Ensure fibre links survive device renames and IP changes without needing to be redrawn.",Backlog,Low
-Remote collector support,"Run Mping headless on a networked Mac and view monitoring data remotely from a separate machine.",Backlog,Low
-Windows support (monitoring engine),"Port the monitoring engine layer to Windows. The engines are designed to be platform-independent. UI can remain macOS-native.",Backlog,Low
+Title|Body|State|Priority
+Packet loss % per device|Track success/fail per ping cycle with a rolling 50-sample window. Display in inspector with colour coding.|done|high
+Jitter measurement|Calculate average RTT variance between consecutive pings. Display in inspector with AVB/Milan-aware colour thresholds and alert integration.|done|high
+Uptime counter|Track how long a device has been continuously online since last recovery. Display in inspector.|done|high
+RTT sparkline graph in inspector|Display a live line graph of the last 60 RTT samples in the device inspector with min/max labels.|done|high
+MAC address display|ARP lookup per device displayed in inspector with on-demand Lookup button.|done|high
+Zone system|Colour-code devices by zone name with a persistent left-strip indicator on each tile. Zone field in inspector.|done|high
+Workspace search bar|Sidebar search field that filters devices by name, IP, or zone. Non-matching devices dim to 22% opacity.|done|high
+Per-device ping monitoring toggle|Allow individual devices to be excluded from all ping cycles via toggle in the inspector and group edit.|done|high
+Per-device SNMP/LLDP toggle|Allow individual Netgear switches to be excluded from telemetry polling via toggle in the inspector and group edit.|done|high
+Device Debug window|Password-protected debug window showing a snapshot of internal monitoring state per device.|done|high
+Device Manager overhaul|Rebuilt as NSTableView with resizable and reorderable columns. Column layout saved to preferences. Auto-scales to screen.|done|high
+Group edit in inspector|Select multiple devices to bulk-set zone, device type, SNMP community, ping monitoring and SNMP monitoring in one action.|done|high
+Last Seen display fix|Offline tile badge shows Last Seen HH:mm:ss. Never Seen for devices not yet reached. Resets on boot.|done|high
+Inspector responsiveness fix|Inspector now renders as a permanent overlay with no layout shift on selection. Removed 500ms delay on appear.|done|high
+URL Prefix field per device|Separate prefix field (e.g. http:// or https://) from the URL suffix in Device Manager. Netgear switches default to http://.|done|medium
+Alert export to CSV|Export filtered Console Output entries as CSV via NSSavePanel from the Console Output debug window.|done|medium
+SNMP CPU usage per switch|Poll CPU load OID on Netgear M4250/M4350 switches during the existing SNMP telemetry pass. Display in inspector and tile badge.|backlog|high
+SNMP memory usage per switch|Poll memory utilisation OID on Netgear switches during the existing SNMP pass. Display alongside CPU in inspector.|backlog|high
+Port up/down visual indicator in Device Ports|Colour-code each row in the Device Ports table based on the existing isUp field - green for up and red/grey for down.|backlog|high
+Per-device ping interval override|Allow individual devices to have a custom ping interval rather than inheriting the global setting.|backlog|medium
+STP alert detection|Detect spanning tree topology changes via SNMP and raise an alert. STP changes cause AVB clock disruption.|backlog|medium
+AVB clock master alert|Detect AVB clock domain changes via LLDP neighbour data and alert when the clock master changes unexpectedly.|backlog|medium
+Historical temperature graph|Temperature history samples are already stored per device. Add a graph view in the inspector to show the trend over time.|backlog|medium
+Switch port utilisation %|Show bandwidth in/out per port as a percentage of link speed pulled from SNMP during the existing telemetry pass.|backlog|medium
+Historical RTT graph|Expand the existing inspector sparkline into a full-size RTT history graph with min/avg/max overlays.|backlog|medium
+Device notes field|Freetext notes field per device in the inspector. Useful for rack location, owner, or show-specific annotations.|backlog|medium
+Packet loss graph over time|Store rolling packet loss history and display as a graph in the inspector not just the current percentage.|backlog|medium
+Fibre loss trend alert|Alert when fibre loss on a link is worsening over successive measurements rather than just crossing a static threshold.|backlog|low
+SFP temperature history|Store SFP temperature samples over time and display as a graph using the same pattern as switch temperature history.|backlog|low
+Jitter trend graph|Store rolling jitter history per device and show as a graph in the inspector.|backlog|low
+Historical port statistics|Track Tx/Rx counters over time per port in the Device Ports view.|backlog|low
+VLAN display per port|Show the VLAN assignment for each port in the Device Ports table via SNMP.|backlog|low
+Auto-layout algorithm|Automatically place devices on the workspace canvas based on LLDP topology data when first discovered.|backlog|low
+Multiple workspace layers|Add a layer toggle (e.g. Physical / Logical / AVB) to show and hide different aspects of the network on the canvas.|backlog|low
+Device icon / custom image|Allow engineers to assign a custom icon to a device to distinguish amps, switches, PCs and other hardware on the canvas.|backlog|low
+Workspace templates|Pre-built workspace layouts for common show configurations such as festival PA, theatre, or corporate AV.|backlog|low
+Fibre link persistence improvements|Ensure fibre links survive device renames and IP changes without needing to be redrawn.|backlog|low
+Remote collector support|Run Mping headless on a networked Mac and view monitoring data remotely from a separate machine.|backlog|low
+Windows support (monitoring engine)|Port the monitoring engine layer to Windows. The engines are designed to be platform-independent. UI can remain macOS-native.|backlog|low
