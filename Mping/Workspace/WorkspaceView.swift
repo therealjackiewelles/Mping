@@ -481,7 +481,6 @@ private struct MpingMapDeviceTileView: View, Equatable {
             && lhs.device.y == rhs.device.y
             && lhs.device.status == rhs.device.status
             && lhs.device.lastRTT == rhs.device.lastRTT
-            && lhs.device.pingRTTHistory == rhs.device.pingRTTHistory
             && lhs.device.pingPulseID == rhs.device.pingPulseID
             && lhs.device.deviceType == rhs.device.deviceType
             && lhs.device.switchTelemetry.temperatureCelsius == rhs.device.switchTelemetry.temperatureCelsius

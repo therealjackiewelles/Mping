@@ -285,82 +285,86 @@ final class DeviceStore: ObservableObject {
 
         markDevicesAsPinging(ids: snapshot.map(\.id), checkedAt: Date())
 
-        for item in snapshot {
-            Task { [weak self] in
-                let result = await PingEngine.ping(
-                    ipAddress: item.ip,
-                    timeoutMilliseconds: timeout,
-                    sourceIPAddress: item.sourceIP,
-                    sourceInterfaceName: item.sourceInterfaceName,
-                    deviceID: item.id,
-                    deviceLabel: item.name
-                )
-
-                await MainActor.run {
-                    guard let self else { return }
-
-                    let checkedAt = Date()
-                    var updatedDevice: MonitoredDevice?
-                    var shouldVerifyOffline = false
-                    var shouldVerifyOnline = false
-
-                    self.updateDeviceRuntime(id: item.id) { device in
-                        let wasOffline = device.status == .offline
-                        device.recordPingResult(result.rtt)
-                        device.recordPingAttempt(success: result.status != .offline)
-                        device.lastChecked = checkedAt
-                        if result.status != .offline {
-                            device.lastSeenOnline = checkedAt
-                        }
-                        device.isPinging = false
-
-                        if result.status == .offline {
-                            if wasOffline {
-                                device.verificationState = .offline
-                                updatedDevice = device
-                            } else {
-                                device.verificationState = .verifyingOffline
-                                shouldVerifyOffline = true
-                            }
-                        } else if wasOffline {
-                            device.verificationState = .verifyingOnline
-                            shouldVerifyOnline = true
-                        } else {
-                            device.verificationState = .online
-                            device.verificationFailures.removeAll(keepingCapacity: false)
-                            self.pingVerificationFailuresByDeviceID[item.id] = nil
-                            device.status = self.effectiveRuntimeStatus(for: device, pingStatus: result.status)
-                            if device.currentOnlineSince == nil {
-                                device.currentOnlineSince = checkedAt
-                            }
-                            updatedDevice = device
-                        }
-                    }
-
-                    if shouldVerifyOffline {
-                        self.startOfflinePingVerification(
-                            id: item.id,
-                            ipAddress: item.ip,
-                            timeoutMilliseconds: timeout,
-                            sourceInterfaceName: item.sourceInterfaceName,
-                            sourceIPAddress: item.sourceIP,
-                            deviceLabel: item.name
-                        )
-                    } else if shouldVerifyOnline {
-                        self.startOnlinePingVerification(
-                            id: item.id,
-                            ipAddress: item.ip,
-                            timeoutMilliseconds: timeout,
-                            sourceInterfaceName: item.sourceInterfaceName,
-                            sourceIPAddress: item.sourceIP,
-                            deviceLabel: item.name
-                        )
-                    } else if let updatedDevice {
-                        self.evaluatePingAlerts(for: updatedDevice)
-                    }
+        // Run all pings concurrently, then apply ALL results in a single MainActor block.
+        // This reduces SwiftUI render passes from N (one per ping result) to 1 per cycle.
+        typealias PingBatchItem = (id: UUID, ip: String, sourceIP: String?, sourceInterfaceName: String?, name: String, result: PingEngine.PingResult)
+        var batchResults: [PingBatchItem] = []
+        await withTaskGroup(of: PingBatchItem.self) { group in
+            for item in snapshot {
+                group.addTask {
+                    let result = await PingEngine.ping(
+                        ipAddress: item.ip,
+                        timeoutMilliseconds: timeout,
+                        sourceIPAddress: item.sourceIP,
+                        sourceInterfaceName: item.sourceInterfaceName,
+                        deviceID: item.id,
+                        deviceLabel: item.name
+                    )
+                    return (item.id, item.ip, item.sourceIP, item.sourceInterfaceName, item.name, result)
                 }
             }
+            for await item in group { batchResults.append(item) }
         }
+
+        await MainActor.run { [weak self] in
+            guard let self else { return }
+            let checkedAt = Date()
+            var pendingOfflineVerification: [PingBatchItem] = []
+            var pendingOnlineVerification: [PingBatchItem] = []
+
+            for item in batchResults {
+                // Inline the per-device update against a local copy via updateDeviceRuntime
+                // (which still mutates self.devices[index] directly — all mutations happen
+                // within this single MainActor block so SwiftUI coalesces into one render pass).
+                var updatedDevice: MonitoredDevice?
+
+                self.updateDeviceRuntime(id: item.id) { device in
+                    let wasOffline = device.status == .offline
+                    device.recordPingResult(item.result.rtt)
+                    device.recordPingAttempt(success: item.result.status != .offline)
+                    device.lastChecked = checkedAt
+                    if item.result.status != .offline { device.lastSeenOnline = checkedAt }
+                    device.isPinging = false
+
+                    if item.result.status == .offline {
+                        if wasOffline {
+                            device.verificationState = .offline
+                            updatedDevice = device
+                        } else {
+                            device.verificationState = .verifyingOffline
+                            pendingOfflineVerification.append(item)
+                        }
+                    } else if wasOffline {
+                        device.verificationState = .verifyingOnline
+                        pendingOnlineVerification.append(item)
+                    } else {
+                        device.verificationState = .online
+                        device.verificationFailures.removeAll(keepingCapacity: false)
+                        self.pingVerificationFailuresByDeviceID[item.id] = nil
+                        device.status = self.effectiveRuntimeStatus(for: device, pingStatus: item.result.status)
+                        if device.currentOnlineSince == nil { device.currentOnlineSince = checkedAt }
+                        updatedDevice = device
+                    }
+                }
+
+                if let updatedDevice { self.evaluatePingAlerts(for: updatedDevice) }
+            }
+
+            // Start verification tasks after all devices are updated
+            for item in pendingOfflineVerification {
+                self.startOfflinePingVerification(
+                    id: item.id, ipAddress: item.ip, timeoutMilliseconds: timeout,
+                    sourceInterfaceName: item.sourceInterfaceName, sourceIPAddress: item.sourceIP,
+                    deviceLabel: item.name)
+            }
+            for item in pendingOnlineVerification {
+                self.startOnlinePingVerification(
+                    id: item.id, ipAddress: item.ip, timeoutMilliseconds: timeout,
+                    sourceInterfaceName: item.sourceInterfaceName, sourceIPAddress: item.sourceIP,
+                    deviceLabel: item.name)
+            }
+        }
+
     }
 
     func lookupMACAddress(for deviceID: UUID, ip: String) {

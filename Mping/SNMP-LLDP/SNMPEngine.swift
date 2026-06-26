@@ -70,9 +70,6 @@ enum SNMPEngine {
             ("M4250 direct temperature", "1.3.6.1.4.1.4526.10.1.1.2.1")
         ]
 
-        print("")
-        print("========== MPING SNMP TEMPERATURE ==========")
-        print("Host:", ip)
 
         for column in liveTemperatureColumns {
             do {
@@ -90,13 +87,9 @@ enum SNMPEngine {
                 for value in values {
                     let line = "\(value.oid) = \(value.value.debugDescription)"
                     raw += line + "\n"
-                    print(line)
                 }
 
                 if let candidate = firstTemperatureCandidate(in: values) {
-                    print("Temperature candidate:", candidate.oid, candidate.temperatureCelsius)
-                    print("===========================================")
-                    print("")
 
                     let fibreSummary = await readFibreOpticsSummary(client: client, raw: &raw, deviceID: deviceID, deviceLabel: deviceLabel, ipAddress: ip)
                     let lldpSummary = await readLLDPNeighbourSummary(client: client, raw: &raw, deviceID: deviceID, deviceLabel: deviceLabel, ipAddress: ip)
@@ -125,13 +118,9 @@ enum SNMPEngine {
             } catch {
                 let line = "\(column.0): failed - \(snmpErrorText(error))"
                 raw += line + "\n"
-                print(line)
             }
         }
 
-        print("No live temperature value found in Netgear temperature tables")
-        print("===========================================")
-        print("")
 
         do {
             ConsoleOutputStore.log(
@@ -328,8 +317,6 @@ private func readFibreOpticsSummary(
 
     var readingsByPort: [Int: FibreOpticsReading] = [:]
 
-    print("")
-    print("========== MPING SNMP FIBRE OPTICS ==========")
     raw += "--- Fibre optics/DDM probe using Netgear table 1.3.6.1.4.1.4526.10.43.1.18 ---\n"
 
     for column in fibreColumns {
@@ -345,13 +332,10 @@ private func readFibreOpticsSummary(
         let values = try await client.walk(baseOID: column.oid, maxResults: 80)
 
         raw += "--- \(column.label) \(column.oid) ---\n"
-        print("--- \(column.label) \(column.oid) ---")
-        print("Returned OIDs:", values.count)
 
         for value in values {
             let line = "\(value.oid) = \(value.value.debugDescription)"
             raw += line + "\n"
-            print(line)
 
             guard let port = lastOIDComponent(value.oid) else {
                 continue
@@ -366,7 +350,6 @@ private func readFibreOpticsSummary(
         } catch {
         let line = "\(column.label): failed - \(snmpErrorText(error))"
         raw += line + "\n"
-        print(line)
         ConsoleOutputStore.log(
             subsystem: "SNMP Fibre",
             direction: .error,
@@ -385,9 +368,6 @@ private func readFibreOpticsSummary(
 
     guard !readings.isEmpty else {
         raw += "No fibre optics DDM rows returned from Netgear table 1.3.6.1.4.1.4526.10.43.1.18\n"
-        print("No fibre optics DDM rows returned from Netgear table 1.3.6.1.4.1.4526.10.43.1.18")
-        print("============================================")
-        print("")
         return "Fibre OID not mapped"
     }
 
@@ -422,11 +402,8 @@ private func readFibreOpticsSummary(
 
         let line = parts.joined(separator: " • ")
         raw += line + "\n"
-        print(line)
     }
 
-    print("============================================")
-    print("")
 
     if let worstRx = readings
         .compactMap({ reading -> (FibreOpticsReading, Double)? in
@@ -456,7 +433,9 @@ private func readInterfacePortSummary(
         ("IF-MIB ifAdminStatus", "1.3.6.1.2.1.2.2.1.7"),
         ("IF-MIB ifOperStatus", "1.3.6.1.2.1.2.2.1.8"),
         ("IF-MIB ifHighSpeed", "1.3.6.1.2.1.31.1.1.1.15"),
-        ("IF-MIB ifConnectorPresent", "1.3.6.1.2.1.31.1.1.1.17"),
+        // ifConnectorPresent removed: returns "Physical connector"/"No connector" which
+        // classifyMedium() maps to "Unknown" — no useful classification contributed.
+        // Fibre ports are already correctly classified via DDM fibrePorts data.
         ("EtherLike dot3StatsDuplexStatus", "1.3.6.1.2.1.10.7.2.1.19")
     ]
 
@@ -522,53 +501,15 @@ private func readSTPSummary(
         raw += "--- FASTPATH CST port role 1.3.6.1.4.1.4526.10.1.2.15.9.1.5 ---\n"
         for v in values { raw += "\(v.oid) = \(v.value.displayValue)\n" }
         let blocking = values.filter { $0.value.displayValue == "1" || $0.value.displayValue == "2" }.compactMap { $0.oid.split(separator: ".").last.flatMap { Int($0) } }
-        let hasRootPort = values.contains { $0.value.displayValue == "3" }
-        ConsoleOutputStore.log(subsystem: "SNMP STP", direction: .output, deviceID: deviceID, deviceLabel: deviceLabel, ipAddress: ipAddress, message: "FASTPATH CST roles: \(values.map { "\($0.oid.split(separator: ".").last ?? "?")=\($0.value.displayValue)" }.joined(separator: " ")) | Blocking: \(blocking) | IsRoot: \(!hasRootPort)")
+        // Only log the summary — skip the per-port role dump to reduce ConsoleOutputStore churn
+        if !blocking.isEmpty {
+            ConsoleOutputStore.log(subsystem: "SNMP STP", direction: .output, deviceID: deviceID, deviceLabel: deviceLabel, ipAddress: ipAddress, message: "STP blocking ports: \(blocking)")
+        }
     } catch {
         raw += "FASTPATH CST port role: not available\n"
         ConsoleOutputStore.log(subsystem: "SNMP STP", direction: .error, deviceID: deviceID, deviceLabel: deviceLabel, ipAddress: ipAddress, message: "FASTPATH CST port role walk failed")
     }
 
-    // MSTP CIST root port scalar — value 0 means this switch IS the root bridge
-    do {
-        let value = try await client.get(oid: "1.3.6.1.2.1.17.7.1.1.5.0")
-        raw += "--- MSTP CIST root port 1.3.6.1.2.1.17.7.1.1.5.0 ---\n"
-        raw += "\(value.oid) = \(value.value.displayValue)\n"
-        ConsoleOutputStore.log(subsystem: "SNMP STP", direction: .output, deviceID: deviceID, deviceLabel: deviceLabel, ipAddress: ipAddress, message: "MSTP CIST root port scalar = \(value.value.displayValue) (0 = this switch is root bridge)")
-    } catch {
-        raw += "MSTP CIST root port: not available\n"
-    }
-
-    let scalarOIDs: [(label: String, oid: String)] = [
-        ("dot1dStpDesignatedRoot", "1.3.6.1.2.1.17.2.5.0"),
-        ("dot1dStpRootPort",       "1.3.6.1.2.1.17.2.7.0")
-    ]
-    for item in scalarOIDs {
-        ConsoleOutputStore.log(subsystem: "SNMP STP", direction: .command, deviceID: deviceID, deviceLabel: deviceLabel, ipAddress: ipAddress, message: "GET \(item.oid) • \(item.label)")
-        do {
-            let value = try await client.get(oid: item.oid)
-            raw += "--- \(item.label) \(item.oid) ---\n"
-            raw += "\(value.oid) = \(value.value.displayValue)\n"
-            ConsoleOutputStore.log(subsystem: "SNMP STP", direction: .output, deviceID: deviceID, deviceLabel: deviceLabel, ipAddress: ipAddress, message: "\(item.label) = \(value.value.displayValue)")
-        } catch {
-            raw += "\(item.label): not available\n"
-            ConsoleOutputStore.log(subsystem: "SNMP STP", direction: .error, deviceID: deviceID, deviceLabel: deviceLabel, ipAddress: ipAddress, message: "\(item.label): not available")
-        }
-    }
-
-    do {
-        ConsoleOutputStore.log(subsystem: "SNMP STP", direction: .command, deviceID: deviceID, deviceLabel: deviceLabel, ipAddress: ipAddress, message: "WALK 1.3.6.1.2.1.17.2.15.1.3 • dot1dStpPortState")
-        let values = try await client.walk(baseOID: "1.3.6.1.2.1.17.2.15.1.3", maxResults: 80)
-        raw += "--- dot1dStpPortState 1.3.6.1.2.1.17.2.15.1.3 ---\n"
-        for value in values {
-            raw += "\(value.oid) = \(value.value.displayValue)\n"
-        }
-        let summary = values.map { "\($0.oid.split(separator: ".").last ?? "?")=\($0.value.displayValue)" }.joined(separator: " ")
-        ConsoleOutputStore.log(subsystem: "SNMP STP", direction: .output, deviceID: deviceID, deviceLabel: deviceLabel, ipAddress: ipAddress, message: "Port states: \(summary.isEmpty ? "none returned" : summary)")
-    } catch {
-        raw += "dot1dStpPortState: not available\n"
-        ConsoleOutputStore.log(subsystem: "SNMP STP", direction: .error, deviceID: deviceID, deviceLabel: deviceLabel, ipAddress: ipAddress, message: "dot1dStpPortState walk failed — bridge MIB may not be supported")
-    }
 }
 
 enum STPTelemetryExtractor {
@@ -580,31 +521,17 @@ enum STPTelemetryExtractor {
 
     static func extract(rawOutput: String) -> STPResult {
         let lines = rawOutput.components(separatedBy: "\n")
-
-        var rootBridgeID: String? = nil
-        var hasRootPort = false
-        var mstpCistRootPort: Int? = nil
         var blockedPorts: [Int] = []
         var inPortState = false
-        var inMstpRootPort = false
 
         for line in lines {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
 
-            if (trimmed.contains("dot1dStpPortState") || trimmed.contains("MSTP CIST port state") || trimmed.contains("FASTPATH CST port role")) && trimmed.contains("---") {
-                inPortState = true; inMstpRootPort = false; continue
-            }
-            if trimmed.contains("MSTP CIST root port") && trimmed.contains("---") {
-                inMstpRootPort = true; inPortState = false; continue
+            if trimmed.contains("FASTPATH CST port role") && trimmed.contains("---") {
+                inPortState = true; continue
             }
             if trimmed.hasPrefix("---") {
-                inPortState = false; inMstpRootPort = false; continue
-            }
-
-            if inMstpRootPort, let eqRange = trimmed.range(of: " = ") {
-                let val = String(trimmed[eqRange.upperBound...]).trimmingCharacters(in: .whitespaces)
-                mstpCistRootPort = Int(val)
-                inMstpRootPort = false
+                inPortState = false; continue
             }
 
             if inPortState, trimmed.contains(" = ") {
@@ -613,40 +540,14 @@ enum STPTelemetryExtractor {
                 let valPart = String(trimmed[eqRange.upperBound...]).trimmingCharacters(in: .whitespaces)
                 guard let state = Int(valPart) else { continue }
                 guard let port = oidPart.split(separator: ".").last.flatMap({ Int($0) }) else { continue }
-
-                if state == 1 || state == 2 {
-                    // FASTPATH CST port role: 1=Alternate(blocking), 2=Backup(blocking)
-                    // Only include physical ports — LAG/CPU/VLAN start at ifIndex 49.
-                    if port < 49 {
-                        blockedPorts.append(port)
-                    }
-                } else if state == 3 {
-                    // Role 3 = Root port — this switch is NOT the root bridge.
-                    hasRootPort = true
+                // 1=Alternate(blocking), 2=Backup(blocking). Only physical ports (LAG/CPU start at 49).
+                if (state == 1 || state == 2) && port < 49 {
+                    blockedPorts.append(port)
                 }
             }
         }
 
-        // Root bridge detection: role 3 covers both Root AND Designated forwarding ports,
-        // so hasRootPort is always true and isRoot always false. Disabled until a reliable
-        // root-vs-designated distinguishing OID is found.
-        let isRoot = false
-        return STPResult(rootBridgeID: rootBridgeID, isRootBridge: isRoot, blockedPorts: blockedPorts)
-    }
-
-    private static func formatBridgeID(_ raw: String) -> String {
-        // Bridge ID is 8 bytes: 2-byte priority + 6-byte MAC.
-        // displayValue returns space/colon/dash separated hex e.g. "80 00 aa bb cc dd ee ff"
-        let cleaned = raw.replacingOccurrences(of: "\"", with: "").trimmingCharacters(in: .whitespaces)
-        let parts = cleaned.components(separatedBy: CharacterSet(charactersIn: ": -"))
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty && $0.allSatisfy({ $0.isHexDigit }) }
-        if parts.count >= 8 {
-            let priority = (Int(parts[0], radix: 16) ?? 0) * 256 + (Int(parts[1], radix: 16) ?? 0)
-            let mac = parts[2...7].joined(separator: ":").uppercased()
-            return "Priority \(priority) — \(mac)"
-        }
-        return cleaned.isEmpty ? "Unknown" : cleaned
+        return STPResult(rootBridgeID: nil, isRootBridge: false, blockedPorts: blockedPorts)
     }
 }
 
