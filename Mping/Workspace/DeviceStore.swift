@@ -188,6 +188,10 @@ final class DeviceStore: ObservableObject {
         self.legacySaveURL = folder.appendingPathComponent("workspace.json")
         self.workingStateURL = folder.appendingPathComponent("Working Workspace.mpingstate")
 
+        if UserDefaults.standard.bool(forKey: "mping.clearTopologyLinksOnBoot") {
+            FibreAutoLinkBuilder.clearAllRememberedLinks()
+        }
+
         refreshNetworkInterfaces()
         loadStartupWorkspace()
 
@@ -837,6 +841,31 @@ final class DeviceStore: ObservableObject {
                 deviceChanged = true
             }
 
+            let stp = STPTelemetryExtractor.extract(rawOutput: result.rawOutput)
+            if device.switchTelemetry.stpIsRootBridge != stp.isRootBridge {
+                device.switchTelemetry.stpIsRootBridge = stp.isRootBridge
+                deviceChanged = true
+                topologyChangedForDevice = true  // triggers tile re-render via Equatable + topology rebuild
+            }
+            if device.switchTelemetry.stpRootBridgeID != stp.rootBridgeID {
+                device.switchTelemetry.stpRootBridgeID = stp.rootBridgeID
+                deviceChanged = true
+            }
+            if device.switchTelemetry.stpBlockedPorts != stp.blockedPorts {
+                device.switchTelemetry.stpBlockedPorts = stp.blockedPorts
+                deviceChanged = true
+                topologyChangedForDevice = true  // triggers topology rebuild → dashed lines update
+            }
+
+            ConsoleOutputStore.log(
+                subsystem: "SNMP STP",
+                direction: .info,
+                deviceID: id,
+                deviceLabel: device.displayName,
+                ipAddress: device.ipAddress,
+                message: "STP extracted — isRoot: \(stp.isRootBridge) | blockedPorts: \(stp.blockedPorts)"
+            )
+
             guard deviceChanged else { continue }
 
             updatedDevices[index] = device
@@ -903,6 +932,17 @@ final class DeviceStore: ObservableObject {
         let key = fibreLabelOffsetKey(for: result, endpoint: endpoint)
         fibreLabelOffsets[key] = PersistedFibreLabelOffset(width: Double(offset.width), height: Double(offset.height))
         markWorkspaceDirty()
+    }
+
+    func clearAllTopologyLinks() {
+        FibreAutoLinkBuilder.clearAllRememberedLinks()
+        cachedFibreResults = []
+        refreshCachedFibreResults()
+    }
+
+    func rebuildFibreTopology() {
+        cachedFibreResults = []
+        refreshCachedFibreResults()
     }
 
     func fibreBoxStyleDidChange() {
@@ -1084,6 +1124,8 @@ final class DeviceStore: ObservableObject {
         var activeFibreKeys = Set<String>()
 
         for result in results {
+            guard !result.isMissing else { continue }
+
             let lossValues = [result.lossAToB, result.lossBToA].compactMap { $0 }
             let worstLoss = lossValues.max()
             let hasNoSignal = result.status == .noSignal

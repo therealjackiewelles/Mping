@@ -1834,6 +1834,7 @@ private struct DeviceDebugRow: View {
                     identitySection
                     if device.sourceInterfaceName != nil || device.sourceIPAddress != nil { interfaceSection }
                     if device.deviceType == .netgearSwitch { snmpSection }
+                    if device.deviceType == .netgearSwitch { stpSection }
                     if !device.switchTelemetry.lldpNeighbours.isEmpty || !device.switchTelemetry.devicePorts.isEmpty { topologySection }
                 }
                 .padding(.horizontal, 12)
@@ -1947,6 +1948,29 @@ private struct DeviceDebugRow: View {
             row("SNMP Status",     value: device.switchTelemetry.snmpStatusText ?? "—")
             row("Temperature",     value: device.switchTelemetry.temperatureCelsius.map { String(format: "%.1f°C", $0) } ?? "—")
             row("Fibre Ports",     value: "\(device.switchTelemetry.fibrePorts.count)")
+        }
+    }
+
+    private var stpSection: some View {
+        debugSection(title: "STP / RSTP") {
+            row("STP Monitoring",    value: device.snmpMonitoringEnabled ? "Active" : "Disabled")
+            row("Root Bridge",       value: device.switchTelemetry.stpIsRootBridge ? "Yes — this switch is root" : "No",
+                valueColor: device.switchTelemetry.stpIsRootBridge ? .yellow : .primary)
+            if let rootID = device.switchTelemetry.stpRootBridgeID {
+                row("Root Bridge ID",  value: rootID, mono: true)
+            }
+
+            let blocked = device.switchTelemetry.stpBlockedPorts
+            if blocked.isEmpty {
+                row("Blocking Ports",  value: "None — all ports forwarding")
+            } else {
+                row("Blocking Ports",  value: blocked.map { "0/\($0)" }.joined(separator: ", "),
+                    valueColor: .orange)
+            }
+
+            let upPorts   = device.switchTelemetry.devicePorts.filter { $0.isUp }.count
+            let totalPorts = device.switchTelemetry.devicePorts.count
+            row("Ports Up",          value: "\(upPorts) / \(totalPorts)")
         }
     }
 

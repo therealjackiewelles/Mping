@@ -103,6 +103,9 @@ struct SwitchTelemetry: Codable, Equatable, Sendable {
     var fibrePorts: [FibrePortTelemetry]
     var lldpNeighbours: [LLDPNeighbour]
     var devicePorts: [DevicePortTelemetry]
+    var stpRootBridgeID: String?
+    var stpIsRootBridge: Bool
+    var stpBlockedPorts: [Int]
 
     init(
         temperatureCelsius: Double? = nil,
@@ -110,7 +113,10 @@ struct SwitchTelemetry: Codable, Equatable, Sendable {
         snmpStatusText: String? = nil,
         fibrePorts: [FibrePortTelemetry] = [],
         lldpNeighbours: [LLDPNeighbour] = [],
-        devicePorts: [DevicePortTelemetry] = []
+        devicePorts: [DevicePortTelemetry] = [],
+        stpRootBridgeID: String? = nil,
+        stpIsRootBridge: Bool = false,
+        stpBlockedPorts: [Int] = []
     ) {
         self.temperatureCelsius = temperatureCelsius
         self.lastSNMPChecked = lastSNMPChecked
@@ -118,6 +124,9 @@ struct SwitchTelemetry: Codable, Equatable, Sendable {
         self.fibrePorts = fibrePorts
         self.lldpNeighbours = lldpNeighbours
         self.devicePorts = devicePorts
+        self.stpRootBridgeID = stpRootBridgeID
+        self.stpIsRootBridge = stpIsRootBridge
+        self.stpBlockedPorts = stpBlockedPorts
     }
 
     enum CodingKeys: String, CodingKey {
@@ -127,6 +136,9 @@ struct SwitchTelemetry: Codable, Equatable, Sendable {
         case fibrePorts
         case lldpNeighbours
         case devicePorts
+        case stpRootBridgeID
+        case stpIsRootBridge
+        case stpBlockedPorts
     }
 
     init(from decoder: Decoder) throws {
@@ -137,6 +149,9 @@ struct SwitchTelemetry: Codable, Equatable, Sendable {
         fibrePorts = try c.decodeIfPresent([FibrePortTelemetry].self, forKey: .fibrePorts) ?? []
         lldpNeighbours = try c.decodeIfPresent([LLDPNeighbour].self, forKey: .lldpNeighbours) ?? []
         devicePorts = try c.decodeIfPresent([DevicePortTelemetry].self, forKey: .devicePorts) ?? []
+        stpRootBridgeID = try c.decodeIfPresent(String.self, forKey: .stpRootBridgeID)
+        stpIsRootBridge = try c.decodeIfPresent(Bool.self, forKey: .stpIsRootBridge) ?? false
+        stpBlockedPorts = try c.decodeIfPresent([Int].self, forKey: .stpBlockedPorts) ?? []
     }
 
     func encode(to encoder: Encoder) throws {
@@ -147,6 +162,9 @@ struct SwitchTelemetry: Codable, Equatable, Sendable {
         try c.encode(fibrePorts, forKey: .fibrePorts)
         try c.encode(lldpNeighbours, forKey: .lldpNeighbours)
         try c.encode(devicePorts, forKey: .devicePorts)
+        try c.encodeIfPresent(stpRootBridgeID, forKey: .stpRootBridgeID)
+        try c.encode(stpIsRootBridge, forKey: .stpIsRootBridge)
+        try c.encode(stpBlockedPorts, forKey: .stpBlockedPorts)
     }
 }
 

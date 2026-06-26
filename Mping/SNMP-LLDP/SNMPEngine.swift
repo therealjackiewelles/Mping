@@ -101,6 +101,7 @@ enum SNMPEngine {
                     let fibreSummary = await readFibreOpticsSummary(client: client, raw: &raw, deviceID: deviceID, deviceLabel: deviceLabel, ipAddress: ip)
                     let lldpSummary = await readLLDPNeighbourSummary(client: client, raw: &raw, deviceID: deviceID, deviceLabel: deviceLabel, ipAddress: ip)
                     let portSummary = await readInterfacePortSummary(client: client, raw: &raw, deviceID: deviceID, deviceLabel: deviceLabel, ipAddress: ip)
+                    await readSTPSummary(client: client, raw: &raw, deviceID: deviceID, deviceLabel: deviceLabel, ipAddress: ip)
                     let suffixParts = [fibreSummary, lldpSummary, portSummary].filter { !$0.isEmpty }
                     let suffixJoined = suffixParts.joined(separator: " • ")
                     let suffix = suffixJoined.isEmpty ? "" : " • \(suffixJoined)"
@@ -146,6 +147,7 @@ enum SNMPEngine {
 
             let fibreSummary = await readFibreOpticsSummary(client: client, raw: &raw, deviceID: deviceID, deviceLabel: deviceLabel, ipAddress: ip)
             let lldpSummary = await readLLDPNeighbourSummary(client: client, raw: &raw, deviceID: deviceID, deviceLabel: deviceLabel, ipAddress: ip)
+            await readSTPSummary(client: client, raw: &raw, deviceID: deviceID, deviceLabel: deviceLabel, ipAddress: ip)
             raw += "--- Device port/interface probe skipped on live telemetry poll ---\n"
             raw += "Mping no longer walks IF-MIB/EtherLike-MIB during every switch telemetry poll.\n"
             let suffixParts = [fibreSummary, lldpSummary].filter { !$0.isEmpty }
@@ -500,6 +502,152 @@ private func readInterfacePortSummary(
 
     raw += "Interface port rows returned: \(returnedRows)\n"
     return "Ports \(returnedRows) rows"
+}
+
+private func readSTPSummary(
+    client: SNMPClient,
+    raw: inout String,
+    deviceID: UUID?,
+    deviceLabel: String,
+    ipAddress: String
+) async {
+    raw += "--- STP probe ---\n"
+
+    // FASTPATH CST port role: 1.3.6.1.4.1.4526.10.1.2.15.9.1.5.{portNum}
+    // Confirmed encoding: 1=Alternate(blocking), 2=Backup(blocking), 3=Root(fwd), 4=Designated(fwd)
+    // A switch with no port returning role 3 (Root) IS the root bridge.
+    do {
+        ConsoleOutputStore.log(subsystem: "SNMP STP", direction: .command, deviceID: deviceID, deviceLabel: deviceLabel, ipAddress: ipAddress, message: "WALK 1.3.6.1.4.1.4526.10.1.2.15.9.1.5 • FASTPATH CST port role")
+        let values = try await client.walk(baseOID: "1.3.6.1.4.1.4526.10.1.2.15.9.1.5", maxResults: 100)
+        raw += "--- FASTPATH CST port role 1.3.6.1.4.1.4526.10.1.2.15.9.1.5 ---\n"
+        for v in values { raw += "\(v.oid) = \(v.value.displayValue)\n" }
+        let blocking = values.filter { $0.value.displayValue == "1" || $0.value.displayValue == "2" }.compactMap { $0.oid.split(separator: ".").last.flatMap { Int($0) } }
+        let hasRootPort = values.contains { $0.value.displayValue == "3" }
+        ConsoleOutputStore.log(subsystem: "SNMP STP", direction: .output, deviceID: deviceID, deviceLabel: deviceLabel, ipAddress: ipAddress, message: "FASTPATH CST roles: \(values.map { "\($0.oid.split(separator: ".").last ?? "?")=\($0.value.displayValue)" }.joined(separator: " ")) | Blocking: \(blocking) | IsRoot: \(!hasRootPort)")
+    } catch {
+        raw += "FASTPATH CST port role: not available\n"
+        ConsoleOutputStore.log(subsystem: "SNMP STP", direction: .error, deviceID: deviceID, deviceLabel: deviceLabel, ipAddress: ipAddress, message: "FASTPATH CST port role walk failed")
+    }
+
+    // MSTP CIST root port scalar — value 0 means this switch IS the root bridge
+    do {
+        let value = try await client.get(oid: "1.3.6.1.2.1.17.7.1.1.5.0")
+        raw += "--- MSTP CIST root port 1.3.6.1.2.1.17.7.1.1.5.0 ---\n"
+        raw += "\(value.oid) = \(value.value.displayValue)\n"
+        ConsoleOutputStore.log(subsystem: "SNMP STP", direction: .output, deviceID: deviceID, deviceLabel: deviceLabel, ipAddress: ipAddress, message: "MSTP CIST root port scalar = \(value.value.displayValue) (0 = this switch is root bridge)")
+    } catch {
+        raw += "MSTP CIST root port: not available\n"
+    }
+
+    let scalarOIDs: [(label: String, oid: String)] = [
+        ("dot1dStpDesignatedRoot", "1.3.6.1.2.1.17.2.5.0"),
+        ("dot1dStpRootPort",       "1.3.6.1.2.1.17.2.7.0")
+    ]
+    for item in scalarOIDs {
+        ConsoleOutputStore.log(subsystem: "SNMP STP", direction: .command, deviceID: deviceID, deviceLabel: deviceLabel, ipAddress: ipAddress, message: "GET \(item.oid) • \(item.label)")
+        do {
+            let value = try await client.get(oid: item.oid)
+            raw += "--- \(item.label) \(item.oid) ---\n"
+            raw += "\(value.oid) = \(value.value.displayValue)\n"
+            ConsoleOutputStore.log(subsystem: "SNMP STP", direction: .output, deviceID: deviceID, deviceLabel: deviceLabel, ipAddress: ipAddress, message: "\(item.label) = \(value.value.displayValue)")
+        } catch {
+            raw += "\(item.label): not available\n"
+            ConsoleOutputStore.log(subsystem: "SNMP STP", direction: .error, deviceID: deviceID, deviceLabel: deviceLabel, ipAddress: ipAddress, message: "\(item.label): not available")
+        }
+    }
+
+    do {
+        ConsoleOutputStore.log(subsystem: "SNMP STP", direction: .command, deviceID: deviceID, deviceLabel: deviceLabel, ipAddress: ipAddress, message: "WALK 1.3.6.1.2.1.17.2.15.1.3 • dot1dStpPortState")
+        let values = try await client.walk(baseOID: "1.3.6.1.2.1.17.2.15.1.3", maxResults: 80)
+        raw += "--- dot1dStpPortState 1.3.6.1.2.1.17.2.15.1.3 ---\n"
+        for value in values {
+            raw += "\(value.oid) = \(value.value.displayValue)\n"
+        }
+        let summary = values.map { "\($0.oid.split(separator: ".").last ?? "?")=\($0.value.displayValue)" }.joined(separator: " ")
+        ConsoleOutputStore.log(subsystem: "SNMP STP", direction: .output, deviceID: deviceID, deviceLabel: deviceLabel, ipAddress: ipAddress, message: "Port states: \(summary.isEmpty ? "none returned" : summary)")
+    } catch {
+        raw += "dot1dStpPortState: not available\n"
+        ConsoleOutputStore.log(subsystem: "SNMP STP", direction: .error, deviceID: deviceID, deviceLabel: deviceLabel, ipAddress: ipAddress, message: "dot1dStpPortState walk failed — bridge MIB may not be supported")
+    }
+}
+
+enum STPTelemetryExtractor {
+    struct STPResult: Sendable {
+        let rootBridgeID: String?
+        let isRootBridge: Bool
+        let blockedPorts: [Int]
+    }
+
+    static func extract(rawOutput: String) -> STPResult {
+        let lines = rawOutput.components(separatedBy: "\n")
+
+        var rootBridgeID: String? = nil
+        var hasRootPort = false
+        var mstpCistRootPort: Int? = nil
+        var blockedPorts: [Int] = []
+        var inPortState = false
+        var inMstpRootPort = false
+
+        for line in lines {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+
+            if (trimmed.contains("dot1dStpPortState") || trimmed.contains("MSTP CIST port state") || trimmed.contains("FASTPATH CST port role")) && trimmed.contains("---") {
+                inPortState = true; inMstpRootPort = false; continue
+            }
+            if trimmed.contains("MSTP CIST root port") && trimmed.contains("---") {
+                inMstpRootPort = true; inPortState = false; continue
+            }
+            if trimmed.hasPrefix("---") {
+                inPortState = false; inMstpRootPort = false; continue
+            }
+
+            if inMstpRootPort, let eqRange = trimmed.range(of: " = ") {
+                let val = String(trimmed[eqRange.upperBound...]).trimmingCharacters(in: .whitespaces)
+                mstpCistRootPort = Int(val)
+                inMstpRootPort = false
+            }
+
+            if inPortState, trimmed.contains(" = ") {
+                guard let eqRange = trimmed.range(of: " = ") else { continue }
+                let oidPart = String(trimmed[trimmed.startIndex..<eqRange.lowerBound])
+                let valPart = String(trimmed[eqRange.upperBound...]).trimmingCharacters(in: .whitespaces)
+                guard let state = Int(valPart) else { continue }
+                guard let port = oidPart.split(separator: ".").last.flatMap({ Int($0) }) else { continue }
+
+                if state == 1 || state == 2 {
+                    // FASTPATH CST port role: 1=Alternate(blocking), 2=Backup(blocking)
+                    // Only include physical ports — LAG/CPU/VLAN start at ifIndex 49.
+                    if port < 49 {
+                        blockedPorts.append(port)
+                    }
+                } else if state == 3 {
+                    // Role 3 = Root port — this switch is NOT the root bridge.
+                    hasRootPort = true
+                }
+            }
+        }
+
+        // Root bridge detection: role 3 covers both Root AND Designated forwarding ports,
+        // so hasRootPort is always true and isRoot always false. Disabled until a reliable
+        // root-vs-designated distinguishing OID is found.
+        let isRoot = false
+        return STPResult(rootBridgeID: rootBridgeID, isRootBridge: isRoot, blockedPorts: blockedPorts)
+    }
+
+    private static func formatBridgeID(_ raw: String) -> String {
+        // Bridge ID is 8 bytes: 2-byte priority + 6-byte MAC.
+        // displayValue returns space/colon/dash separated hex e.g. "80 00 aa bb cc dd ee ff"
+        let cleaned = raw.replacingOccurrences(of: "\"", with: "").trimmingCharacters(in: .whitespaces)
+        let parts = cleaned.components(separatedBy: CharacterSet(charactersIn: ": -"))
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty && $0.allSatisfy({ $0.isHexDigit }) }
+        if parts.count >= 8 {
+            let priority = (Int(parts[0], radix: 16) ?? 0) * 256 + (Int(parts[1], radix: 16) ?? 0)
+            let mac = parts[2...7].joined(separator: ":").uppercased()
+            return "Priority \(priority) — \(mac)"
+        }
+        return cleaned.isEmpty ? "Unknown" : cleaned
+    }
 }
 
 private func readLLDPNeighbourSummary(

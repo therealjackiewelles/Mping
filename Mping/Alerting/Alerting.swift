@@ -164,6 +164,7 @@ struct AlertingSidebarBox: View {
                     )
                 }
             }
+            .animation(nil, value: alertPulse)
         }
         .padding(panelPadding)
         .frame(maxWidth: .infinity)

@@ -181,6 +181,9 @@ struct WorkspaceView: View {
                     onPaste: {
                         store.pasteSelection()
                     },
+                    onClearTopologyLinks: {
+                        store.clearAllTopologyLinks()
+                    },
                     deviceAt: { swiftUIPoint in
                         let scale = store.workspaceScale
                         let offset = store.workspaceOffset
@@ -485,6 +488,8 @@ private struct MpingMapDeviceTileView: View, Equatable {
             && lhs.device.lastSeenOnline == rhs.device.lastSeenOnline
             && lhs.device.verificationState == rhs.device.verificationState
             && lhs.device.zoneName == rhs.device.zoneName
+            && lhs.device.switchTelemetry.stpIsRootBridge == rhs.device.switchTelemetry.stpIsRootBridge
+            && lhs.device.switchTelemetry.stpBlockedPorts == rhs.device.switchTelemetry.stpBlockedPorts
             && lhs.isSelected == rhs.isSelected
             && lhs.shouldShowSecondaryDetail == rhs.shouldShowSecondaryDetail
     }
@@ -623,6 +628,17 @@ private struct MpingMapDeviceTileView: View, Equatable {
                     .fill(zoneColor(for: zone))
                     .frame(width: 3)
                     .padding(.vertical, 6)
+            }
+        }
+        .overlay(alignment: .bottomTrailing) {
+            if device.switchTelemetry.stpIsRootBridge {
+                Text("ROOT")
+                    .font(.system(size: 7, weight: .black, design: .rounded))
+                    .foregroundStyle(.black)
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 2)
+                    .background(Color.yellow, in: RoundedRectangle(cornerRadius: 3, style: .continuous))
+                    .padding(5)
             }
         }
         .contentShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
@@ -906,6 +922,7 @@ private struct WorkspaceEventCatcher: NSViewRepresentable {
     let onSetGridSize: (CGFloat) -> Void
     let onCopySelection: () -> Void
     let onPaste: () -> Void
+    var onClearTopologyLinks: (() -> Void)?
     var deviceAt: ((CGPoint) -> MonitoredDevice?)?
     var onOpenWebInterface: ((UUID) -> Void)?
     var onSelectDevice: ((UUID) -> Void)?
@@ -929,6 +946,7 @@ private struct WorkspaceEventCatcher: NSViewRepresentable {
         view.gridSize = gridSize
         view.hasSelection = hasSelection
         view.hasClipboardContent = hasClipboardContent
+        view.onClearTopologyLinks = onClearTopologyLinks
         view.onScroll = onScroll
         view.onRightPan = onRightPan
         view.onToggleSnapToGrid = onToggleSnapToGrid
@@ -955,6 +973,7 @@ private struct WorkspaceEventCatcher: NSViewRepresentable {
         var onSetGridSize: ((CGFloat) -> Void)?
         var onCopySelection: (() -> Void)?
         var onPaste: (() -> Void)?
+        var onClearTopologyLinks: (() -> Void)?
         var deviceAt: ((CGPoint) -> MonitoredDevice?)?
         var onOpenWebInterface: ((UUID) -> Void)?
         var onSelectDevice: ((UUID) -> Void)?
@@ -1160,6 +1179,14 @@ private struct WorkspaceEventCatcher: NSViewRepresentable {
                 to: menu,
                 title: "Paste",
                 action: { [weak self] in self?.onPaste?() }
+            )
+
+            menu.addItem(.separator())
+
+            addMenuItem(
+                to: menu,
+                title: "Clear All Topology Links",
+                action: { [weak self] in self?.onClearTopologyLinks?() }
             )
 
             NSMenu.popUpContextMenu(menu, with: event, for: self)

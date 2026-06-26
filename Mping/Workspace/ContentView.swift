@@ -9,6 +9,7 @@ struct ContentView: View {
     @Binding var showingDevicePortsView: Bool
     @State private var openAlertCategory: MpingAlertCategory? = nil
     @AppStorage("mping.showMinimap") private var showMinimap: Bool = true
+    @AppStorage("mping.clearTopologyLinksOnBoot") private var clearTopologyLinksOnBoot: Bool = true
     @State private var workspaceSearch: String = ""
     @EnvironmentObject private var preferences: AppPreferences
     @State private var sidebarWidth: CGFloat = 230
@@ -119,6 +120,10 @@ struct ContentView: View {
                 .foregroundStyle(.white)
 
             Toggle("Minimap", isOn: $showMinimap)
+                .toggleStyle(.switch)
+                .foregroundStyle(.white.opacity(0.9))
+
+            Toggle("Clear Links on Boot", isOn: $clearTopologyLinksOnBoot)
                 .toggleStyle(.switch)
                 .foregroundStyle(.white.opacity(0.9))
 

@@ -176,6 +176,7 @@ struct FibreLossResult: Identifiable, Hashable, Sendable {
     let bIsOpticalPort: Bool
     let linkMedium: TopologyLinkMedium
     let isMissing: Bool
+    let stpBlocking: Bool
 
     var displayName: String {
         let trimmed = connection.name.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -291,7 +292,8 @@ enum FibreLossCalculator {
         bDeviceName: String,
         telemetry: [FibrePortTelemetry],
         aIsOpticalPort: Bool = true,
-        bIsOpticalPort: Bool = true
+        bIsOpticalPort: Bool = true,
+        stpBlocking: Bool = false
     ) -> FibreLossResult {
         let a = matchingTelemetry(
             deviceID: connection.aDeviceID,
@@ -324,7 +326,8 @@ enum FibreLossCalculator {
             aIsOpticalPort: aIsOpticalPort,
             bIsOpticalPort: bIsOpticalPort,
             linkMedium: (aIsOpticalPort || bIsOpticalPort) ? .fibre : .copper,
-            isMissing: false
+            isMissing: false,
+            stpBlocking: stpBlocking
         )
     }
 
@@ -650,17 +653,33 @@ enum FibreAutoLinkBuilder {
             }
         }
 
-        let liveResults = bestByPhysicalLink.values.map { result(from: $0) }
+        let allLiveResults = bestByPhysicalLink.values.map { result(from: $0) }
 
-        // Remember links that have existed. When LLDP stops reporting a link, keep
-        // the link visible and turn it red instead of deleting it from the topology.
-        // The user can then right-click the red link and delete it if the physical
-        // link has genuinely been removed.
-        remember(liveResults)
+        // Always show all LLDP-confirmed live links (fibre and copper).
+        // Copper links only appear when LLDP is actively reporting them — they
+        // are never persisted as stale. Fibre links are remembered and shown in
+        // red when LLDP stops reporting them so the user knows something changed.
+        let liveResults = allLiveResults
 
-        let liveIDs = Set(liveResults.map { $0.id })
+        // Only remember fibre links — copper links disappear naturally when
+        // LLDP stops seeing them rather than persisting as stale red links.
+        let fibreLiveResults = liveResults.filter { $0.linkMedium == .fibre }
+        remember(fibreLiveResults)
+
+        // Match by physical endpoints rather than ID — String.hashValue is
+        // randomised per process so stableConnectionID produces a different UUID
+        // each launch, meaning ID-based matching always fails across sessions.
+        let liveEndpointKeys = Set(liveResults.map {
+            canonicalKey($0.connection.aDeviceID, $0.connection.aPort,
+                         $0.connection.bDeviceID, $0.connection.bPort)
+        })
         let missingResults = rememberedLinks(devices: switches)
-            .filter { !liveIDs.contains($0.id) }
+            .filter { result in
+                let key = canonicalKey(result.connection.aDeviceID, result.connection.aPort,
+                                       result.connection.bDeviceID, result.connection.bPort)
+                return !liveEndpointKeys.contains(key)
+            }
+            .filter { $0.linkMedium == .fibre }
 
         return (liveResults + missingResults)
             .sorted { lhs, rhs in
@@ -697,16 +716,30 @@ enum FibreAutoLinkBuilder {
         saveRememberedLinks(remaining)
     }
 
+    static func clearAllRememberedLinks() {
+        UserDefaults.standard.removeObject(forKey: rememberedLinksKey)
+        UserDefaults.standard.removeObject(forKey: deletedLinksKey)
+    }
+
     private static func remember(_ results: [FibreLossResult]) {
         guard !results.isEmpty else { return }
         let deleted = deletedLinkIDs()
-        var byID: [UUID: RememberedTopologyLink] = [:]
+
+        // Key by canonical physical endpoint pair, NOT by the generated UUID.
+        // stableConnectionID uses String.hashValue which is randomised per process,
+        // so using UUID as key causes a new duplicate entry to be added on every boot
+        // for the same physical link. Physical key is always deterministic.
+        var byPhysicalKey: [String: RememberedTopologyLink] = [:]
         for remembered in loadRememberedLinks() {
-            byID[remembered.id] = remembered
+            let key = canonicalKey(remembered.aDeviceID, remembered.aPort,
+                                   remembered.bDeviceID, remembered.bPort)
+            byPhysicalKey[key] = remembered
         }
 
         for result in results where !deleted.contains(result.id) {
-            byID[result.id] = RememberedTopologyLink(
+            let key = canonicalKey(result.connection.aDeviceID, result.connection.aPort,
+                                   result.connection.bDeviceID, result.connection.bPort)
+            byPhysicalKey[key] = RememberedTopologyLink(
                 id: result.id,
                 aDeviceID: result.connection.aDeviceID,
                 aPort: result.connection.aPort,
@@ -719,7 +752,7 @@ enum FibreAutoLinkBuilder {
             )
         }
 
-        saveRememberedLinks(Array(byID.values))
+        saveRememberedLinks(Array(byPhysicalKey.values))
     }
 
     private static func rememberedLinks(devices: [MonitoredDevice]) -> [FibreLossResult] {
@@ -757,7 +790,8 @@ enum FibreAutoLinkBuilder {
                     aIsOpticalPort: remembered.medium == .fibre,
                     bIsOpticalPort: remembered.medium == .fibre,
                     linkMedium: remembered.medium,
-                    isMissing: true
+                    isMissing: true,
+                    stpBlocking: false
                 )
             }
     }
@@ -833,13 +867,19 @@ enum FibreAutoLinkBuilder {
         )
 
         let telemetry = observation.localDevice.switchTelemetry.fibrePorts + observation.remoteDevice.switchTelemetry.fibrePorts
+        let aIsOptical = isOpticalPort(on: observation.localDevice, port: observation.localPort)
+        let bIsOptical = isOpticalPort(on: observation.remoteDevice, port: observation.remotePort)
+        // Show STP blocking on any inter-switch link — RSTP blocks both copper and fibre paths.
+        let stpBlocking = observation.localDevice.switchTelemetry.stpBlockedPorts.contains(observation.localPort)
+                       || observation.remoteDevice.switchTelemetry.stpBlockedPorts.contains(observation.remotePort)
         return FibreLossCalculator.calculate(
             connection: connection,
             aDeviceName: observation.localDevice.name,
             bDeviceName: observation.remoteDevice.name,
             telemetry: telemetry,
-            aIsOpticalPort: isOpticalPort(on: observation.localDevice, port: observation.localPort),
-            bIsOpticalPort: isOpticalPort(on: observation.remoteDevice, port: observation.remotePort)
+            aIsOpticalPort: aIsOptical,
+            bIsOpticalPort: bIsOptical,
+            stpBlocking: stpBlocking
         )
     }
 
@@ -1062,7 +1102,15 @@ struct FibreLinkLine: View {
                     path.move(to: start)
                     path.addLine(to: end)
                 }
-                .stroke(result.topologyLineColor, style: StrokeStyle(lineWidth: result.topologyLineWidth, lineCap: .round, lineJoin: .round))
+                .stroke(
+                    result.stpBlocking ? Color.orange : result.topologyLineColor,
+                    style: StrokeStyle(
+                        lineWidth: result.topologyLineWidth,
+                        lineCap: .round,
+                        lineJoin: .round,
+                        dash: result.stpBlocking ? [10, 7] : []
+                    )
+                )
             }
 
             if showLabels {
