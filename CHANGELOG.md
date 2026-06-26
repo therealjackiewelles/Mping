@@ -5,6 +5,24 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.3.2 — 2026-06-26
+
+### UI Polish
+- Devices with active unacknowledged alerts pulse with a yellow border on the workspace canvas
+- Pulse matches the alerting sidebar timing (1.4s ease-in-out)
+- Yellow border fades out in 0.3s when alerts are acknowledged
+- Workspace background pulse removed in favour of per-device indication
+
+---
+
+## v0.3.1 — 2026-06-26
+
+### UI Polish
+- Workspace background pulses red when any alert is active, matching the alerting sidebar panel
+- Pulse fades out smoothly when all alerts are acknowledged
+
+---
+
 ## v0.3.0 — 2026-06-26
 
 ### Monitoring

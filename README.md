@@ -137,6 +137,12 @@ Mping is built in Xcode. There is no package manager or CLI build step.
 
 ## Changelog
 
+### v0.3.2 — 2026-06-26
+- Devices with active alerts pulse with a yellow border on the canvas
+
+### v0.3.1 — 2026-06-26
+- Workspace background pulses red when any alert is active (removed in v0.3.2)
+
 ### v0.3.0 — 2026-06-26
 - **STP / RSTP** — Blocking links detected via SNMP and shown as dashed orange lines on the topology canvas
 - **Monitoring** — Packet loss %, jitter, uptime counter, RTT sparkline, per-device monitoring toggles
