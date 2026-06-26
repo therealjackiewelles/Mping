@@ -5,6 +5,7 @@ struct WorkspaceView: View {
     @ObservedObject var store: DeviceStore
     var searchText: String = ""
 
+
     @State private var deviceDragStart: [UUID: CGPoint] = [:]
     @State private var shapeDragStart: [UUID: CGPoint] = [:]
     @State private var selectionStart: CGPoint? = nil
@@ -100,7 +101,10 @@ struct WorkspaceView: View {
                         MpingMapDeviceTileView(
                             device: device,
                             isSelected: store.selectedDeviceIDs.contains(device.id),
-                            shouldShowSecondaryDetail: store.workspaceScale >= 0.52
+                            shouldShowSecondaryDetail: store.workspaceScale >= 0.52,
+                            hasAlert: store.alertEvents.contains(where: {
+                                $0.deviceID == device.id && $0.kind == .alert && !$0.isAcknowledged && $0.isCurrent
+                            })
                         )
                         .equatable()
                         .opacity(deviceMatchesSearch(device) ? 1.0 : 0.22)
@@ -463,11 +467,13 @@ private struct MpingMapDeviceTileView: View, Equatable {
     let device: MonitoredDevice
     let isSelected: Bool
     let shouldShowSecondaryDetail: Bool
+    let hasAlert: Bool
 
     @ObservedObject private var tileStyle = DeviceTileEditorSettings.shared
 
     @State private var pulseScale: CGFloat = 0.45
     @State private var pulseOpacity: Double = 0.0
+    @State private var alertPulse: Bool = false
 
     static func == (lhs: MpingMapDeviceTileView, rhs: MpingMapDeviceTileView) -> Bool {
         // Keep the map tile stable during SNMP/LLDP polling.
@@ -491,6 +497,7 @@ private struct MpingMapDeviceTileView: View, Equatable {
             && lhs.device.switchTelemetry.stpBlockedPorts == rhs.device.switchTelemetry.stpBlockedPorts
             && lhs.isSelected == rhs.isSelected
             && lhs.shouldShowSecondaryDetail == rhs.shouldShowSecondaryDetail
+            && lhs.hasAlert == rhs.hasAlert
     }
 
     private var tileWidth: CGFloat { tileStyle.tileWidth }
@@ -621,6 +628,25 @@ private struct MpingMapDeviceTileView: View, Equatable {
                 .allowsHitTesting(false)
         }
         .frame(width: tileWidth, height: tileHeight)
+        .overlay(
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .stroke(Color.yellow.opacity(hasAlert ? (alertPulse ? 0.85 : 0.1) : 0.0), lineWidth: 2.5)
+                .animation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true), value: alertPulse)
+        )
+        .onAppear {
+            if hasAlert {
+                alertPulse = false
+                withAnimation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true)) { alertPulse = true }
+            }
+        }
+        .onChange(of: hasAlert) { _, active in
+            if active {
+                alertPulse = false
+                withAnimation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true)) { alertPulse = true }
+            } else {
+                withAnimation(.easeOut(duration: 0.3)) { alertPulse = false }
+            }
+        }
         .overlay(alignment: .leading) {
             if let zone = device.zoneName, !zone.isEmpty {
                 RoundedRectangle(cornerRadius: 2, style: .continuous)
