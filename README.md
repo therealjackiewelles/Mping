@@ -135,6 +135,29 @@ Mping is built in Xcode. There is no package manager or CLI build step.
 
 ---
 
+## Changelog
+
+### v0.3.0 — 2026-06-26
+- **STP / RSTP** — Blocking links detected via SNMP and shown as dashed orange lines on the topology canvas
+- **Monitoring** — Packet loss %, jitter, uptime counter, RTT sparkline, per-device monitoring toggles
+- **Device Manager** — Rebuilt as native macOS table with resizable/reorderable columns and screen-aware sizing
+- **Inspector** — MAC address, zone, sparkline graph, monitoring controls; 500ms tap delay eliminated
+- **Workspace** — Zone colour system, sidebar search, right-click context menus, deselect on tap
+- **Group Edit** — Bulk-edit zone, device type, SNMP community and monitoring state across multiple devices
+- **Performance** — Ping results batched into one render pass per cycle; unnecessary SNMP walks removed
+- **Bug Fixes** — Topology link deduplication, Last Seen display, false STP alerts on boot, alerting box resize
+
+### v0.2.0 — Earlier 2026
+- ICMP ping monitoring with verification engine
+- Workspace canvas, SNMP/LLDP telemetry, fibre link visualisation
+- Inspector panel, minimap, alerting framework
+- Device Ports view, Console Output debug window
+- Workspace persistence
+
+[Full changelog →](CHANGELOG.md)
+
+---
+
 ## License
 
 See [LICENSE](LICENSE) for details.
