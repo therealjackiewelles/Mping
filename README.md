@@ -137,6 +137,13 @@ Mping is built in Xcode. There is no package manager or CLI build step.
 
 ## Changelog
 
+### v0.4.1 — 2026-06-27
+- Inspector temperature history converted to a sparkline graph matching the ping graph layout
+- Hover tooltips on ping and temperature graphs showing value + timestamp
+- Stat cards show Min / Avg / Max for both ping and temperature (Current removed)
+- Temperature values display to 2 significant figures; jitter card height fixed
+- Device Debug: "Root Bridge ID" correctly labelled as "Root Bridge MAC" on root and "Own Chassis MAC" on others
+
 ### v0.4.0 — 2026-06-27
 - RSTP root bridge auto-detected via SNMP — ROOT badge on tile
 - All active fibre links show animated directional flow toward root bridge

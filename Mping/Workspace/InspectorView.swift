@@ -432,15 +432,17 @@ private struct DeviceInspector: View {
             }
 
             if device.pingRTTHistory.count >= 2 {
-                PingSparklineView(values: Array(device.pingRTTHistory.suffix(60)))
-                    .frame(height: 36)
+                PingSparklineView(
+                    values: Array(device.pingRTTHistory.suffix(60)),
+                    valueFormatter: { String(format: "%.2f ms", $0) }
+                )
+                .frame(height: 36)
             }
 
             HStack(spacing: 6) {
-                pingStatCard(title: "Current", value: formattedPingValue(device.lastRTT))
-                pingStatCard(title: "Min",     value: formattedPingValue(device.minimumRTT))
-                pingStatCard(title: "Avg",     value: formattedPingValue(device.averageRTT))
-                pingStatCard(title: "Max",     value: formattedPingValue(device.maximumRTT))
+                pingStatCard(title: "Min", value: formattedPingValue(device.minimumRTT))
+                pingStatCard(title: "Avg", value: formattedPingValue(device.averageRTT))
+                pingStatCard(title: "Max", value: formattedPingValue(device.maximumRTT))
             }
 
             HStack(spacing: 6) {
@@ -538,7 +540,7 @@ private struct DeviceInspector: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.65)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .padding(.horizontal, 8)
         .padding(.vertical, 7)
         .background(
@@ -564,54 +566,56 @@ private struct DeviceInspector: View {
 
     private var temperatureHistorySection: some View {
         let history = store.temperatureHistory(for: device.id)
-        let latestSamples = Array(history.suffix(8).reversed())
-        let values = history.map(\.temperatureCelsius)
-        let minTemp = values.min()
-        let maxTemp = values.max()
-        let avgTemp = values.isEmpty ? nil : values.reduce(0, +) / Double(values.count)
+        let allValues = history.map(\.temperatureCelsius)
+        let windowSamples = Array(history.suffix(20))
+        let windowValues = windowSamples.map(\.temperatureCelsius)
+        let windowTimestamps = windowSamples.map(\.timestamp)
+        let minTemp = allValues.min()
+        let maxTemp = allValues.max()
+        let avgTemp = allValues.isEmpty ? nil : allValues.reduce(0, +) / Double(allValues.count)
+        let currentTemp = device.switchTelemetry.temperatureCelsius
+
+        let graphColor: Color = {
+            guard let t = maxTemp else { return .green }
+            if t >= 70 { return .red }
+            if t >= 55 { return .orange }
+            return .green
+        }()
 
         return VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("Temperature History")
+                Text("Temperature")
                     .font(.headline)
                     .foregroundStyle(.white)
-
                 Spacer()
-
-                Text("\(history.count) samples")
-                    .font(.system(size: 10, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.42))
+                Text(currentTemp.map { String(format: "%.1f°C", $0) } ?? "—")
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .foregroundStyle(temperatureColor)
             }
 
-            HStack(spacing: 8) {
-                temperatureStatCard(title: "Current", value: formatTemperature(device.switchTelemetry.temperatureCelsius))
-                temperatureStatCard(title: "Min", value: formatTemperature(minTemp))
-                temperatureStatCard(title: "Avg", value: formatTemperature(avgTemp))
-                temperatureStatCard(title: "Max", value: formatTemperature(maxTemp))
+            if windowValues.count >= 2 {
+                PingSparklineView(
+                    values: windowValues,
+                    lineColor: graphColor,
+                    minLabel: minTemp.map { String(format: "%.0f°C", $0) },
+                    maxLabel: maxTemp.map { String(format: "%.0f°C", $0) },
+                    valueFormatter: { String(format: "%.1f°C", $0) },
+                    timestamps: windowTimestamps
+                )
+                .frame(height: 36)
             }
 
-            if latestSamples.isEmpty {
+            HStack(spacing: 6) {
+                pingStatCard(title: "Min", value: formatTemperature(minTemp))
+                pingStatCard(title: "Avg", value: formatTemperature(avgTemp))
+                pingStatCard(title: "Max", value: formatTemperature(maxTemp))
+            }
+
+            if windowValues.isEmpty {
                 Text("Temperature history will appear after SNMP polling records samples.")
                     .font(.system(size: 10, weight: .medium, design: .rounded))
                     .foregroundStyle(.white.opacity(0.38))
                     .fixedSize(horizontal: false, vertical: true)
-            } else {
-                VStack(spacing: 4) {
-                    ForEach(latestSamples) { sample in
-                        HStack {
-                            Text(sample.timestamp.formatted(date: .omitted, time: .standard))
-                                .font(.system(size: 10, weight: .regular, design: .monospaced))
-                                .foregroundStyle(.white.opacity(0.45))
-
-                            Spacer()
-
-                            Text(formatTemperature(sample.temperatureCelsius))
-                                .font(.system(size: 11, weight: .semibold, design: .rounded))
-                                .foregroundStyle(temperatureHistoryColor(sample.temperatureCelsius))
-                                .monospacedDigit()
-                        }
-                    }
-                }
             }
         }
         .padding(10)
@@ -699,32 +703,6 @@ private struct DeviceInspector: View {
         )
     }
 
-    private func temperatureStatCard(title: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title.uppercased())
-                .font(.system(size: 9, weight: .medium, design: .rounded))
-                .foregroundStyle(.white.opacity(0.46))
-                .lineLimit(1)
-
-            Text(value)
-                .font(.system(size: 14, weight: .semibold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.88))
-                .monospacedDigit()
-                .lineLimit(1)
-                .minimumScaleFactor(0.72)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 7)
-        .background(
-            RoundedRectangle(cornerRadius: 9)
-                .fill(Color.black.opacity(0.18))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 9)
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
-        )
-    }
 
     private func fibreLossPill(title: String, value: String, loss: Double?) -> some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -747,7 +725,7 @@ private struct DeviceInspector: View {
 
     private func formatTemperature(_ temperature: Double?) -> String {
         guard let temperature, temperature.isFinite else { return "—" }
-        return String(format: "%.1f°C", temperature)
+        return String(format: "%.2g°C", temperature)
     }
 
     private func formatLoss(_ loss: Double?) -> String {
@@ -865,8 +843,20 @@ private struct DeviceInspector: View {
     }
 }
 
+
 private struct PingSparklineView: View {
     let values: [Double]
+    var lineColor: Color = .green
+    var minLabel: String? = nil
+    var maxLabel: String? = nil
+    var valueFormatter: ((Double) -> String)? = nil
+    var timestamps: [Date]? = nil
+
+    @State private var hoverIndex: Int? = nil
+
+    private static let tooltipTimeFormatter: DateFormatter = {
+        let f = DateFormatter(); f.dateFormat = "HH:mm:ss"; return f
+    }()
 
     var body: some View {
         GeometryReader { geo in
@@ -889,18 +879,67 @@ private struct PingSparklineView: View {
                         else { path.addLine(to: CGPoint(x: x, y: y)) }
                     }
                 }
-                .stroke(Color.green.opacity(0.75), style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
+                .stroke(lineColor.opacity(0.75), style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
+
+                // Hover cursor and tooltip
+                if let idx = hoverIndex, idx < count {
+                    let x = w * CGFloat(idx) / CGFloat(max(1, count - 1))
+                    let y = h - (h * CGFloat((values[idx] - minV) / range)) * 0.85 - h * 0.075
+
+                    // Vertical cursor line
+                    Path { path in
+                        path.move(to: CGPoint(x: x, y: 0))
+                        path.addLine(to: CGPoint(x: x, y: h))
+                    }
+                    .stroke(Color.white.opacity(0.3), lineWidth: 1)
+
+                    // Dot at data point
+                    Circle()
+                        .fill(lineColor)
+                        .frame(width: 6, height: 6)
+                        .position(x: x, y: y)
+
+                    // Tooltip bubble
+                    let tipX = x > w * 0.6 ? x - 4 : x + 4
+                    let tipAlignment: Alignment = x > w * 0.6 ? .trailing : .leading
+                    VStack(alignment: x > w * 0.6 ? .trailing : .leading, spacing: 1) {
+                        if let ts = timestamps, idx < ts.count {
+                            Text(Self.tooltipTimeFormatter.string(from: ts[idx]))
+                                .font(.system(size: 9, weight: .regular, design: .monospaced))
+                                .foregroundStyle(.white.opacity(0.6))
+                        }
+                        Text(valueFormatter?(values[idx]) ?? String(format: "%.2f", values[idx]))
+                            .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                            .foregroundStyle(.white)
+                    }
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 4)
+                    .background(.black.opacity(0.75), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous).stroke(lineColor.opacity(0.5), lineWidth: 1))
+                    .position(x: tipX, y: max(24, y - 20))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: tipAlignment)
+                }
 
                 HStack {
-                    Text(String(format: "%.1f", minV))
+                    Text(minLabel ?? String(format: "%.1f", minV))
                     Spacer()
-                    Text(String(format: "%.1f ms", maxV))
+                    Text(maxLabel ?? String(format: "%.1f ms", maxV))
                 }
                 .font(.system(size: 8, weight: .medium, design: .monospaced))
                 .foregroundStyle(.white.opacity(0.35))
                 .padding(.horizontal, 5)
                 .padding(.vertical, 3)
                 .frame(maxHeight: .infinity, alignment: .bottom)
+            }
+            .onContinuousHover { phase in
+                switch phase {
+                case .active(let loc):
+                    guard count > 1 else { return }
+                    let idx = Int((loc.x / w * CGFloat(count - 1)).rounded())
+                    hoverIndex = max(0, min(count - 1, idx))
+                case .ended:
+                    hoverIndex = nil
+                }
             }
         }
     }

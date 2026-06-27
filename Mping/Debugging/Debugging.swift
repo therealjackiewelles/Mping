@@ -1956,8 +1956,12 @@ private struct DeviceDebugRow: View {
             row("STP Monitoring",    value: device.snmpMonitoringEnabled ? "Active" : "Disabled")
             row("Root Bridge",       value: device.switchTelemetry.stpIsRootBridge ? "Yes — this switch is root" : "No",
                 valueColor: device.switchTelemetry.stpIsRootBridge ? .yellow : .primary)
-            if let rootID = device.switchTelemetry.stpRootBridgeID {
-                row("Root Bridge ID",  value: rootID, mono: true)
+            if let ownMAC = device.switchTelemetry.stpRootBridgeID {
+                row(
+                    device.switchTelemetry.stpIsRootBridge ? "Root Bridge MAC" : "Own Chassis MAC",
+                    value: ownMAC,
+                    mono: true
+                )
             }
 
             let blocked = device.switchTelemetry.stpBlockedPorts

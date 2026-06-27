@@ -5,6 +5,21 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.4.1 — 2026-06-27
+
+### Inspector
+- Temperature history converted to a sparkline graph — matches the ping graph layout exactly
+- Temperature graph shows a 20-point sliding window, filling right to left as new samples arrive
+- Hover over any data point in the ping or temperature graph to see a tooltip with the exact value and timestamp
+- Stat cards updated: Min, Avg, Max shown for both ping and temperature (Current card removed — live value already visible in the section header)
+- Temperature values now display to 2 significant figures (e.g. 55°C, 7.8°C)
+- Jitter stat card height fixed — now matches the other cards in the same row
+
+### Debugging
+- Device Debug: "Root Bridge ID" renamed — on the root bridge shows "Root Bridge MAC" (correct), on other switches shows "Own Chassis MAC" (accurate — it was always this switch's own MAC, not the root bridge's MAC)
+
+---
+
 ## v0.4.0 — 2026-06-27
 
 ### STP / RSTP Root Bridge Detection
