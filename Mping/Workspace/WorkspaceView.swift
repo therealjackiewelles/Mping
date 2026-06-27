@@ -500,8 +500,9 @@ private struct MpingMapDeviceTileView: View, Equatable {
             && lhs.hasAlert == rhs.hasAlert
     }
 
+    private var isPingOnly: Bool { device.deviceType == .pingOnly }
     private var tileWidth: CGFloat { tileStyle.tileWidth }
-    private var tileHeight: CGFloat { tileStyle.tileHeight }
+    private var tileHeight: CGFloat { isPingOnly ? tileStyle.tileHeight * 0.5 : tileStyle.tileHeight }
     private var cornerRadius: CGFloat { tileStyle.tileCornerRadius }
 
     private var statusColor: Color {
@@ -617,10 +618,18 @@ private struct MpingMapDeviceTileView: View, Equatable {
                 )
                 .shadow(color: statusColor.opacity(statusGlowOpacity), radius: statusGlowRadius, x: 0, y: 0)
 
-            tileContent
-                .padding(.horizontal, tileStyle.tileHorizontalPadding)
-                .padding(.top, tileStyle.tileTopPadding)
-                .padding(.bottom, tileStyle.tileBottomPadding)
+            Group {
+                if isPingOnly {
+                    pingOnlyContent
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 7)
+                } else {
+                    tileContent
+                        .padding(.horizontal, tileStyle.tileHorizontalPadding)
+                        .padding(.top, tileStyle.tileTopPadding)
+                        .padding(.bottom, tileStyle.tileBottomPadding)
+                }
+            }
 
             heartbeatIndicator
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
@@ -711,7 +720,7 @@ private struct MpingMapDeviceTileView: View, Equatable {
                 .padding(.top, tileStyle.ipTopSpacing)
                 .padding(.trailing, tileStyle.ipTrailingPadding)
 
-            if shouldShowSecondaryDetail {
+            if shouldShowSecondaryDetail && !isPingOnly {
                 HStack(spacing: tileStyle.typeIconSpacing) {
                     Image(systemName: iconName)
                         .font(.system(size: tileStyle.typeIconSize, weight: .regular))
@@ -739,6 +748,37 @@ private struct MpingMapDeviceTileView: View, Equatable {
                     Spacer(minLength: tileStyle.bottomRowSpacerMinLength)
                     tempBadge
                 }
+            }
+        }
+    }
+
+    private var pingOnlyContent: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(device.displayName)
+                .font(.system(size: tileStyle.titleSize, weight: .semibold, design: .rounded))
+                .foregroundStyle(.white.opacity(0.95))
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+                .truncationMode(.tail)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.trailing, tileStyle.statusOuterFrameSize * 0.6)
+
+            Spacer(minLength: 0)
+
+            HStack(spacing: 6) {
+                Text(latencyText)
+                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.88))
+                    .lineLimit(1)
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 3)
+                    .background(.white.opacity(0.12), in: RoundedRectangle(cornerRadius: 5, style: .continuous))
+
+                Text(device.ipAddress)
+                    .font(.system(size: 9.5, weight: .regular, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.50))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
         }
     }

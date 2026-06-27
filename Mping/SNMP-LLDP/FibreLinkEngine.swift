@@ -204,25 +204,22 @@ struct FibreLossResult: Identifiable, Hashable, Sendable {
     }
 
     var aEndpointLabel: String {
-        // The rendered fibre tile endpoints were visually reversed on the map.
-        // Swap the displayed endpoint information so the tile next to each side
-        // matches the physical port the user sees on the topology.
+        // Label near device A: show A's port, the loss on A's transmit path, A's SFP temperature.
         compactEndpointLabel(
-            port: connection.bPort,
+            port: connection.aPort,
             loss: lossAToB,
-            temperature: bTemperatureCelsius,
-            hasOpticalTelemetry: bHasOpticalTelemetry
+            temperature: aTemperatureCelsius,
+            hasOpticalTelemetry: aHasOpticalTelemetry
         )
     }
 
     var bEndpointLabel: String {
-        // See aEndpointLabel: keep the visual endpoint labels reversed so the
-        // map display matches the actual physical link orientation.
+        // Label near device B: show B's port, the loss on B's transmit path, B's SFP temperature.
         compactEndpointLabel(
-            port: connection.aPort,
+            port: connection.bPort,
             loss: lossBToA,
-            temperature: aTemperatureCelsius,
-            hasOpticalTelemetry: aHasOpticalTelemetry
+            temperature: bTemperatureCelsius,
+            hasOpticalTelemetry: bHasOpticalTelemetry
         )
     }
 
@@ -1054,6 +1051,8 @@ struct FibreLinkLine: View {
     let result: FibreLossResult
     let showLine: Bool
     let showLabels: Bool
+    var showALabel: Bool = true
+    var showBLabel: Bool = true
     let onSaveLabelOffset: (CGSize, String) -> Void
     let onDeleteMissingLink: () -> Void
     let automaticALabelOffset: CGSize
@@ -1073,6 +1072,8 @@ struct FibreLinkLine: View {
         result: FibreLossResult,
         showLine: Bool,
         showLabels: Bool,
+        showALabel: Bool = true,
+        showBLabel: Bool = true,
         initialALabelOffset: CGSize,
         initialBLabelOffset: CGSize,
         automaticALabelOffset: CGSize = .zero,
@@ -1085,6 +1086,8 @@ struct FibreLinkLine: View {
         self.result = result
         self.showLine = showLine
         self.showLabels = showLabels
+        self.showALabel = showALabel
+        self.showBLabel = showBLabel
         self.automaticALabelOffset = automaticALabelOffset
         self.automaticBLabelOffset = automaticBLabelOffset
         self.onSaveLabelOffset = onSaveLabelOffset
@@ -1114,32 +1117,34 @@ struct FibreLinkLine: View {
             }
 
             if showLabels {
-                endpointLabel(result.aEndpointLabel)
-                    .position(aLabelPosition)
-                    .offset(combinedOffset(manual: aLabelOffset, automatic: automaticALabelOffset))
-                    .zIndex(1001)
-                    .highPriorityGesture(
-                        DragGesture(minimumDistance: 1)
-                            .onChanged { value in
-                                let base = aDragStartOffset ?? aLabelOffset
-                                aDragStartOffset = base
-                                aLabelOffset = CGSize(
-                                    width: base.width + value.translation.width,
-                                    height: base.height + value.translation.height
-                                )
-                            }
-                            .onEnded { _ in
-                                aDragStartOffset = nil
-                                aLabelOffset = snappedManualOffsetIfCloseToLink(
-                                    basePosition: aLabelPosition,
-                                    manualOffset: aLabelOffset,
-                                    automaticOffset: automaticALabelOffset
-                                )
-                                onSaveLabelOffset(aLabelOffset, "A")
-                            }
-                    )
+                if showALabel {
+                    endpointLabel(result.aEndpointLabel)
+                        .position(aLabelPosition)
+                        .offset(combinedOffset(manual: aLabelOffset, automatic: automaticALabelOffset))
+                        .zIndex(1001)
+                        .highPriorityGesture(
+                            DragGesture(minimumDistance: 1)
+                                .onChanged { value in
+                                    let base = aDragStartOffset ?? aLabelOffset
+                                    aDragStartOffset = base
+                                    aLabelOffset = CGSize(
+                                        width: base.width + value.translation.width,
+                                        height: base.height + value.translation.height
+                                    )
+                                }
+                                .onEnded { _ in
+                                    aDragStartOffset = nil
+                                    aLabelOffset = snappedManualOffsetIfCloseToLink(
+                                        basePosition: aLabelPosition,
+                                        manualOffset: aLabelOffset,
+                                        automaticOffset: automaticALabelOffset
+                                    )
+                                    onSaveLabelOffset(aLabelOffset, "A")
+                                }
+                        )
+                }
 
-                endpointLabel(result.bEndpointLabel)
+                if showBLabel { endpointLabel(result.bEndpointLabel)
                     .position(bLabelPosition)
                     .offset(combinedOffset(manual: bLabelOffset, automatic: automaticBLabelOffset))
                     .zIndex(1001)
@@ -1163,6 +1168,7 @@ struct FibreLinkLine: View {
                                 onSaveLabelOffset(bLabelOffset, "B")
                             }
                     )
+                }
             }
         }
         .contextMenu {
@@ -1351,153 +1357,120 @@ struct FibreLinksLayer: View {
 
         ZStack(alignment: .topLeading) {
             ForEach(items) { item in
-                FibreLinkLine(
-                    start: item.start,
-                    end: item.end,
-                    result: item.result,
-                    showLine: showLines,
-                    showLabels: showLabels,
-                    initialALabelOffset: fibreLabelOffset(item.result, "A"),
-                    initialBLabelOffset: fibreLabelOffset(item.result, "B"),
-                    automaticALabelOffset: labelOffsets[item.id]?.a ?? .zero,
-                    automaticBLabelOffset: labelOffsets[item.id]?.b ?? .zero,
-                    onSaveLabelOffset: { offset, endpoint in
-                        setFibreLabelOffset(offset, item.result, endpoint)
-                    },
-                    onDeleteMissingLink: {
-                        deletedMissingLinkIDs.insert(item.result.id)
-                        FibreAutoLinkBuilder.deleteRememberedLink(id: item.result.id)
-                    }
-                )
+                linkView(for: item, labelOffsets: labelOffsets)
             }
         }
     }
 
+
+    @ViewBuilder
+    private func linkView(for item: FibreLinkRenderItem, labelOffsets: [UUID: AutomaticEndpointOffsets]) -> some View {
+        let aVis = labelOffsets[item.id]?.aVisible ?? true
+        let bVis = labelOffsets[item.id]?.bVisible ?? true
+        FibreLinkLine(
+            start: item.start,
+            end: item.end,
+            result: item.result,
+            showLine: showLines,
+            showLabels: showLabels && (aVis || bVis),
+            showALabel: showLabels && aVis,
+            showBLabel: showLabels && bVis,
+            initialALabelOffset: fibreLabelOffset(item.result, "A"),
+            initialBLabelOffset: fibreLabelOffset(item.result, "B"),
+            automaticALabelOffset: labelOffsets[item.id]?.a ?? .zero,
+            automaticBLabelOffset: labelOffsets[item.id]?.b ?? .zero,
+            onSaveLabelOffset: { offset, endpoint in
+                setFibreLabelOffset(offset, item.result, endpoint)
+            },
+            onDeleteMissingLink: {
+                deletedMissingLinkIDs.insert(item.result.id)
+                FibreAutoLinkBuilder.deleteRememberedLink(id: item.result.id)
+            }
+        )
+    }
 
     private struct AutomaticEndpointOffsets {
         var a: CGSize = .zero
         var b: CGSize = .zero
+        var aVisible: Bool = true
+        var bVisible: Bool = true
     }
 
-    private struct LabelCandidate: Identifiable {
-        let id: String
-        let resultID: UUID
-        let endpoint: String
-        let basePosition: CGPoint
-        let text: String
-    }
 
     private func automaticLabelOffsets(for items: [FibreLinkRenderItem]) -> [UUID: AutomaticEndpointOffsets] {
         guard showLabels else { return [:] }
 
-        let candidates = items.flatMap { item in
-            [
-                LabelCandidate(
-                    id: "\(item.id.uuidString)-A",
-                    resultID: item.id,
-                    endpoint: "A",
-                    basePosition: endpointLabelPosition(from: item.start, toward: item.end),
-                    text: item.result.aEndpointLabel
-                ),
-                LabelCandidate(
-                    id: "\(item.id.uuidString)-B",
-                    resultID: item.id,
-                    endpoint: "B",
-                    basePosition: endpointLabelPosition(from: item.end, toward: item.start),
-                    text: item.result.bEndpointLabel
-                )
-            ]
-        }
-        .sorted { lhs, rhs in
-            if abs(lhs.basePosition.y - rhs.basePosition.y) > 0.5 { return lhs.basePosition.y < rhs.basePosition.y }
-            if abs(lhs.basePosition.x - rhs.basePosition.x) > 0.5 { return lhs.basePosition.x < rhs.basePosition.x }
-            return lhs.id.localizedStandardCompare(rhs.id) == .orderedAscending
+        let halfTileW = deviceTileSettings.tileWidth / 2 + 2
+        let halfTileH = deviceTileSettings.tileHeight / 2 + 2
+        let deviceRects = devices.map { device in
+            CGRect(
+                x: CGFloat(device.x) - halfTileW,
+                y: CGFloat(device.y) - halfTileH,
+                width: halfTileW * 2,
+                height: halfTileH * 2
+            )
         }
 
-        var acceptedRects: [CGRect] = []
         var offsets: [UUID: AutomaticEndpointOffsets] = [:]
 
-        for candidate in candidates {
-            let size = estimatedLabelSize(for: candidate.text)
-            let chosenOffset = firstNonCollidingOffset(for: candidate, labelSize: size, acceptedRects: acceptedRects)
-            let chosenRect = labelRect(center: CGPoint(
-                x: candidate.basePosition.x + chosenOffset.width,
-                y: candidate.basePosition.y + chosenOffset.height
-            ), size: size).insetBy(dx: -4, dy: -4)
-            acceptedRects.append(chosenRect)
+        for item in items {
+            let aSize = estimatedLabelSize(for: item.result.aEndpointLabel)
+            let bSize = estimatedLabelSize(for: item.result.bEndpointLabel)
 
-            var pair = offsets[candidate.resultID] ?? AutomaticEndpointOffsets()
-            if candidate.endpoint == "A" {
-                pair.a = chosenOffset
-            } else {
-                pair.b = chosenOffset
+            // Natural label positions just outside each device tile
+            let aBase = endpointLabelPosition(from: item.start, toward: item.end)
+            let bBase = endpointLabelPosition(from: item.end, toward: item.start)
+
+            var aCenter = aBase
+            var bCenter = bBase
+
+            // If the two labels overlap each other, slide each one back along the
+            // link toward its device until they no longer touch.
+            let aRect = labelRect(center: aCenter, size: aSize)
+            let bRect = labelRect(center: bCenter, size: bSize)
+
+            if aRect.intersects(bRect) {
+                let linkDX = item.end.x - item.start.x
+                let linkDY = item.end.y - item.start.y
+                let linkLen = hypot(linkDX, linkDY)
+                guard linkLen > 1 else { offsets[item.id] = AutomaticEndpointOffsets(a: .zero, b: .zero, aVisible: false, bVisible: false); continue }
+
+                let ux = linkDX / linkLen
+                let uy = linkDY / linkLen
+
+                // Half the label's footprint projected along the link direction
+                let aHalf = (aSize.width / 2) * abs(ux) + (aSize.height / 2) * abs(uy)
+                let bHalf = (bSize.width / 2) * abs(ux) + (bSize.height / 2) * abs(uy)
+
+                // Each label gets half the link length minus its own half-footprint and a small gap
+                let aMax = linkLen / 2 - aHalf - 2
+                let bMax = linkLen / 2 - bHalf - 2
+
+                let aNatDist = hypot(aBase.x - item.start.x, aBase.y - item.start.y)
+                let bNatDist = hypot(bBase.x - item.end.x, bBase.y - item.end.y)
+
+                if aNatDist > aMax {
+                    aCenter = CGPoint(x: item.start.x + ux * aMax, y: item.start.y + uy * aMax)
+                }
+                if bNatDist > bMax {
+                    bCenter = CGPoint(x: item.end.x - ux * bMax, y: item.end.y - uy * bMax)
+                }
             }
-            offsets[candidate.resultID] = pair
+
+            let aFinal = labelRect(center: aCenter, size: aSize)
+            let bFinal = labelRect(center: bCenter, size: bSize)
+
+            offsets[item.id] = AutomaticEndpointOffsets(
+                a: CGSize(width: aCenter.x - aBase.x, height: aCenter.y - aBase.y),
+                b: CGSize(width: bCenter.x - bBase.x, height: bCenter.y - bBase.y),
+                aVisible: !deviceRects.contains(where: { $0.intersects(aFinal) }),
+                bVisible: !deviceRects.contains(where: { $0.intersects(bFinal) })
+            )
         }
 
         return offsets
     }
 
-    private func firstNonCollidingOffset(
-        for candidate: LabelCandidate,
-        labelSize: CGSize,
-        acceptedRects: [CGRect]
-    ) -> CGSize {
-        for offset in collisionAvoidanceOffsets(labelSize: labelSize) {
-            let rect = labelRect(center: CGPoint(
-                x: candidate.basePosition.x + offset.width,
-                y: candidate.basePosition.y + offset.height
-            ), size: labelSize).insetBy(dx: -4, dy: -4)
-
-            if !acceptedRects.contains(where: { $0.intersects(rect) }) {
-                return offset
-            }
-        }
-
-        // Extremely dense diagrams can exhaust the compact search pattern. Keep
-        // moving the label downward in deterministic steps rather than allowing an
-        // overlap. This makes the horizontal scrollbar/zoom preferable to stacked
-        // unreadable fibre tiles.
-        let step = max(labelSize.height + 12.0, 30.0)
-        var multiplier: CGFloat = 1.0
-        while multiplier < 200.0 {
-            let offset = CGSize(width: 0, height: step * multiplier)
-            let rect = labelRect(center: CGPoint(
-                x: candidate.basePosition.x,
-                y: candidate.basePosition.y + offset.height
-            ), size: labelSize).insetBy(dx: -4, dy: -4)
-            if !acceptedRects.contains(where: { $0.intersects(rect) }) {
-                return offset
-            }
-            multiplier += 1.0
-        }
-
-        return .zero
-    }
-
-    private func collisionAvoidanceOffsets(labelSize: CGSize) -> [CGSize] {
-        let horizontalStep = max(labelSize.width + 14.0, 86.0)
-        let verticalStep = max(labelSize.height + 14.0, 42.0)
-        var offsets: [CGSize] = [.zero]
-
-        for ring in 1...10 {
-            let r = CGFloat(ring)
-            let horizontal = horizontalStep * r
-            let vertical = verticalStep * r
-            offsets.append(contentsOf: [
-                CGSize(width: 0, height: -vertical),
-                CGSize(width: 0, height: vertical),
-                CGSize(width: -horizontal, height: 0),
-                CGSize(width: horizontal, height: 0),
-                CGSize(width: -horizontal, height: -vertical),
-                CGSize(width: horizontal, height: -vertical),
-                CGSize(width: -horizontal, height: vertical),
-                CGSize(width: horizontal, height: vertical)
-            ])
-        }
-
-        return offsets
-    }
 
     private func labelRect(center: CGPoint, size: CGSize) -> CGRect {
         CGRect(

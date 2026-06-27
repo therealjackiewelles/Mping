@@ -5,6 +5,32 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.3.3 — 2026-06-27
+
+### Fibre Topology
+- Fibre label tiles now correctly show each switch's own data at its own end of the link (was reversed)
+- When devices are moved close together, fibre label tiles slide back along the link toward their device
+- When there is not enough room for both label tiles, they hide cleanly rather than snapping to a random position
+- Label tiles never overlap device tiles — they disappear when the gap becomes too small
+
+### Ping-Only Device Tiles
+- Ping-only devices (amps, computers, etc.) now use a compact half-height tile
+- Tile shows device name, ping RTT badge, and IP address — no device type label
+- IP address moved next to the RTT badge for a cleaner layout
+
+### Web Interface
+- Default URL prefix for Netgear switches changed from `http://` to `https://` (port 49152 requires HTTPS)
+- Fixed URL suffix (`webInterfacePath`) not persisting across restarts — was being reset to blank on every boot
+- Prefix correctly applied when opening web interface from right-click menu
+- Empty prefix fields now fall back to `https://` rather than producing malformed URLs
+- Preferences window scaffolding built (disabled for now — browser security blocks URL-embedded credentials)
+
+### Infrastructure
+- `KeychainHelper` added for future secure credential storage (macOS Keychain integration)
+- `PreferencesView` built with General and Switch Credentials tabs (disabled pending auto-login solution)
+
+---
+
 ## v0.3.2 — 2026-06-26
 
 ### UI Polish

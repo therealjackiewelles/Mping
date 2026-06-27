@@ -137,6 +137,12 @@ Mping is built in Xcode. There is no package manager or CLI build step.
 
 ## Changelog
 
+### v0.3.3 — 2026-06-27
+- Fibre label tiles slide back along the link when devices are close, hide when no room
+- Fibre labels fixed to show correct data at each end
+- Ping-only devices use compact half-height tile (name, RTT, IP)
+- Netgear web interface defaults to `https://` and URL suffix now persists correctly
+
 ### v0.3.2 — 2026-06-26
 - Devices with active alerts pulse with a yellow border on the canvas
 

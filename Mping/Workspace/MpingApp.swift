@@ -16,6 +16,7 @@ struct MpingApp: App {
         .commands {
             MpingMenuCommands(store: store, showingDeviceView: $showingDeviceView, showingDevicePortsView: $showingDevicePortsView)
         }
+
     }
 }
 

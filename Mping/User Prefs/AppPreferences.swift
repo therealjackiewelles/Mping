@@ -34,6 +34,10 @@ final class AppPreferences: ObservableObject {
         didSet { save() }
     }
 
+    @Published var switchUsername: String {
+        didSet { save() }
+    }
+
     private let fileURL: URL
 
     private struct Payload: Codable {
@@ -44,6 +48,7 @@ final class AppPreferences: ObservableObject {
         var devicePortsColumnWidths: [String: Double]?
         var deviceManagerColumnOrder: [String]?
         var deviceManagerColumnWidths: [String: Double]?
+        var switchUsername: String?
     }
 
     private init() {
@@ -60,6 +65,7 @@ final class AppPreferences: ObservableObject {
         devicePortsColumnWidths = payload.devicePortsColumnWidths ?? [:]
         deviceManagerColumnOrder = payload.deviceManagerColumnOrder ?? []
         deviceManagerColumnWidths = payload.deviceManagerColumnWidths ?? [:]
+        switchUsername = payload.switchUsername ?? ""
     }
 
     func setSidebarWidth(_ width: CGFloat) {
@@ -77,7 +83,8 @@ final class AppPreferences: ObservableObject {
             devicePortsColumnOrder: devicePortsColumnOrder,
             devicePortsColumnWidths: devicePortsColumnWidths,
             deviceManagerColumnOrder: deviceManagerColumnOrder,
-            deviceManagerColumnWidths: deviceManagerColumnWidths
+            deviceManagerColumnWidths: deviceManagerColumnWidths,
+            switchUsername: switchUsername
         )
 
         do {
@@ -124,7 +131,8 @@ final class AppPreferences: ObservableObject {
                 devicePortsColumnOrder: decoded.devicePortsColumnOrder,
                 devicePortsColumnWidths: decoded.devicePortsColumnWidths,
                 deviceManagerColumnOrder: decoded.deviceManagerColumnOrder,
-                deviceManagerColumnWidths: decoded.deviceManagerColumnWidths
+                deviceManagerColumnWidths: decoded.deviceManagerColumnWidths,
+                switchUsername: decoded.switchUsername
             )
         } catch {
             return defaultPayload

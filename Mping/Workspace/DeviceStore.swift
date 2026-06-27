@@ -1469,7 +1469,7 @@ final class DeviceStore: ObservableObject {
                 devices[index].webInterfacePath = MonitoredDevice.defaultNetgearWebInterfacePath
             }
             if devices[index].webInterfacePrefix.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                devices[index].webInterfacePrefix = "http://"
+                devices[index].webInterfacePrefix = "https://"
             }
         }
         markWorkspaceDirty()
@@ -1499,7 +1499,9 @@ final class DeviceStore: ObservableObject {
         let ip = device.ipAddress.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !ip.isEmpty else { return }
 
-        let prefix = device.webInterfacePrefix.trimmingCharacters(in: .whitespacesAndNewlines)
+        let rawPrefix = device.webInterfacePrefix.trimmingCharacters(in: .whitespacesAndNewlines)
+        let prefix = rawPrefix.isEmpty ? "https://" : rawPrefix
+        let credentials = "" // Auto-login disabled — credentials not embedded in URL
         let suffix = device.effectiveWebInterfacePath
         let normalisedSuffix: String
         if suffix.isEmpty {
@@ -1510,9 +1512,15 @@ final class DeviceStore: ObservableObject {
             normalisedSuffix = "/" + suffix
         }
 
-        let target = "\(prefix)\(ip)\(normalisedSuffix)"
-        guard let url = URL(string: target) else { return }
-        NSWorkspace.shared.open(url)
+        let target = "\(prefix)\(credentials)\(ip)\(normalisedSuffix)"
+        ConsoleOutputStore.log(subsystem: "WebUI", direction: .info, deviceID: device.id, deviceLabel: device.displayName, ipAddress: ip, message: "Opening web interface: \(target)")
+        guard let url = URL(string: target) else {
+            ConsoleOutputStore.log(subsystem: "WebUI", direction: .error, deviceID: device.id, deviceLabel: device.displayName, ipAddress: ip, message: "Invalid URL — could not parse: \(target)")
+            return
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            NSWorkspace.shared.open(url)
+        }
     }
 
     func updateDeviceWebInterfacePrefix(id: UUID, prefix: String) {
@@ -2360,6 +2368,7 @@ final class DeviceStore: ObservableObject {
             deviceType: device.deviceType,
             snmpCommunity: device.snmpCommunity,
             webInterfacePrefix: device.webInterfacePrefix,
+            webInterfacePath: device.webInterfacePath,
             switchTelemetry: SwitchTelemetry(),
             pingLossHistory: [],
             currentOnlineSince: nil,

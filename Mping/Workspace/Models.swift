@@ -320,10 +320,14 @@ struct MonitoredDevice: Identifiable, Codable, Equatable, Sendable {
         sourceIPAddress = try c.decodeIfPresent(String.self, forKey: .sourceIPAddress)
         deviceType = try c.decodeIfPresent(MonitoredDeviceType.self, forKey: .deviceType) ?? .pingOnly
         snmpCommunity = try c.decodeIfPresent(String.self, forKey: .snmpCommunity) ?? "public"
-        webInterfacePrefix = try c.decodeIfPresent(String.self, forKey: .webInterfacePrefix) ?? "http://"
+        let decodedPrefix = (try c.decodeIfPresent(String.self, forKey: .webInterfacePrefix) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        webInterfacePrefix = decodedPrefix.isEmpty ? "https://" : decodedPrefix
         webInterfacePath = try c.decodeIfPresent(String.self, forKey: .webInterfacePath) ?? ""
         if deviceType == .netgearSwitch && webInterfacePath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             webInterfacePath = MonitoredDevice.defaultNetgearWebInterfacePath
+        }
+        if deviceType == .netgearSwitch && webInterfacePrefix == "http://" {
+            webInterfacePrefix = "https://"
         }
         switchTelemetry = try c.decodeIfPresent(SwitchTelemetry.self, forKey: .switchTelemetry) ?? SwitchTelemetry()
         pingLossHistory = try c.decodeIfPresent([Bool].self, forKey: .pingLossHistory) ?? []
