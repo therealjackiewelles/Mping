@@ -78,3 +78,6 @@ xcuserdata/
 *.zip
 # Claude Code
 .claude/
+
+# Event logs
+*.csv

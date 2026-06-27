@@ -137,6 +137,11 @@ Mping is built in Xcode. There is no package manager or CLI build step.
 
 ## Changelog
 
+### v0.4.0 — 2026-06-27
+- RSTP root bridge auto-detected via SNMP — ROOT badge on tile
+- All active fibre links show animated directional flow toward root bridge
+- Fibre link lines thicker with topologically correct arrow direction per link
+
 ### v0.3.3 — 2026-06-27
 - Fibre label tiles slide back along the link when devices are close, hide when no room
 - Fibre labels fixed to show correct data at each end

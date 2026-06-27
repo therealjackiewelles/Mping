@@ -664,7 +664,7 @@ private struct MpingMapDeviceTileView: View, Equatable {
                     .padding(.vertical, 6)
             }
         }
-        .overlay(alignment: .bottomTrailing) {
+        .overlay(alignment: .topTrailing) {
             if device.switchTelemetry.stpIsRootBridge {
                 Text("ROOT")
                     .font(.system(size: 7, weight: .black, design: .rounded))
@@ -672,7 +672,8 @@ private struct MpingMapDeviceTileView: View, Equatable {
                     .padding(.horizontal, 4)
                     .padding(.vertical, 2)
                     .background(Color.yellow, in: RoundedRectangle(cornerRadius: 3, style: .continuous))
-                    .padding(5)
+                    .padding(.top, 5)
+                    .padding(.trailing, 5)
             }
         }
         .contentShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))

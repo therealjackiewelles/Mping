@@ -493,21 +493,44 @@ private func readSTPSummary(
     raw += "--- STP probe ---\n"
 
     // FASTPATH CST port role: 1.3.6.1.4.1.4526.10.1.2.15.9.1.5.{portNum}
-    // Confirmed encoding: 1=Alternate(blocking), 2=Backup(blocking), 3=Root(fwd), 4=Designated(fwd)
-    // A switch with no port returning role 3 (Root) IS the root bridge.
+    // 1=Alternate(blocking), 2=Backup(blocking), 3=Forwarding(Root or Designated), 4=Disabled
     do {
-        ConsoleOutputStore.log(subsystem: "SNMP STP", direction: .command, deviceID: deviceID, deviceLabel: deviceLabel, ipAddress: ipAddress, message: "WALK 1.3.6.1.4.1.4526.10.1.2.15.9.1.5 • FASTPATH CST port role")
         let values = try await client.walk(baseOID: "1.3.6.1.4.1.4526.10.1.2.15.9.1.5", maxResults: 100)
         raw += "--- FASTPATH CST port role 1.3.6.1.4.1.4526.10.1.2.15.9.1.5 ---\n"
         for v in values { raw += "\(v.oid) = \(v.value.displayValue)\n" }
         let blocking = values.filter { $0.value.displayValue == "1" || $0.value.displayValue == "2" }.compactMap { $0.oid.split(separator: ".").last.flatMap { Int($0) } }
-        // Only log the summary — skip the per-port role dump to reduce ConsoleOutputStore churn
         if !blocking.isEmpty {
             ConsoleOutputStore.log(subsystem: "SNMP STP", direction: .output, deviceID: deviceID, deviceLabel: deviceLabel, ipAddress: ipAddress, message: "STP blocking ports: \(blocking)")
         }
     } catch {
         raw += "FASTPATH CST port role: not available\n"
-        ConsoleOutputStore.log(subsystem: "SNMP STP", direction: .error, deviceID: deviceID, deviceLabel: deviceLabel, ipAddress: ipAddress, message: "FASTPATH CST port role walk failed")
+    }
+
+    // FASTPATH CST designated bridge per port (col 9).
+    // Each active port returns the bridge ID of the switch that is designated on that segment.
+    // On the root bridge ALL active ports return the root bridge's own bridge ID.
+    // On non-root switches at least one port returns a different bridge's ID (upstream).
+    // Use debugDescription for OctetString values — displayValue loses binary MAC bytes.
+    // debugDescription emits the NSData hex format: {length = N, bytes = 0x...}
+    do {
+        let values = try await client.walk(baseOID: "1.3.6.1.4.1.4526.10.1.2.15.9.1.9", maxResults: 100)
+        raw += "--- FASTPATH CST designated bridge 1.3.6.1.4.1.4526.10.1.2.15.9.1.9 ---\n"
+        for v in values { raw += "\(v.oid) = \(v.value.debugDescription)\n" }
+        let sample = values.prefix(2).map { "\($0.oid.split(separator: ".").last ?? "?")=\($0.value.debugDescription)" }.joined(separator: " | ")
+        ConsoleOutputStore.log(subsystem: "SNMP STP", direction: .output, deviceID: deviceID, deviceLabel: deviceLabel, ipAddress: ipAddress, message: "Designated bridge sample: \(sample.isEmpty ? "none returned" : sample)")
+    } catch {
+        raw += "FASTPATH CST designated bridge: not available\n"
+        ConsoleOutputStore.log(subsystem: "SNMP STP", direction: .error, deviceID: deviceID, deviceLabel: deviceLabel, ipAddress: ipAddress, message: "Designated bridge walk failed")
+    }
+
+    do {
+        let value = try await client.get(oid: "1.0.8802.1.1.2.1.3.2.0")
+        raw += "--- LLDP local chassis ID 1.0.8802.1.1.2.1.3.2.0 ---\n"
+        raw += "\(value.oid) = \(value.value.debugDescription)\n"
+        ConsoleOutputStore.log(subsystem: "SNMP STP", direction: .output, deviceID: deviceID, deviceLabel: deviceLabel, ipAddress: ipAddress, message: "Chassis ID raw: \(value.value.debugDescription)")
+    } catch {
+        raw += "LLDP local chassis ID: not available\n"
+        ConsoleOutputStore.log(subsystem: "SNMP STP", direction: .error, deviceID: deviceID, deviceLabel: deviceLabel, ipAddress: ipAddress, message: "Chassis ID GET failed")
     }
 
 }
@@ -517,37 +540,138 @@ enum STPTelemetryExtractor {
         let rootBridgeID: String?
         let isRootBridge: Bool
         let blockedPorts: [Int]
+        let designatedBridgePerPort: [Int: String]
     }
 
     static func extract(rawOutput: String) -> STPResult {
         let lines = rawOutput.components(separatedBy: "\n")
         var blockedPorts: [Int] = []
-        var inPortState = false
+        var portRoles: [Int: Int] = [:]          // port → role (3 = forwarding)
+        var designatedBridges: [Int: String] = [:] // port → designated bridge MAC (last 6 bytes hex)
+        var ownMAC: String? = nil
+
+        var inPortRole = false
+        var inDesignatedBridge = false
+        var inChassisID = false
 
         for line in lines {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
 
             if trimmed.contains("FASTPATH CST port role") && trimmed.contains("---") {
-                inPortState = true; continue
+                inPortRole = true; inDesignatedBridge = false; inChassisID = false; continue
+            }
+            if trimmed.contains("FASTPATH CST designated bridge") && trimmed.contains("---") {
+                inDesignatedBridge = true; inPortRole = false; inChassisID = false; continue
+            }
+            if trimmed.contains("LLDP local chassis ID") && trimmed.contains("---") {
+                inChassisID = true; inPortRole = false; inDesignatedBridge = false; continue
             }
             if trimmed.hasPrefix("---") {
-                inPortState = false; continue
+                inPortRole = false; inDesignatedBridge = false; inChassisID = false; continue
             }
 
-            if inPortState, trimmed.contains(" = ") {
+            if inPortRole, trimmed.contains(" = ") {
                 guard let eqRange = trimmed.range(of: " = ") else { continue }
                 let oidPart = String(trimmed[trimmed.startIndex..<eqRange.lowerBound])
                 let valPart = String(trimmed[eqRange.upperBound...]).trimmingCharacters(in: .whitespaces)
                 guard let state = Int(valPart) else { continue }
                 guard let port = oidPart.split(separator: ".").last.flatMap({ Int($0) }) else { continue }
-                // 1=Alternate(blocking), 2=Backup(blocking). Only physical ports (LAG/CPU start at 49).
-                if (state == 1 || state == 2) && port < 49 {
-                    blockedPorts.append(port)
+                portRoles[port] = state
+                if (state == 1 || state == 2) && port < 49 { blockedPorts.append(port) }
+            }
+
+            if inDesignatedBridge, trimmed.contains(" = ") {
+                guard let eqRange = trimmed.range(of: " = ") else { continue }
+                let oidPart = String(trimmed[trimmed.startIndex..<eqRange.lowerBound])
+                let valPart = String(trimmed[eqRange.upperBound...]).trimmingCharacters(in: .whitespaces)
+                guard let port = oidPart.split(separator: ".").last.flatMap({ Int($0) }) else { continue }
+                // 8-byte bridge ID: first 2 bytes = priority, last 6 = MAC
+                if let mac = extractMACFromBridgeID(valPart) {
+                    designatedBridges[port] = mac
                 }
+            }
+
+            if inChassisID, trimmed.contains(" = ") {
+                guard let eqRange = trimmed.range(of: " = ") else { continue }
+                let valPart = String(trimmed[eqRange.upperBound...]).trimmingCharacters(in: .whitespaces)
+                ownMAC = normalisedMAC(valPart)
+                inChassisID = false
             }
         }
 
-        return STPResult(rootBridgeID: nil, isRootBridge: false, blockedPorts: blockedPorts)
+        // Root bridge detection: compare each forwarding port's designated bridge
+        // with this switch's own MAC. On the root bridge all forwarding ports are
+        // self-designated, so all designated bridge MACs equal own MAC.
+        let isRoot = detectRootBridge(portRoles: portRoles, designatedBridges: designatedBridges, ownMAC: ownMAC)
+
+        if isRoot {
+            ConsoleOutputStore.log(subsystem: "SNMP STP", direction: .output,
+                deviceID: nil, deviceLabel: "STP", ipAddress: "",
+                message: "Root bridge detected — own MAC \(ownMAC ?? "unknown") matches all designated bridges")
+        }
+
+        return STPResult(rootBridgeID: ownMAC, isRootBridge: isRoot, blockedPorts: blockedPorts, designatedBridgePerPort: designatedBridges)
+    }
+
+    private static func detectRootBridge(portRoles: [Int: Int], designatedBridges: [Int: String], ownMAC: String?) -> Bool {
+        guard let ownMAC else { return false }
+        // Only check physical ports (< 49) that are forwarding (role 3)
+        let forwardingPorts = portRoles.filter { $0.value == 3 && $0.key < 49 }.map(\.key)
+        guard !forwardingPorts.isEmpty else { return false }
+        // All forwarding ports must have their designated bridge == own MAC
+        return forwardingPorts.allSatisfy { port in
+            designatedBridges[port] == ownMAC
+        }
+    }
+
+    private static func extractMACFromBridgeID(_ raw: String) -> String? {
+        // Handles NSData format: "TYPE 0x4: {length = 8, bytes = 0x80002894016dcf0c}"
+        // Bridge ID = 2-byte priority + 6-byte MAC, skip first 2 bytes (4 hex chars).
+        if let hex = extractHexFromNSData(raw), hex.count >= 16 {
+            let macStart = hex.index(hex.startIndex, offsetBy: 4)
+            let macHex = String(hex[macStart...].prefix(12))
+            return macHexToColonMAC(macHex)
+        }
+        // Fallback: space/colon-separated format "80 00 28 94 01 6D CF 0C"
+        let parts = hexParts(from: raw)
+        guard parts.count >= 8 else { return nil }
+        return parts[2...7].map { $0.uppercased() }.joined(separator: ":")
+    }
+
+    private static func normalisedMAC(_ raw: String) -> String? {
+        // Handles NSData format: "STRING: {length = 6, bytes = 0x28940...}"
+        if let hex = extractHexFromNSData(raw), hex.count >= 12 {
+            return macHexToColonMAC(String(hex.prefix(12)))
+        }
+        let parts = hexParts(from: raw)
+        guard parts.count == 6 else { return nil }
+        return parts.map { $0.uppercased() }.joined(separator: ":")
+    }
+
+    private static func extractHexFromNSData(_ raw: String) -> String? {
+        guard raw.contains("bytes = 0x") || raw.contains("0x"),
+              let range = raw.range(of: "0x") else { return nil }
+        let after = String(raw[range.upperBound...])
+        let hex = after.prefix(while: { $0.isHexDigit })
+        return hex.isEmpty ? nil : String(hex)
+    }
+
+    private static func hexParts(from raw: String) -> [String] {
+        // Handle "STRING: XX:XX:XX" prefix from debugDescription
+        let cleaned = raw.hasPrefix("STRING: ") ? String(raw.dropFirst(8)) : raw
+        return cleaned.replacingOccurrences(of: ":", with: " ")
+            .components(separatedBy: .whitespaces)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty && $0.count <= 2 && $0.allSatisfy({ $0.isHexDigit }) }
+    }
+
+    private static func macHexToColonMAC(_ hex: String) -> String? {
+        guard hex.count == 12 else { return nil }
+        return stride(from: 0, to: 12, by: 2).map { i -> String in
+            let s = hex.index(hex.startIndex, offsetBy: i)
+            let e = hex.index(s, offsetBy: 2)
+            return String(hex[s..<e]).uppercased()
+        }.joined(separator: ":")
     }
 }
 
@@ -1069,7 +1193,13 @@ private struct BERReader {
         case 0x02:
         return .integer(Self.decodeSignedInteger(value))
         case 0x04:
-        return .string(String(data: value, encoding: .utf8) ?? "")
+        // If bytes are valid UTF-8 use the string; otherwise encode as hex so binary
+        // values like MAC addresses and bridge IDs are not silently dropped.
+        if let str = String(data: value, encoding: .utf8), !str.isEmpty {
+            return .string(str)
+        }
+        let hex = value.map { String(format: "%02X", $0) }.joined(separator: ":")
+        return .string(hex)
         case 0x05:
         return .null
         case 0x06:

@@ -106,6 +106,7 @@ struct SwitchTelemetry: Codable, Equatable, Sendable {
     var stpRootBridgeID: String?
     var stpIsRootBridge: Bool
     var stpBlockedPorts: [Int]
+    var stpDesignatedBridgePerPort: [Int: String]  // port → designated bridge MAC
 
     init(
         temperatureCelsius: Double? = nil,
@@ -116,7 +117,8 @@ struct SwitchTelemetry: Codable, Equatable, Sendable {
         devicePorts: [DevicePortTelemetry] = [],
         stpRootBridgeID: String? = nil,
         stpIsRootBridge: Bool = false,
-        stpBlockedPorts: [Int] = []
+        stpBlockedPorts: [Int] = [],
+        stpDesignatedBridgePerPort: [Int: String] = [:]
     ) {
         self.temperatureCelsius = temperatureCelsius
         self.lastSNMPChecked = lastSNMPChecked
@@ -127,6 +129,7 @@ struct SwitchTelemetry: Codable, Equatable, Sendable {
         self.stpRootBridgeID = stpRootBridgeID
         self.stpIsRootBridge = stpIsRootBridge
         self.stpBlockedPorts = stpBlockedPorts
+        self.stpDesignatedBridgePerPort = stpDesignatedBridgePerPort
     }
 
     enum CodingKeys: String, CodingKey {
@@ -139,6 +142,7 @@ struct SwitchTelemetry: Codable, Equatable, Sendable {
         case stpRootBridgeID
         case stpIsRootBridge
         case stpBlockedPorts
+        case stpDesignatedBridgePerPort
     }
 
     init(from decoder: Decoder) throws {
@@ -152,6 +156,9 @@ struct SwitchTelemetry: Codable, Equatable, Sendable {
         stpRootBridgeID = try c.decodeIfPresent(String.self, forKey: .stpRootBridgeID)
         stpIsRootBridge = try c.decodeIfPresent(Bool.self, forKey: .stpIsRootBridge) ?? false
         stpBlockedPorts = try c.decodeIfPresent([Int].self, forKey: .stpBlockedPorts) ?? []
+        stpDesignatedBridgePerPort = try c.decodeIfPresent([String: String].self, forKey: .stpDesignatedBridgePerPort).map { dict in
+            Dictionary(uniqueKeysWithValues: dict.compactMap { k, v in Int(k).map { ($0, v) } })
+        } ?? [:]
     }
 
     func encode(to encoder: Encoder) throws {
@@ -165,6 +172,8 @@ struct SwitchTelemetry: Codable, Equatable, Sendable {
         try c.encodeIfPresent(stpRootBridgeID, forKey: .stpRootBridgeID)
         try c.encode(stpIsRootBridge, forKey: .stpIsRootBridge)
         try c.encode(stpBlockedPorts, forKey: .stpBlockedPorts)
+        let stringKeyedDesignated = Dictionary(uniqueKeysWithValues: stpDesignatedBridgePerPort.map { ("\($0.key)", $0.value) })
+        try c.encode(stringKeyedDesignated, forKey: .stpDesignatedBridgePerPort)
     }
 }
 

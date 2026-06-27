@@ -5,6 +5,27 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.4.0 — 2026-06-27
+
+### STP / RSTP Root Bridge Detection
+- Root bridge identified via SNMP — compares LLDP chassis ID against per-port designated bridge MACs across all switches
+- The switch where all active ports designate themselves as the upstream bridge is confirmed as root
+- Root bridge displays a yellow **ROOT** badge in the top-right corner of its tile
+- Fixed: OctetString binary values (MAC addresses, bridge IDs) now correctly decoded as hex by the SNMP client
+
+### Fibre Link Flow Animation
+- All active (non-blocking) fibre links now show animated grey rectangular dashes flowing toward the root bridge
+- Direction determined per-link using the STP designated bridge MAC for each port — topologically correct for every link
+- Grey dashes with black border for clear visibility against the coloured line
+- Blocking links retain the dashed orange style with no flow animation
+- Fibre link lines made thicker across all signal states
+
+### Bug Fixes
+- CSV event log files excluded from Xcode project via `.gitignore` (were causing build errors)
+- Binary OctetString SNMP values no longer silently dropped — encoded as colon-separated hex
+
+---
+
 ## v0.3.3 — 2026-06-27
 
 ### Fibre Topology

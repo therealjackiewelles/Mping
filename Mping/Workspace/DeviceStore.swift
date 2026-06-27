@@ -858,7 +858,12 @@ final class DeviceStore: ObservableObject {
             if device.switchTelemetry.stpBlockedPorts != stp.blockedPorts {
                 device.switchTelemetry.stpBlockedPorts = stp.blockedPorts
                 deviceChanged = true
-                topologyChangedForDevice = true  // triggers topology rebuild → dashed lines update
+                topologyChangedForDevice = true
+            }
+            if device.switchTelemetry.stpDesignatedBridgePerPort != stp.designatedBridgePerPort {
+                device.switchTelemetry.stpDesignatedBridgePerPort = stp.designatedBridgePerPort
+                deviceChanged = true
+                topologyChangedForDevice = true
             }
 
             ConsoleOutputStore.log(
@@ -867,7 +872,7 @@ final class DeviceStore: ObservableObject {
                 deviceID: id,
                 deviceLabel: device.displayName,
                 ipAddress: device.ipAddress,
-                message: "STP extracted — isRoot: \(stp.isRootBridge) | blockedPorts: \(stp.blockedPorts)"
+                message: "STP — isRoot: \(stp.isRootBridge) | rootBridgeID: \(stp.rootBridgeID ?? "unknown") | blocking: \(stp.blockedPorts)"
             )
 
             guard deviceChanged else { continue }

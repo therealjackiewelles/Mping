@@ -1,2 +1,0 @@
-Timestamp,Subsystem,Direction,Device,IP Address,Message
-"2026-06-27T14:39:58Z","WebUI","INFO","Delay 1B Pri","192.168.17.111","Opening web interface: http://192.168.17.111:49152/v1/base/cheetah_login.html"

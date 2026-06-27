@@ -4,15 +4,15 @@ import SwiftUI
 // MARK: - Fibre Box Baked Defaults
 
 enum FibreBoxStyleDefaults {
-    static let textSize: CGFloat = 10.0
-    static let textBold: Bool = true
-    static let lineSpacing: CGFloat = 1.0
-    static let horizontalPadding: CGFloat = 10.0
-    static let verticalPadding: CGFloat = 5.0
-    static let minimumWidth: CGFloat = 62.0
-    static let cornerRadius: CGFloat = 7.0
-    static let borderWidth: CGFloat = 1.0
-    static let opacity: CGFloat = 0.5
+    static let textSize: CGFloat = 9.013
+    static let textBold: Bool = false
+    static let lineSpacing: CGFloat = 0.0
+    static let horizontalPadding: CGFloat = 1.399
+    static let verticalPadding: CGFloat = 1.218
+    static let minimumWidth: CGFloat = 30.0
+    static let cornerRadius: CGFloat = 2.779
+    static let borderWidth: CGFloat = 1.378
+    static let opacity: CGFloat = 0.6
 }
 
 
@@ -177,6 +177,9 @@ struct FibreLossResult: Identifiable, Hashable, Sendable {
     let linkMedium: TopologyLinkMedium
     let isMissing: Bool
     let stpBlocking: Bool
+    let flowDirection: FlowDirection
+
+    enum FlowDirection { case none, aToB, bToA }
 
     var displayName: String {
         let trimmed = connection.name.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -264,10 +267,10 @@ enum FibreSignalStatus: Int, Sendable {
 
     var lineWidth: CGFloat {
         switch self {
-        case .unknown: return 1.5
-        case .good: return 2.0
-        case .warning: return 3.0
-        case .bad, .noSignal: return 4.0
+        case .unknown: return 2.5
+        case .good: return 3.5
+        case .warning: return 4.5
+        case .bad, .noSignal: return 5.5
         }
     }
 
@@ -290,7 +293,8 @@ enum FibreLossCalculator {
         telemetry: [FibrePortTelemetry],
         aIsOpticalPort: Bool = true,
         bIsOpticalPort: Bool = true,
-        stpBlocking: Bool = false
+        stpBlocking: Bool = false,
+        flowDirection: FibreLossResult.FlowDirection = .none
     ) -> FibreLossResult {
         let a = matchingTelemetry(
             deviceID: connection.aDeviceID,
@@ -324,7 +328,8 @@ enum FibreLossCalculator {
             bIsOpticalPort: bIsOpticalPort,
             linkMedium: (aIsOpticalPort || bIsOpticalPort) ? .fibre : .copper,
             isMissing: false,
-            stpBlocking: stpBlocking
+            stpBlocking: stpBlocking,
+            flowDirection: flowDirection
         )
     }
 
@@ -788,7 +793,8 @@ enum FibreAutoLinkBuilder {
                     bIsOpticalPort: remembered.medium == .fibre,
                     linkMedium: remembered.medium,
                     isMissing: true,
-                    stpBlocking: false
+                    stpBlocking: false,
+                    flowDirection: .none
                 )
             }
     }
@@ -869,6 +875,40 @@ enum FibreAutoLinkBuilder {
         // Show STP blocking on any inter-switch link — RSTP blocks both copper and fibre paths.
         let stpBlocking = observation.localDevice.switchTelemetry.stpBlockedPorts.contains(observation.localPort)
                        || observation.remoteDevice.switchTelemetry.stpBlockedPorts.contains(observation.remotePort)
+
+        // Determine flow direction using STP designated bridge data.
+        // The designated bridge for a port is the switch closer to root on that segment.
+        // If local port's designated bridge == local device's own MAC → local is closer to root
+        //   → arrows flow FROM remote TOWARD local (bToA)
+        // If local port's designated bridge == remote device's own MAC → remote is closer to root
+        //   → arrows flow FROM local TOWARD remote (aToB)
+        let flowDirection: FibreLossResult.FlowDirection
+        if stpBlocking {
+            flowDirection = .none
+        } else {
+            let localMAC  = observation.localDevice.switchTelemetry.stpRootBridgeID
+            let remoteMAC = observation.remoteDevice.switchTelemetry.stpRootBridgeID
+            let designatedForLocalPort = observation.localDevice.switchTelemetry.stpDesignatedBridgePerPort[observation.localPort]
+
+            if let desig = designatedForLocalPort, let localMAC {
+                if desig == localMAC {
+                    // Local is the designated bridge → local is closer to root → arrows from remote toward local
+                    flowDirection = .bToA
+                } else if let remoteMAC, desig == remoteMAC {
+                    // Remote is the designated bridge → remote is closer to root → arrows from local toward remote
+                    flowDirection = .aToB
+                } else {
+                    flowDirection = .bToA  // fallback
+                }
+            } else if observation.localDevice.switchTelemetry.stpIsRootBridge {
+                flowDirection = .bToA
+            } else if observation.remoteDevice.switchTelemetry.stpIsRootBridge {
+                flowDirection = .aToB
+            } else {
+                flowDirection = .bToA  // consistent fallback
+            }
+        }
+
         return FibreLossCalculator.calculate(
             connection: connection,
             aDeviceName: observation.localDevice.name,
@@ -876,7 +916,8 @@ enum FibreAutoLinkBuilder {
             telemetry: telemetry,
             aIsOpticalPort: aIsOptical,
             bIsOpticalPort: bIsOptical,
-            stpBlocking: stpBlocking
+            stpBlocking: stpBlocking,
+            flowDirection: flowDirection
         )
     }
 
@@ -1062,6 +1103,7 @@ struct FibreLinkLine: View {
     @State private var bLabelOffset: CGSize
     @State private var aDragStartOffset: CGSize?
     @State private var bDragStartOffset: CGSize?
+    @State private var dashPhase: CGFloat = 0
     @AppStorage("Mping.fibreLabelOpacity") private var fibreLabelOpacity: Double = 0.5
     @ObservedObject private var fibreBoxSettings = FibreBoxEditorSettings.shared
     @ObservedObject private var deviceTileSettings = DeviceTileEditorSettings.shared
@@ -1101,6 +1143,7 @@ struct FibreLinkLine: View {
     var body: some View {
         ZStack {
             if showLine {
+                // Base fibre line — slightly thicker than copper links
                 Path { path in
                     path.move(to: start)
                     path.addLine(to: end)
@@ -1108,12 +1151,47 @@ struct FibreLinkLine: View {
                 .stroke(
                     result.stpBlocking ? Color.orange : result.topologyLineColor,
                     style: StrokeStyle(
-                        lineWidth: result.topologyLineWidth,
+                        lineWidth: result.stpBlocking ? result.topologyLineWidth : result.topologyLineWidth * 1.4,
                         lineCap: .round,
                         lineJoin: .round,
                         dash: result.stpBlocking ? [10, 7] : []
                     )
                 )
+
+                // Animated grey dot arrows showing quickest path to root (AVB clock direction).
+                // GPU-driven dash phase — zero CPU per frame.
+                if result.flowDirection != .none {
+                    // Black border layer — slightly wider, same dash pattern
+                    Path { path in
+                        path.move(to: start)
+                        path.addLine(to: end)
+                    }
+                    .stroke(
+                        Color.black.opacity(0.85),
+                        style: StrokeStyle(
+                            lineWidth: result.topologyLineWidth * 1.7,
+                            lineCap: .butt,
+                            dash: [4, 10],
+                            dashPhase: dashPhase
+                        )
+                    )
+                    // Grey rectangle on top
+                    Path { path in
+                        path.move(to: start)
+                        path.addLine(to: end)
+                    }
+                    .stroke(
+                        Color(white: 0.65).opacity(0.95),
+                        style: StrokeStyle(
+                            lineWidth: result.topologyLineWidth * 1.0,
+                            lineCap: .butt,
+                            dash: [4, 10],
+                            dashPhase: dashPhase
+                        )
+                    )
+                    .onAppear { startFlowAnimation() }
+                    .onChange(of: result.flowDirection) { _, _ in startFlowAnimation() }
+                }
             }
 
             if showLabels {
@@ -1177,6 +1255,18 @@ struct FibreLinkLine: View {
                     onDeleteMissingLink()
                 }
             }
+        }
+    }
+
+    private func startFlowAnimation() {
+        guard result.flowDirection != .none else { return }
+        dashPhase = 0
+        // Dash period = 7 (dash) + 9 (gap) = 16px. Animating by 16px per cycle
+        // moves one full pattern length. Speed tunable via duration.
+        let period: CGFloat = 14  // dash (2) + gap (12) = 14px
+        let target: CGFloat = result.flowDirection == .aToB ? -period : period
+        withAnimation(.linear(duration: 0.6).repeatForever(autoreverses: false)) {
+            dashPhase = target
         }
     }
 
