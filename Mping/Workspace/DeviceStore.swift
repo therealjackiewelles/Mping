@@ -56,6 +56,9 @@ final class DeviceStore: ObservableObject {
     @Published var devices: [MonitoredDevice] = []
     @Published var shapes: [WorkspaceShape] = []
     @Published private(set) var cachedFibreResults: [FibreLossResult] = []
+    // Debounce flow direction changes: only commit after 2 consecutive polls agree,
+    // to avoid oscillation while STP reconverges after a link state change.
+    private var pendingFlowDirections: [UUID: (direction: FibreLossResult.FlowDirection, count: Int)] = [:]
     @Published private(set) var temperatureHistoryByDeviceID: [UUID: [TemperatureHistorySample]] = [:]
     @Published private(set) var alertEvents: [MpingAlertEvent] = []
     private var alertAcknowledgeCutoffs: [MpingAlertCategory: Date] = [:]
@@ -713,7 +716,40 @@ final class DeviceStore: ObservableObject {
     }
 
     private func refreshCachedFibreResults(forceAlertEvaluation: Bool = false) {
-        let rebuiltResults = FibreAutoLinkBuilder.buildResults(from: devices)
+        var rebuiltResults = FibreAutoLinkBuilder.buildResults(from: devices)
+
+        // Debounce flow direction changes. STP reconvergence causes the designated-bridge
+        // OIDs to oscillate across polls while RSTP is still electing. Only commit a
+        // direction change after it has been consistent for 2 consecutive polls.
+        let requiredStablePolls = 2
+        for i in rebuiltResults.indices {
+            let result = rebuiltResults[i]
+            let key = result.connection.id
+            let currentDirection = cachedFibreResults.first(where: { $0.connection.id == key })?.flowDirection
+
+            guard let current = currentDirection, result.flowDirection != current else {
+                // No prior direction, or direction unchanged — clear any pending and keep result.
+                pendingFlowDirections.removeValue(forKey: key)
+                continue
+            }
+
+            // Direction changed — require stability before committing.
+            let pending = pendingFlowDirections[key]
+            if pending?.direction == result.flowDirection {
+                let newCount = (pending?.count ?? 0) + 1
+                if newCount >= requiredStablePolls {
+                    pendingFlowDirections.removeValue(forKey: key)
+                    // Commit the new direction — leave rebuiltResults[i] as-is.
+                } else {
+                    pendingFlowDirections[key] = (result.flowDirection, newCount)
+                    rebuiltResults[i].flowDirection = current  // hold old direction
+                }
+            } else {
+                // Different pending direction — reset counter.
+                pendingFlowDirections[key] = (result.flowDirection, 1)
+                rebuiltResults[i].flowDirection = current  // hold old direction
+            }
+        }
 
         // LLDP polling can run even when the physical topology has not changed.
         // Re-publishing an identical fibre result array forces the workspace/link layer
@@ -945,11 +981,13 @@ final class DeviceStore: ObservableObject {
 
     func clearAllTopologyLinks() {
         FibreAutoLinkBuilder.clearAllRememberedLinks()
+        pendingFlowDirections = [:]
         cachedFibreResults = []
         refreshCachedFibreResults()
     }
 
     func rebuildFibreTopology() {
+        pendingFlowDirections = [:]
         cachedFibreResults = []
         refreshCachedFibreResults()
     }

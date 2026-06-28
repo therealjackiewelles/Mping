@@ -9,13 +9,11 @@ struct ContentView: View {
     @Binding var showingDevicePortsView: Bool
     @State private var openAlertCategory: MpingAlertCategory? = nil
     @AppStorage("mping.showMinimap") private var showMinimap: Bool = true
-    @AppStorage("mping.clearTopologyLinksOnBoot") private var clearTopologyLinksOnBoot: Bool = true
     @State private var workspaceSearch: String = ""
     @EnvironmentObject private var preferences: AppPreferences
     @State private var sidebarWidth: CGFloat = 230
     @State private var hasLoadedSavedSidebarWidth: Bool = false
     @State private var isResizingSidebar: Bool = false
-    @ObservedObject private var fibreBoxStyle = FibreBoxEditorSettings.shared
 
     var body: some View {
         HStack(spacing: 0) {
@@ -40,7 +38,7 @@ struct ContentView: View {
             )
 
             ZStack(alignment: .topTrailing) {
-                WorkspaceView(store: store, searchText: workspaceSearch)
+                WorkspacePlaneCoordinator(store: store, searchText: workspaceSearch)
 
                 if showMinimap && !store.hasSelection {
                     MiniMapView(store: store)
@@ -119,31 +117,6 @@ struct ContentView: View {
                 .toggleStyle(.switch)
                 .foregroundStyle(.white)
 
-            Toggle("Minimap", isOn: $showMinimap)
-                .toggleStyle(.switch)
-                .foregroundStyle(.white.opacity(0.9))
-
-            Toggle("Clear Links on Boot", isOn: $clearTopologyLinksOnBoot)
-                .toggleStyle(.switch)
-                .foregroundStyle(.white.opacity(0.9))
-
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    Text("Fibre Box Opacity")
-                    Spacer()
-                    Text("\(Int(fibreBoxStyle.opacity * 100))%")
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.65))
-                }
-                .font(.system(size: 12, weight: .semibold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.8))
-
-                Slider(value: $fibreBoxStyle.opacity, in: 0.10...1.0, step: 0.05)
-                    .onChange(of: fibreBoxStyle.opacity) { _, _ in
-                        store.fibreBoxStyleDidChange()
-                    }
-            }
-
             HStack(spacing: 6) {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 11, weight: .medium))
@@ -177,28 +150,6 @@ struct ContentView: View {
                     .font(.system(size: 11, weight: .semibold, design: .rounded))
                     .foregroundStyle(.orange)
             }
-
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Zoom: \(Int(store.workspaceScale * 100))%")
-                    .foregroundStyle(.white.opacity(0.8))
-
-                Slider(value: $store.workspaceScale, in: 0.25...3.5)
-            }
-
-            VStack(alignment: .leading, spacing: 8) {
-                Toggle("Snap to Grid", isOn: $store.snapToGridEnabled)
-                    .foregroundStyle(.white)
-
-                if store.snapToGridEnabled {
-                    Text("Grid Size: \(Int(store.snapGridSize)) px")
-                        .font(.system(size: 11, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.75))
-
-                    Slider(value: $store.snapGridSize, in: 20...100, step: 20)
-                }
-            }
-
-
 
             Button("Clear Selection") {
                 store.clearSelection()

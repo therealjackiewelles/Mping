@@ -5,6 +5,28 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.5.0 — 2026-06-28
+
+### Workspace View Switcher
+- Plane switcher added at the bottom of the canvas — switch between **Overview** (full canvas) and **STP** view without losing your zoom or pan position
+- **STP plane** shows a dedicated read-only view of the spanning tree topology: root bridge highlighted in gold, switches with blocking ports in amber, active links with flow animation, blocking links in orange dashed style
+- STP plane includes a legend (Root Bridge / Active Link / Blocking Link) and supports scroll-to-zoom and right-drag-to-pan
+- Architecture: one Swift file per plane under `Workspace/Planes/`, coordinated by `WorkspacePlaneCoordinator`
+
+### STP Flow Direction Fixes
+- Flow direction now voted from both sides of each link independently — resolves cases where one link was consistently animated the wrong way due to a port-numbering mismatch on one switch
+- Flow direction changes are now debounced across 2 consecutive SNMP polls before being committed — eliminates oscillation (back-and-forth animation) during STP reconvergence after a link state change
+
+### Sidebar Cleanup
+- Minimap toggle moved to Preferences (was already there — removed duplicate from sidebar)
+- Clear Links on Boot moved to Preferences (was already there — removed duplicate from sidebar)
+- Zoom slider removed from sidebar
+- Snap to Grid controls removed from sidebar
+- Fibre Box Opacity slider moved to Fibre Box Editor in Debugging tools
+- Fibre box opacity default changed to 100%
+
+---
+
 ## v0.4.1 — 2026-06-27
 
 ### Inspector

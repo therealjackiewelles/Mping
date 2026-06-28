@@ -12,7 +12,7 @@ enum FibreBoxStyleDefaults {
     static let minimumWidth: CGFloat = 30.0
     static let cornerRadius: CGFloat = 2.779
     static let borderWidth: CGFloat = 1.378
-    static let opacity: CGFloat = 0.6
+    static let opacity: CGFloat = 1.0
 }
 
 
@@ -177,7 +177,7 @@ struct FibreLossResult: Identifiable, Hashable, Sendable {
     let linkMedium: TopologyLinkMedium
     let isMissing: Bool
     let stpBlocking: Bool
-    let flowDirection: FlowDirection
+    var flowDirection: FlowDirection
 
     enum FlowDirection { case none, aToB, bToA }
 
@@ -878,28 +878,35 @@ enum FibreAutoLinkBuilder {
 
         // Determine flow direction using STP designated bridge data.
         // The designated bridge for a port is the switch closer to root on that segment.
-        // If local port's designated bridge == local device's own MAC → local is closer to root
-        //   → arrows flow FROM remote TOWARD local (bToA)
-        // If local port's designated bridge == remote device's own MAC → remote is closer to root
-        //   → arrows flow FROM local TOWARD remote (aToB)
+        // We check both sides of the link: local port's designated bridge and remote port's
+        // designated bridge, and count votes to handle cases where only one side has data.
         let flowDirection: FibreLossResult.FlowDirection
         if stpBlocking {
             flowDirection = .none
         } else {
             let localMAC  = observation.localDevice.switchTelemetry.stpRootBridgeID
             let remoteMAC = observation.remoteDevice.switchTelemetry.stpRootBridgeID
-            let designatedForLocalPort = observation.localDevice.switchTelemetry.stpDesignatedBridgePerPort[observation.localPort]
+            let designatedForLocalPort  = observation.localDevice.switchTelemetry.stpDesignatedBridgePerPort[observation.localPort]
+            let designatedForRemotePort = observation.remoteDevice.switchTelemetry.stpDesignatedBridgePerPort[observation.remotePort]
 
-            if let desig = designatedForLocalPort, let localMAC {
-                if desig == localMAC {
-                    // Local is the designated bridge → local is closer to root → arrows from remote toward local
-                    flowDirection = .bToA
-                } else if let remoteMAC, desig == remoteMAC {
-                    // Remote is the designated bridge → remote is closer to root → arrows from local toward remote
-                    flowDirection = .aToB
-                } else {
-                    flowDirection = .bToA  // fallback
-                }
+            // Count direction votes from both sides independently.
+            var bToAVotes = 0  // local is closer to root → remote flows toward local
+            var aToBVotes = 0  // remote is closer to root → local flows toward remote
+
+            if let desig = designatedForLocalPort, let lMAC = localMAC, let rMAC = remoteMAC {
+                if desig == lMAC { bToAVotes += 1 }
+                else if desig == rMAC { aToBVotes += 1 }
+            }
+            if let desig = designatedForRemotePort, let lMAC = localMAC, let rMAC = remoteMAC {
+                // Remote port's designated bridge being remote MAC → remote is designated → bToA
+                if desig == rMAC { bToAVotes += 1 }
+                else if desig == lMAC { aToBVotes += 1 }
+            }
+
+            if bToAVotes > aToBVotes {
+                flowDirection = .bToA
+            } else if aToBVotes > bToAVotes {
+                flowDirection = .aToB
             } else if observation.localDevice.switchTelemetry.stpIsRootBridge {
                 flowDirection = .bToA
             } else if observation.remoteDevice.switchTelemetry.stpIsRootBridge {

@@ -137,6 +137,13 @@ Mping is built in Xcode. There is no package manager or CLI build step.
 
 ## Changelog
 
+### v0.5.0 — 2026-06-28
+- Workspace plane switcher — toggle between Overview and STP view at the bottom of the canvas
+- STP plane: root bridge in gold, blocking ports in amber, active links animated, full legend
+- STP flow animation direction fixed — two-side voting and debounce eliminate wrong direction and oscillation during reconvergence
+- Sidebar cleaned up — zoom, snap-to-grid, minimap toggle, clear-links-on-boot, and fibre opacity slider moved out
+- Fibre box opacity defaults to 100%
+
 ### v0.4.1 — 2026-06-27
 - Inspector temperature history converted to a sparkline graph matching the ping graph layout
 - Hover tooltips on ping and temperature graphs showing value + timestamp
