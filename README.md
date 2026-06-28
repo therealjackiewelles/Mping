@@ -137,6 +137,13 @@ Mping is built in Xcode. There is no package manager or CLI build step.
 
 ## Changelog
 
+### v0.5.1 — 2026-06-28
+- Alert history box in sidebar showing last 10 alerts; click to open full cross-category history
+- Clicking an alert row focuses the device: inspector opens, canvas pans to it, tile flickers white for 5 seconds
+- Pan calculation accounts for inspector panel width (variable-width ready)
+- Sidebar click-through fixed — tiles behind the sidebar are no longer accidentally tappable
+- Alert descriptions shortened; device disconnect icon updated; history popover column alignment fixed
+
 ### v0.5.0 — 2026-06-28
 - Workspace plane switcher — toggle between Overview and STP view at the bottom of the canvas
 - STP plane: root bridge in gold, blocking ports in amber, active links animated, full legend

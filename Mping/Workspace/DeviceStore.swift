@@ -62,6 +62,9 @@ final class DeviceStore: ObservableObject {
     @Published private(set) var temperatureHistoryByDeviceID: [UUID: [TemperatureHistorySample]] = [:]
     @Published private(set) var alertEvents: [MpingAlertEvent] = []
     private var alertAcknowledgeCutoffs: [MpingAlertCategory: Date] = [:]
+    @Published private(set) var flashingDeviceIDs: Set<UUID> = []
+    @Published var pendingFocusDeviceID: UUID? = nil
+    @Published var inspectorWidth: CGFloat = 280
     private let maximumTemperatureHistorySamples = 240
 
     private static let pingAlertThresholdKey = "Mping.alerting.pingThresholdMilliseconds"
@@ -1038,6 +1041,22 @@ final class DeviceStore: ObservableObject {
             }
     }
 
+    func focusDevice(_ id: UUID) {
+        pendingFocusDeviceID = id
+        selectOnlyDevice(id)
+        flashingDeviceIDs.insert(id)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) { [weak self] in
+            self?.flashingDeviceIDs.remove(id)
+        }
+    }
+
+    func allAlerts() -> [MpingAlertEvent] {
+        alertEvents.sorted {
+            if $0.firstTriggeredAt != $1.firstTriggeredAt { return $0.firstTriggeredAt > $1.firstTriggeredAt }
+            return $0.lastUpdatedAt > $1.lastUpdatedAt
+        }
+    }
+
     func acknowledgeAlerts(category: MpingAlertCategory? = nil) {
         let acknowledgeTime = Date()
         let categoriesToAcknowledge = category.map { [$0] } ?? MpingAlertCategory.allCases
@@ -1058,25 +1077,7 @@ final class DeviceStore: ObservableObject {
     }
 
     private func offlineAlertDetail(for device: MonitoredDevice) -> String {
-        let failures = Array((pingVerificationFailuresByDeviceID[device.id] ?? device.verificationFailures).suffix(4))
-        guard failures.count >= 4 else {
-            return "Device is offline after confirmed verification ping failures"
-        }
-
-        let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm:ss"
-
-        let lines = failures.enumerated().map { index, failure in
-            let time = formatter.string(from: failure.timestamp)
-            let firstLine = failure.rawOutput
-                .split(whereSeparator: { $0 == "\n" || $0 == "\r" })
-                .first
-                .map(String.init) ?? "No ping reply"
-
-            return "Ping \(index + 1): \(time), timeout \(failure.timeoutMilliseconds) ms, via \(failure.sourceDisplayText) — \(firstLine)"
-        }
-
-        return (["Device is offline after 4 verification ping failures"] + lines).joined(separator: "\n")
+        "Offline"
     }
 
     private func evaluatePingAlerts(for device: MonitoredDevice) {
@@ -1102,7 +1103,7 @@ final class DeviceStore: ObservableObject {
                 deviceID: device.id,
                 deviceName: device.displayName,
                 location: device.ipAddress,
-                detail: String(format: "%.1f ms RTT over %.0f ms threshold", rtt, pingAlertThresholdMilliseconds)
+                detail: String(format: "RTT %.0f ms (limit %.0f ms)", rtt, pingAlertThresholdMilliseconds)
             )
         } else {
             resolveAlert(conditionKey: pingKey)
@@ -1118,7 +1119,7 @@ final class DeviceStore: ObservableObject {
                 deviceID: device.id,
                 deviceName: device.displayName,
                 location: device.ipAddress,
-                detail: String(format: "%.2f ms jitter over %.1f ms threshold", jitter, jitterAlertThresholdMilliseconds)
+                detail: String(format: "Jitter %.2f ms (limit %.1f ms)", jitter, jitterAlertThresholdMilliseconds)
             )
         } else {
             resolveAlert(conditionKey: jitterKey)
@@ -1135,7 +1136,7 @@ final class DeviceStore: ObservableObject {
                 deviceID: device.id,
                 deviceName: device.displayName,
                 location: device.ipAddress,
-                detail: String(format: "Switch %.1f°C over %.0f°C threshold", temperature, switchTemperatureAlertThresholdCelsius)
+                detail: String(format: "%.0f°C", temperature)
             )
         } else {
             resolveAlert(conditionKey: switchKey)
@@ -1154,7 +1155,7 @@ final class DeviceStore: ObservableObject {
                     deviceID: device.id,
                     deviceName: device.displayName,
                     location: "SFP P\(port.port)",
-                    detail: String(format: "SFP %.1f°C over %.0f°C threshold", temperature, sfpTemperatureAlertThresholdCelsius)
+                    detail: String(format: "SFP %.0f°C", temperature)
                 )
             } else {
                 resolveAlert(conditionKey: sfpKey)
@@ -1185,11 +1186,11 @@ final class DeviceStore: ObservableObject {
 
             let detail: String
             if hasNoSignal {
-                detail = "No optical signal detected"
+                detail = "No Link"
             } else if let worstLoss {
-                detail = String(format: "%.1f dB loss over -%.2fdb threshold", worstLoss, fibreLossAlertThresholdDb)
+                detail = String(format: "%.1f dB", worstLoss)
             } else {
-                detail = "Fibre link warning"
+                detail = "Loss"
             }
 
             raiseAlert(
@@ -1271,7 +1272,7 @@ final class DeviceStore: ObservableObject {
                     deviceID: resolvedAlert.deviceID,
                     deviceName: resolvedAlert.deviceName,
                     location: resolvedAlert.location,
-                    detail: "Back to normal / OK after: \(resolvedAlert.detail)",
+                    detail: "Recovered",
                     firstTriggeredAt: now,
                     lastUpdatedAt: now,
                     isCurrent: false,

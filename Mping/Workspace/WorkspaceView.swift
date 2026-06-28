@@ -104,7 +104,8 @@ struct WorkspaceView: View {
                             shouldShowSecondaryDetail: store.workspaceScale >= 0.52,
                             hasAlert: store.alertEvents.contains(where: {
                                 $0.deviceID == device.id && $0.kind == .alert && !$0.isAcknowledged && $0.isCurrent
-                            })
+                            }),
+                            isFlashing: store.flashingDeviceIDs.contains(device.id)
                         )
                         .equatable()
                         .opacity(deviceMatchesSearch(device) ? 1.0 : 0.22)
@@ -221,6 +222,18 @@ struct WorkspaceView: View {
                 case .ended:
                     hoverPoint = nil
                 }
+            }
+            .onChange(of: store.pendingFocusDeviceID) { _, id in
+                guard let id,
+                      let device = store.devices.first(where: { $0.id == id }) else { return }
+                let inspectorWidth: CGFloat = store.hasSelection ? store.inspectorWidth : 0
+                let visibleWidth = proxy.size.width - inspectorWidth
+                let targetOffsetX = visibleWidth / 2 - device.x * store.workspaceScale
+                let targetOffsetY = proxy.size.height / 2 - device.y * store.workspaceScale
+                withAnimation(.easeInOut(duration: 0.55)) {
+                    store.workspaceOffset = CGSize(width: targetOffsetX, height: targetOffsetY)
+                }
+                store.pendingFocusDeviceID = nil
             }
             .clipped()
             .background(Color(red: 0.055, green: 0.055, blue: 0.06))
@@ -468,12 +481,14 @@ private struct MpingMapDeviceTileView: View, Equatable {
     let isSelected: Bool
     let shouldShowSecondaryDetail: Bool
     let hasAlert: Bool
+    let isFlashing: Bool
 
     @ObservedObject private var tileStyle = DeviceTileEditorSettings.shared
 
     @State private var pulseScale: CGFloat = 0.45
     @State private var pulseOpacity: Double = 0.0
     @State private var alertPulse: Bool = false
+    @State private var flashOpacity: Double = 0.0
 
     static func == (lhs: MpingMapDeviceTileView, rhs: MpingMapDeviceTileView) -> Bool {
         // Keep the map tile stable during SNMP/LLDP polling.
@@ -498,6 +513,7 @@ private struct MpingMapDeviceTileView: View, Equatable {
             && lhs.isSelected == rhs.isSelected
             && lhs.shouldShowSecondaryDetail == rhs.shouldShowSecondaryDetail
             && lhs.hasAlert == rhs.hasAlert
+            && lhs.isFlashing == rhs.isFlashing
     }
 
     private var isPingOnly: Bool { device.deviceType == .pingOnly }
@@ -662,6 +678,22 @@ private struct MpingMapDeviceTileView: View, Equatable {
                     .fill(zoneColor(for: zone))
                     .frame(width: 3)
                     .padding(.vertical, 6)
+            }
+        }
+        .overlay(
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .fill(Color.white.opacity(flashOpacity))
+                .allowsHitTesting(false)
+        )
+        .onChange(of: isFlashing) { _, flashing in
+            if flashing {
+                withAnimation(.easeInOut(duration: 0.3).repeatCount(17, autoreverses: true)) {
+                    flashOpacity = 0.55
+                }
+            } else {
+                withAnimation(.easeOut(duration: 0.25)) {
+                    flashOpacity = 0.0
+                }
             }
         }
         .overlay(alignment: .topTrailing) {

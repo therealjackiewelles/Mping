@@ -39,6 +39,7 @@ struct ContentView: View {
 
             ZStack(alignment: .topTrailing) {
                 WorkspacePlaneCoordinator(store: store, searchText: workspaceSearch)
+                    .contentShape(Rectangle())
 
                 if showMinimap && !store.hasSelection {
                     MiniMapView(store: store)
@@ -51,7 +52,7 @@ struct ContentView: View {
                 HStack(spacing: 0) {
                     Spacer(minLength: 0)
                     InspectorView(store: store)
-                        .frame(width: 280)
+                        .frame(width: store.inspectorWidth)
                         .opacity(store.hasSelection ? 1 : 0)
                         .allowsHitTesting(store.hasSelection)
                 }
@@ -112,6 +113,8 @@ struct ContentView: View {
                 openCategory: $openAlertCategory,
                 sidebarWidth: sidebarWidth
             )
+
+            AlertHistoryBox(store: store, sidebarWidth: sidebarWidth)
 
             Toggle("Monitoring", isOn: $store.monitoringEnabled)
                 .toggleStyle(.switch)

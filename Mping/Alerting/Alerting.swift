@@ -22,7 +22,7 @@ enum MpingAlertCategory: String, CaseIterable, Identifiable, Codable, Sendable {
         switch self {
         case .fibreLoss: return "point.3.connected.trianglepath.dotted"
         case .pingThreshold: return "waveform.path.ecg"
-        case .deviceDisconnect: return "wifi.slash"
+        case .deviceDisconnect: return "network.slash"
         case .overTemperature: return "thermometer.high"
         }
     }
@@ -274,7 +274,7 @@ private struct AlertIconButton: View {
                 if !isPresented { openCategory = nil }
             }
         ), arrowEdge: .leading) {
-            AlertCategoryPopover(store: store, category: category)
+            AlertCategoryPopover(store: store, category: category, dismiss: { openCategory = nil })
         }
     }
 
@@ -295,6 +295,7 @@ private struct AlertIconButton: View {
 private struct AlertCategoryPopover: View {
     @ObservedObject var store: DeviceStore
     let category: MpingAlertCategory
+    var dismiss: (() -> Void)? = nil
 
     @State private var displayedRowLimit = 200
 
@@ -319,7 +320,7 @@ private struct AlertCategoryPopover: View {
         let hiddenRowCount = max(0, rows.count - visibleRows.count)
         let layout = AlertTableColumnLayout(rows: visibleRows)
         let tableWidth = layout.totalWidth
-        let popoverWidth = min(max(tableWidth + 28, 640), preferredMaximumPopoverWidth)
+        let popoverWidth = min(max(tableWidth + 48, 640), preferredMaximumPopoverWidth)
 
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
@@ -362,7 +363,12 @@ private struct AlertCategoryPopover: View {
                                     .padding(.vertical, 12)
                             } else {
                                 ForEach(visibleRows) { alert in
-                                    AlertTableRow(alert: alert, timeFormatter: timeFormatter, layout: layout)
+                                    AlertTableRow(alert: alert, timeFormatter: timeFormatter, layout: layout) {
+                                        if let id = alert.deviceID {
+                                            store.focusDevice(id)
+                                            dismiss?()
+                                        }
+                                    }
                                 }
 
                                 if hiddenRowCount > 0 {
@@ -708,6 +714,7 @@ private struct AlertTableRow: View {
     let alert: MpingAlertEvent
     let timeFormatter: DateFormatter
     let layout: AlertTableColumnLayout
+    var onTap: (() -> Void)? = nil
 
     private var isNew: Bool {
         alert.kind == .alert && !alert.isAcknowledged
@@ -765,5 +772,339 @@ private struct AlertTableRow: View {
             RoundedRectangle(cornerRadius: 8)
                 .stroke(rowStroke, lineWidth: 1)
         )
+        .contentShape(Rectangle())
+        .onTapGesture { onTap?() }
+    }
+}
+
+// MARK: - Alert History Box
+
+struct AlertHistoryBox: View {
+    @ObservedObject var store: DeviceStore
+    let sidebarWidth: CGFloat
+    @State private var showingFullHistory = false
+
+    private let timeFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "HH:mm:ss"
+        return f
+    }()
+
+    private var recentAlerts: [MpingAlertEvent] {
+        Array(store.allAlerts().prefix(10))
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            header
+            if recentAlerts.isEmpty {
+                Text("No alerts recorded this session.")
+                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.30))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 10)
+            } else {
+                VStack(spacing: 2) {
+                    ForEach(recentAlerts) { alert in
+                        historyRow(alert)
+                    }
+                }
+                .padding(.horizontal, 6)
+                .padding(.bottom, 6)
+            }
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.white.opacity(0.04))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+        )
+        .contentShape(Rectangle())
+        .onTapGesture { showingFullHistory = true }
+        .popover(isPresented: $showingFullHistory, arrowEdge: .leading) {
+            AlertFullHistoryPopover(store: store, dismiss: { showingFullHistory = false })
+        }
+    }
+
+    private var header: some View {
+        HStack(spacing: 6) {
+            Text("History")
+                .font(.system(size: 11, weight: .black, design: .rounded))
+                .foregroundStyle(.white.opacity(0.70))
+            Spacer()
+            Text("\(store.allAlerts().count) total")
+                .font(.system(size: 9, weight: .bold, design: .rounded))
+                .foregroundStyle(.white.opacity(0.28))
+            Image(systemName: "chevron.right")
+                .font(.system(size: 9, weight: .bold))
+                .foregroundStyle(.white.opacity(0.22))
+        }
+        .padding(.horizontal, 10)
+        .padding(.top, 9)
+        .padding(.bottom, 7)
+    }
+
+    private func historyRow(_ alert: MpingAlertEvent) -> some View {
+        HStack(spacing: 5) {
+            Circle()
+                .fill(rowDotColor(alert))
+                .frame(width: 5, height: 5)
+                .fixedSize()
+
+            Text(timeFormatter.string(from: alert.firstTriggeredAt))
+                .font(.system(size: 9, weight: .semibold, design: .rounded))
+                .foregroundStyle(.white.opacity(0.30))
+                .monospacedDigit()
+                .fixedSize()
+
+            Image(systemName: alert.category.systemImage)
+                .font(.system(size: 8, weight: .semibold))
+                .foregroundStyle(categoryColor(alert.category).opacity(0.60))
+                .fixedSize()
+
+            Text(alert.deviceName.isEmpty ? alert.location : alert.deviceName)
+                .font(.system(size: 10, weight: .bold, design: .rounded))
+                .foregroundStyle(alert.kind == .alert && !alert.isAcknowledged ? .white.opacity(0.88) : .white.opacity(0.42))
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .layoutPriority(1)
+
+            Text(alert.detail)
+                .font(.system(size: 9, weight: .medium, design: .rounded))
+                .foregroundStyle(.white.opacity(0.30))
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .layoutPriority(0)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 3)
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .fill(rowBackground(alert))
+        )
+    }
+
+    private func rowDotColor(_ alert: MpingAlertEvent) -> Color {
+        if alert.kind == .recovery { return .green.opacity(0.80) }
+        if alert.isAcknowledged { return .white.opacity(0.18) }
+        return .red.opacity(0.85)
+    }
+
+    private func rowBackground(_ alert: MpingAlertEvent) -> Color {
+        if alert.kind == .recovery { return .green.opacity(0.06) }
+        if alert.isAcknowledged { return .white.opacity(0.03) }
+        return .red.opacity(0.08)
+    }
+
+    private func categoryColor(_ category: MpingAlertCategory) -> Color {
+        switch category {
+        case .deviceDisconnect: return .red
+        case .fibreLoss: return .orange
+        case .overTemperature: return .orange
+        case .pingThreshold: return .yellow
+        }
+    }
+}
+
+// MARK: - Full History Popover
+
+private struct AlertFullHistoryPopover: View {
+    @ObservedObject var store: DeviceStore
+    var dismiss: (() -> Void)? = nil
+    @State private var displayedRowLimit = 200
+
+    private let pageSize = 200
+    private let timeFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "HH:mm:ss"
+        return f
+    }()
+
+    private var allRows: [MpingAlertEvent] { store.allAlerts() }
+    private var visibleRows: [MpingAlertEvent] { Array(allRows.prefix(displayedRowLimit)) }
+    private var hiddenCount: Int { max(0, allRows.count - visibleRows.count) }
+
+    var body: some View {
+        let layout = AlertTableColumnLayout(rows: visibleRows)
+        let tableWidth = layout.totalWidth + 130 + layout.spacing + 6
+        let popoverWidth = min(max(tableWidth + 48, 680), preferredMaxWidth)
+
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: "clock.arrow.circlepath")
+                    .foregroundStyle(.secondary)
+                Text("Alert History")
+                    .font(.system(size: 15, weight: .black, design: .rounded))
+                Spacer()
+                Text("\(allRows.filter { $0.kind == .alert && !$0.isAcknowledged }.count) active · \(allRows.count) total")
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .foregroundStyle(.secondary)
+                Button("Acknowledge All") {
+                    store.acknowledgeAlerts()
+                }
+                .buttonStyle(.plain)
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .foregroundStyle(.white.opacity(0.65))
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .background(RoundedRectangle(cornerRadius: 7).fill(Color.white.opacity(0.07)))
+            }
+
+            Divider()
+
+            ScrollView(.horizontal, showsIndicators: tableWidth > popoverWidth - 28) {
+                VStack(alignment: .leading, spacing: 6) {
+                    fullHistoryHeader(layout: layout)
+
+                    ScrollView {
+                        LazyVStack(spacing: 3) {
+                            if visibleRows.isEmpty {
+                                Text("No alerts recorded this session.")
+                                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                                    .foregroundStyle(.secondary)
+                                    .frame(width: tableWidth, alignment: .leading)
+                                    .padding(.vertical, 12)
+                            } else {
+                                ForEach(visibleRows) { alert in
+                                    fullHistoryRow(alert, layout: layout)
+                                }
+                                if hiddenCount > 0 {
+                                    AlertHistoryLoadMoreRow(
+                                        hiddenRowCount: hiddenCount,
+                                        pageSize: pageSize,
+                                        showMore: { displayedRowLimit += pageSize },
+                                        showAll: { displayedRowLimit = allRows.count }
+                                    )
+                                    .frame(width: tableWidth)
+                                }
+                            }
+                        }
+                        .padding(.bottom, 4)
+                    }
+                    .frame(minHeight: 120, maxHeight: 400)
+                }
+                .frame(width: tableWidth, alignment: .leading)
+            }
+        }
+        .padding(14)
+        .frame(width: popoverWidth)
+    }
+
+    private func fullHistoryHeader(layout: AlertTableColumnLayout) -> some View {
+        HStack(spacing: layout.spacing) {
+            Text("Time")
+                .frame(width: layout.time, alignment: .leading)
+            Text("Category")
+                .frame(width: 130, alignment: .leading)
+            Text("Device / Link")
+                .frame(width: layout.device, alignment: .leading)
+            Text("Port / IP")
+                .frame(width: layout.location, alignment: .leading)
+            Text("Acknowledged")
+                .frame(width: layout.acknowledged, alignment: .leading)
+            Text("Event")
+                .frame(width: layout.event, alignment: .leading)
+        }
+        .font(.system(size: 10, weight: .black, design: .rounded))
+        .foregroundStyle(.secondary)
+        .padding(.leading, 14)
+        .padding(.trailing, 8)
+        .frame(width: layout.totalWidth + 130 + layout.spacing + 6, alignment: .leading)
+    }
+
+    private func fullHistoryRow(_ alert: MpingAlertEvent, layout: AlertTableColumnLayout) -> some View {
+        FullHistoryRow(alert: alert, layout: layout, timeFormatter: timeFormatter) {
+            if let id = alert.deviceID {
+                store.focusDevice(id)
+                dismiss?()
+            }
+        }
+    }
+
+    private var preferredMaxWidth: CGFloat {
+        if let w = NSScreen.main?.visibleFrame.width { return max(680, w * 0.88) }
+        return 1280
+    }
+}
+
+private struct FullHistoryRow: View {
+    let alert: MpingAlertEvent
+    let layout: AlertTableColumnLayout
+    let timeFormatter: DateFormatter
+    var onTap: (() -> Void)? = nil
+
+    private var isNew: Bool { alert.kind == .alert && !alert.isAcknowledged }
+    private var isRecovery: Bool { alert.kind == .recovery }
+
+    private var rowFill: Color {
+        if isNew { return Color.red.opacity(0.52) }
+        if isRecovery { return Color.green.opacity(0.10) }
+        return Color.white.opacity(0.055)
+    }
+
+    private var rowStroke: Color {
+        if isNew { return Color.red.opacity(0.75) }
+        if isRecovery { return Color.green.opacity(0.30) }
+        return Color.white.opacity(0.07)
+    }
+
+    private var rowWidth: CGFloat { layout.totalWidth + 130 + layout.spacing + 6 }
+
+    var body: some View {
+        HStack(spacing: layout.spacing) {
+            Text(timeFormatter.string(from: alert.firstTriggeredAt))
+                .frame(width: layout.time, alignment: .leading)
+                .monospacedDigit()
+
+            categoryCell
+
+            Text(alert.deviceName)
+                .frame(width: layout.device, alignment: .leading)
+                .lineLimit(1)
+                .truncationMode(.middle)
+
+            Text(alert.location)
+                .frame(width: layout.location, alignment: .leading)
+                .lineLimit(1)
+                .truncationMode(.middle)
+
+            ackedCell
+
+            Text(alert.detail)
+                .frame(width: layout.event, alignment: .leading)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .font(.system(size: 11, weight: .semibold, design: .rounded))
+        .foregroundStyle(isNew ? .white : .white.opacity(0.55))
+        .padding(.leading, 14)
+        .padding(.trailing, 8)
+        .padding(.vertical, 4)
+        .frame(width: rowWidth, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 8).fill(rowFill))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(rowStroke, lineWidth: 1))
+        .contentShape(Rectangle())
+        .onTapGesture { onTap?() }
+    }
+
+    private var categoryCell: some View {
+        HStack(spacing: 4) {
+            Image(systemName: alert.category.systemImage)
+                .font(.system(size: 10))
+            Text(alert.category.label)
+                .lineLimit(1)
+        }
+        .frame(width: 130, alignment: .leading)
+    }
+
+    private var ackedCell: some View {
+        let label: String = isRecovery ? "OK" : (alert.isAcknowledged ? "Yes" : "No")
+        return Text(label)
+            .frame(width: layout.acknowledged, alignment: .leading)
+            .font(.system(size: 10, weight: .black, design: .rounded))
+            .foregroundStyle(isNew ? .white : .white.opacity(0.55))
     }
 }

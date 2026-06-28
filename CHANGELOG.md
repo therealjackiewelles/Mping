@@ -5,6 +5,20 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.5.1 — 2026-06-28
+
+### Alerting
+- Alert history box added to the sidebar below the alerting panel — shows the 10 most recent alerts across all categories with time, device, and description on a single compact line
+- Clicking the history box opens a full history popover with all alerts, a Category column, colour-coded rows (red = active, green = recovered, grey = acknowledged), and the same paginated load-more pattern as the per-category popover
+- Clicking any alert row in either the per-category popover or the full history popover now focuses the device: the popover closes, the inspector opens, the canvas pans to centre the device, and the tile flickers white for 5 seconds
+- Canvas pan on focus correctly accounts for the inspector panel width so the device lands in the centre of the visible canvas area, not behind the inspector — inspector width is stored in DeviceStore and ready for a variable-width inspector in future
+- Sidebar click-through fixed — device tiles that have panned underneath the sidebar can no longer be accidentally clicked through it
+- Alert descriptions shortened across all categories: Offline, RTT 1423 ms (limit 100 ms), Jitter 2.34 ms (limit 2.0 ms), 74°C, SFP 78°C, 3.2 dB, No Link, Recovered
+- Device disconnect icon changed from wifi slash to network.slash
+- Full history popover: Category column widened to fit "Device Disconnect" without truncating; Time column left padding increased for breathing room; column alignment fixed
+
+---
+
 ## v0.5.0 — 2026-06-28
 
 ### Workspace View Switcher
