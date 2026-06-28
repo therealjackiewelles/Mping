@@ -249,6 +249,7 @@ private struct DeviceInspector: View {
     @State private var selectedInterfaceID: String = "AUTO"
     @State private var selectedDeviceType: MonitoredDeviceType = .pingOnly
     @State private var zoneName: String = ""
+    @State private var showDeleteConfirmation: Bool = false
     @FocusState private var focusedField: DeviceInspectorField?
 
     var body: some View {
@@ -260,67 +261,65 @@ private struct DeviceInspector: View {
 
                 monitoringControlsSection
 
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Text("Name")
-                            .foregroundStyle(.white.opacity(0.7))
-
+                // Name
+                compactCard {
+                    HStack(spacing: 6) {
+                        Text("NAME")
+                            .font(.system(size: 9, weight: .medium, design: .rounded))
+                            .foregroundStyle(.white.opacity(0.46))
+                            .textCase(.uppercase)
                         Spacer()
-
-                        Toggle("Use SNMP/LLDP", isOn: Binding(
+                        Toggle("SNMP/LLDP", isOn: Binding(
                             get: { selectedNameSource == .automatic },
-                            set: { useAutomaticName in
+                            set: { useAutomatic in
                                 commitDeviceTextFields()
-                                let newSource: DeviceNameSource = useAutomaticName ? .automatic : .manual
-                                selectedNameSource = newSource
-                                store.updateDeviceNameSource(id: device.id, source: newSource)
+                                let src: DeviceNameSource = useAutomatic ? .automatic : .manual
+                                selectedNameSource = src
+                                store.updateDeviceNameSource(id: device.id, source: src)
                             }
                         ))
                         .toggleStyle(.checkbox)
-                        .font(.system(size: 11, weight: .medium, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.72))
+                        .font(.system(size: 10, weight: .medium, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.60))
                     }
-
                     TextField("Name", text: $name)
-                        .textFieldStyle(.roundedBorder)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .foregroundStyle(selectedNameSource == .automatic ? .white.opacity(0.45) : .white.opacity(0.92))
                         .focused($focusedField, equals: .name)
                         .disabled(selectedNameSource == .automatic)
-                        .opacity(selectedNameSource == .automatic ? 0.48 : 1.0)
-                        .onSubmit {
-                            commitDeviceTextFields()
-                        }
-
-                    if selectedNameSource == .automatic {
-                        Text("Automatic naming will use the discovered SNMP/LLDP name when available. Manual name is kept as a fallback.")
-                            .font(.system(size: 10, weight: .medium, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.42))
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
+                        .onSubmit { commitDeviceTextFields() }
                 }
 
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("IP Address").foregroundStyle(.white.opacity(0.7))
-                    TextField("IP Address", text: $ip)
-                        .textFieldStyle(.roundedBorder)
-                        .focused($focusedField, equals: .ipAddress)
-                        .onSubmit {
-                            commitDeviceTextFields()
-                        }
-                }
-
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Device Type")
-                        .foregroundStyle(.white.opacity(0.7))
-
-                    Picker("Device Type", selection: $selectedDeviceType) {
-                        ForEach(MonitoredDeviceType.allCases, id: \.self) { type in
-                            Text(type.label).tag(type)
-                        }
+                // IP + Device Type
+                HStack(spacing: 8) {
+                    compactCard {
+                        Text("IP ADDRESS")
+                            .font(.system(size: 9, weight: .medium, design: .rounded))
+                            .foregroundStyle(.white.opacity(0.46))
+                        TextField("IP", text: $ip)
+                            .textFieldStyle(.plain)
+                            .font(.system(size: 12, weight: .medium, design: .rounded))
+                            .foregroundStyle(.white.opacity(0.92))
+                            .focused($focusedField, equals: .ipAddress)
+                            .onSubmit { commitDeviceTextFields() }
                     }
-                    .labelsHidden()
-                    .onChange(of: selectedDeviceType) { _, newValue in
-                        guard newValue != device.deviceType else { return }
-                        store.updateDeviceType(id: device.id, type: newValue)
+
+                    compactCard {
+                        Text("TYPE")
+                            .font(.system(size: 9, weight: .medium, design: .rounded))
+                            .foregroundStyle(.white.opacity(0.46))
+                        Picker("", selection: $selectedDeviceType) {
+                            ForEach(MonitoredDeviceType.allCases, id: \.self) { type in
+                                Text(type.label).tag(type)
+                            }
+                        }
+                        .labelsHidden()
+                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .onChange(of: selectedDeviceType) { _, newValue in
+                            guard newValue != device.deviceType else { return }
+                            store.updateDeviceType(id: device.id, type: newValue)
+                        }
                     }
                 }
 
@@ -329,18 +328,52 @@ private struct DeviceInspector: View {
                     fibreLossSection
                 }
 
-                zoneSection
+                // Zone
+                compactCard {
+                    Text("ZONE")
+                        .font(.system(size: 9, weight: .medium, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.46))
+                    TextField("Optional", text: $zoneName)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.92))
+                        .onSubmit { commitZoneName() }
+                }
 
-                nicSection
-
-                Text("Text changes apply when you press Return or click away.")
-                    .font(.system(size: 10, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.38))
-                    .fixedSize(horizontal: false, vertical: true)
-
-                Button("Delete Device", role: .destructive) {
-                    commitDeviceTextFields()
-                    store.deleteSelectedDevice()
+                // NIC
+                compactCard {
+                    HStack(spacing: 6) {
+                        Text("PING NIC")
+                            .font(.system(size: 9, weight: .medium, design: .rounded))
+                            .foregroundStyle(.white.opacity(0.46))
+                        Spacer()
+                        Button("Refresh") {
+                            store.refreshNetworkInterfaces()
+                            syncInterfaceSelection()
+                        }
+                        .font(.system(size: 9, weight: .medium, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.40))
+                        .buttonStyle(.plain)
+                    }
+                    Picker("", selection: $selectedInterfaceID) {
+                        Text("Auto Routing").tag("AUTO")
+                        ForEach(store.networkInterfaces) { nic in
+                            Text(nic.pickerTitle).tag(nic.id)
+                        }
+                    }
+                    .labelsHidden()
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .onChange(of: selectedInterfaceID) { _, newValue in
+                        let currentID: String
+                        if let sourceIPAddress = device.sourceIPAddress,
+                           let match = store.networkInterfaces.first(where: { $0.ipv4Address == sourceIPAddress }) {
+                            currentID = match.id
+                        } else {
+                            currentID = "AUTO"
+                        }
+                        guard newValue != currentID else { return }
+                        store.updateDeviceInterface(id: device.id, interfaceID: newValue)
+                    }
                 }
 
                 Divider()
@@ -353,6 +386,8 @@ private struct DeviceInspector: View {
                 }
 
                 Spacer(minLength: 12)
+
+                deleteSection
             }
             .padding(18)
         }
@@ -436,7 +471,7 @@ private struct DeviceInspector: View {
                     values: Array(device.pingRTTHistory.suffix(60)),
                     valueFormatter: { String(format: "%.2f ms", $0) }
                 )
-                .frame(height: 36)
+                .frame(height: 56)
             }
 
             HStack(spacing: 6) {
@@ -466,27 +501,6 @@ private struct DeviceInspector: View {
                 )
             }
 
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("MAC Address")
-                        .font(.system(size: 9, weight: .medium, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.46))
-                        .textCase(.uppercase)
-                    Text(device.macAddress ?? "—")
-                        .font(.system(size: 11, weight: .medium, design: .monospaced))
-                        .foregroundStyle(.white.opacity(0.78))
-                        .textSelection(.enabled)
-                }
-                Spacer()
-                Button("Lookup") {
-                    store.lookupMACAddress(for: device.id, ip: device.ipAddress)
-                }
-                .font(.system(size: 11, weight: .medium, design: .rounded))
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 7)
-            .background(Color.black.opacity(0.18), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 9, style: .continuous).stroke(Color.white.opacity(0.08), lineWidth: 1))
         }
         .padding(10)
         .background(
@@ -597,12 +611,10 @@ private struct DeviceInspector: View {
                 PingSparklineView(
                     values: windowValues,
                     lineColor: graphColor,
-                    minLabel: minTemp.map { String(format: "%.0f°C", $0) },
-                    maxLabel: maxTemp.map { String(format: "%.0f°C", $0) },
-                    valueFormatter: { String(format: "%.1f°C", $0) },
+                    valueFormatter: { String(format: "%.0f°C", $0) },
                     timestamps: windowTimestamps
                 )
-                .frame(height: 36)
+                .frame(height: 56)
             }
 
             HStack(spacing: 6) {
@@ -747,13 +759,93 @@ private struct DeviceInspector: View {
         return .green
     }
 
-    private var zoneSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Zone").foregroundStyle(.white.opacity(0.7))
-            TextField("Zone name (optional)", text: $zoneName)
-                .textFieldStyle(.roundedBorder)
-                .onSubmit { commitZoneName() }
+    private var deleteSection: some View {
+        VStack(spacing: 0) {
+            if showDeleteConfirmation {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "exclamationmark.triangle")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Color.red.opacity(0.85))
+                        Text("Delete \(device.displayName.isEmpty ? "this device" : device.displayName)?")
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .foregroundStyle(.white.opacity(0.88))
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
+                    Text("This cannot be undone. All monitoring data for this device will be lost.")
+                        .font(.system(size: 10, weight: .medium, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.50))
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    HStack(spacing: 8) {
+                        Button("Cancel") {
+                            withAnimation(.easeOut(duration: 0.15)) {
+                                showDeleteConfirmation = false
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.60))
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 7)
+                        .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 8))
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.10), lineWidth: 1))
+
+                        Button("Delete") {
+                            commitDeviceTextFields()
+                            store.deleteSelectedDevice()
+                        }
+                        .buttonStyle(.plain)
+                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 7)
+                        .frame(maxWidth: .infinity)
+                        .background(Color.red.opacity(0.75), in: RoundedRectangle(cornerRadius: 8))
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.red.opacity(0.90), lineWidth: 1))
+                    }
+                }
+                .padding(12)
+                .background(Color.red.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.red.opacity(0.25), lineWidth: 1))
+                .transition(.opacity.combined(with: .move(edge: .bottom)))
+            } else {
+                Button {
+                    withAnimation(.easeOut(duration: 0.15)) {
+                        showDeleteConfirmation = true
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "trash")
+                            .font(.system(size: 11, weight: .medium))
+                        Text("Delete Device")
+                            .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    }
+                    .foregroundStyle(Color.red.opacity(0.70))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                    .background(Color.red.opacity(0.07), in: RoundedRectangle(cornerRadius: 8))
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.red.opacity(0.18), lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+                .transition(.opacity)
+            }
         }
+        .animation(.easeOut(duration: 0.15), value: showDeleteConfirmation)
+        .onChange(of: device.id) { _, _ in showDeleteConfirmation = false }
+    }
+
+    @ViewBuilder
+    private func compactCard<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            content()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 7)
+        .background(Color.black.opacity(0.18), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 9, style: .continuous).stroke(Color.white.opacity(0.08), lineWidth: 1))
     }
 
     private func commitZoneName() {
@@ -761,48 +853,6 @@ private struct DeviceInspector: View {
         let newZone: String? = trimmed.isEmpty ? nil : trimmed
         guard newZone != device.zoneName else { return }
         store.updateDeviceZoneName(id: device.id, zoneName: newZone)
-    }
-
-    private var nicSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("Ping NIC").foregroundStyle(.white.opacity(0.7))
-
-                Spacer()
-
-                Button("Refresh") {
-                    store.refreshNetworkInterfaces()
-                    syncInterfaceSelection()
-                }
-                .font(.caption)
-            }
-
-            Picker("Ping NIC", selection: $selectedInterfaceID) {
-                Text("Auto Routing").tag("AUTO")
-
-                ForEach(store.networkInterfaces) { nic in
-                    Text(nic.pickerTitle).tag(nic.id)
-                }
-            }
-            .labelsHidden()
-            .onChange(of: selectedInterfaceID) { _, newValue in
-                let currentID: String
-                if let sourceIPAddress = device.sourceIPAddress,
-                   let match = store.networkInterfaces.first(where: { $0.ipv4Address == sourceIPAddress }) {
-                    currentID = match.id
-                } else {
-                    currentID = "AUTO"
-                }
-
-                guard newValue != currentID else { return }
-                store.updateDeviceInterface(id: device.id, interfaceID: newValue)
-            }
-
-            Text("Current: \(device.nicDisplayText)")
-                .font(.system(size: 11, weight: .medium, design: .rounded))
-                .foregroundStyle(.white.opacity(0.55))
-                .fixedSize(horizontal: false, vertical: true)
-        }
     }
 
     private var temperatureColor: Color {
@@ -859,88 +909,84 @@ private struct PingSparklineView: View {
     }()
 
     var body: some View {
-        GeometryReader { geo in
-            let w = geo.size.width
-            let h = geo.size.height
-            let minV = values.min() ?? 0
-            let maxV = values.max() ?? 1
-            let range = max(0.1, maxV - minV)
-            let count = values.count
+        let minV = values.min() ?? 0
+        let maxV = values.max() ?? 1
 
-            ZStack(alignment: .topLeading) {
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(Color.black.opacity(0.18))
-
-                Path { path in
-                    for (i, v) in values.enumerated() {
-                        let x = w * CGFloat(i) / CGFloat(max(1, count - 1))
-                        let y = h - (h * CGFloat((v - minV) / range)) * 0.85 - h * 0.075
-                        if i == 0 { path.move(to: CGPoint(x: x, y: y)) }
-                        else { path.addLine(to: CGPoint(x: x, y: y)) }
-                    }
-                }
-                .stroke(lineColor.opacity(0.75), style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
-
-                // Hover cursor and tooltip
-                if let idx = hoverIndex, idx < count {
-                    let x = w * CGFloat(idx) / CGFloat(max(1, count - 1))
-                    let y = h - (h * CGFloat((values[idx] - minV) / range)) * 0.85 - h * 0.075
-
-                    // Vertical cursor line
-                    Path { path in
-                        path.move(to: CGPoint(x: x, y: 0))
-                        path.addLine(to: CGPoint(x: x, y: h))
-                    }
-                    .stroke(Color.white.opacity(0.3), lineWidth: 1)
-
-                    // Dot at data point
-                    Circle()
-                        .fill(lineColor)
-                        .frame(width: 6, height: 6)
-                        .position(x: x, y: y)
-
-                    // Tooltip bubble
-                    let tipX = x > w * 0.6 ? x - 4 : x + 4
-                    let tipAlignment: Alignment = x > w * 0.6 ? .trailing : .leading
-                    VStack(alignment: x > w * 0.6 ? .trailing : .leading, spacing: 1) {
-                        if let ts = timestamps, idx < ts.count {
-                            Text(Self.tooltipTimeFormatter.string(from: ts[idx]))
-                                .font(.system(size: 9, weight: .regular, design: .monospaced))
-                                .foregroundStyle(.white.opacity(0.6))
-                        }
-                        Text(valueFormatter?(values[idx]) ?? String(format: "%.2f", values[idx]))
-                            .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                            .foregroundStyle(.white)
-                    }
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 4)
-                    .background(.black.opacity(0.75), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous).stroke(lineColor.opacity(0.5), lineWidth: 1))
-                    .position(x: tipX, y: max(24, y - 20))
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: tipAlignment)
-                }
-
-                HStack {
-                    Text(minLabel ?? String(format: "%.1f", minV))
-                    Spacer()
-                    Text(maxLabel ?? String(format: "%.1f ms", maxV))
-                }
+        VStack(alignment: .leading, spacing: 2) {
+            Text(maxLabel ?? (valueFormatter?(maxV) ?? String(format: "%.1f ms", maxV)))
                 .font(.system(size: 8, weight: .medium, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.35))
-                .padding(.horizontal, 5)
-                .padding(.vertical, 3)
-                .frame(maxHeight: .infinity, alignment: .bottom)
-            }
-            .onContinuousHover { phase in
-                switch phase {
-                case .active(let loc):
-                    guard count > 1 else { return }
-                    let idx = Int((loc.x / w * CGFloat(count - 1)).rounded())
-                    hoverIndex = max(0, min(count - 1, idx))
-                case .ended:
-                    hoverIndex = nil
+                .foregroundStyle(.white.opacity(0.40))
+
+            GeometryReader { geo in
+                let w = geo.size.width
+                let h = geo.size.height
+                let range = max(0.1, maxV - minV)
+                let count = values.count
+
+                ZStack(alignment: .topLeading) {
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(Color.black.opacity(0.18))
+
+                    Path { path in
+                        for (i, v) in values.enumerated() {
+                            let x = w * CGFloat(i) / CGFloat(max(1, count - 1))
+                            let y = h - (h * CGFloat((v - minV) / range)) * 0.85 - h * 0.075
+                            if i == 0 { path.move(to: CGPoint(x: x, y: y)) }
+                            else { path.addLine(to: CGPoint(x: x, y: y)) }
+                        }
+                    }
+                    .stroke(lineColor.opacity(0.75), style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
+
+                    if let idx = hoverIndex, idx < count {
+                        let x = w * CGFloat(idx) / CGFloat(max(1, count - 1))
+                        let y = h - (h * CGFloat((values[idx] - minV) / range)) * 0.85 - h * 0.075
+
+                        Path { path in
+                            path.move(to: CGPoint(x: x, y: 0))
+                            path.addLine(to: CGPoint(x: x, y: h))
+                        }
+                        .stroke(Color.white.opacity(0.3), lineWidth: 1)
+
+                        Circle()
+                            .fill(lineColor)
+                            .frame(width: 6, height: 6)
+                            .position(x: x, y: y)
+
+                        let tipX = x > w * 0.6 ? x - 4 : x + 4
+                        let tipAlignment: Alignment = x > w * 0.6 ? .trailing : .leading
+                        VStack(alignment: x > w * 0.6 ? .trailing : .leading, spacing: 1) {
+                            if let ts = timestamps, idx < ts.count {
+                                Text(Self.tooltipTimeFormatter.string(from: ts[idx]))
+                                    .font(.system(size: 9, weight: .regular, design: .monospaced))
+                                    .foregroundStyle(.white.opacity(0.6))
+                            }
+                            Text(valueFormatter?(values[idx]) ?? String(format: "%.2f", values[idx]))
+                                .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                                .foregroundStyle(.white)
+                        }
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 4)
+                        .background(.black.opacity(0.75), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous).stroke(lineColor.opacity(0.5), lineWidth: 1))
+                        .position(x: tipX, y: max(24, y - 20))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: tipAlignment)
+                    }
+                }
+                .onContinuousHover { phase in
+                    switch phase {
+                    case .active(let loc):
+                        guard count > 1 else { return }
+                        let idx = Int((loc.x / w * CGFloat(count - 1)).rounded())
+                        hoverIndex = max(0, min(count - 1, idx))
+                    case .ended:
+                        hoverIndex = nil
+                    }
                 }
             }
+
+            Text(minLabel ?? (valueFormatter?(minV) ?? String(format: "%.1f", minV)))
+                .font(.system(size: 8, weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.40))
         }
     }
 }

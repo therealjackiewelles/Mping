@@ -137,6 +137,14 @@ Mping is built in Xcode. There is no package manager or CLI build step.
 
 ## Changelog
 
+### v0.5.2 — 2026-06-28
+- Inspector device info redesigned as compact stat cards (Name, IP+Type side-by-side, Zone, NIC)
+- Delete Device moved to bottom with two-step confirmation; requires ⌘⌫
+- Preferences window wired to ⌘, via macOS Settings scene
+- Graph min/max labels moved outside the graph box; temperature graph shows window min/max
+- Alternating row shading and bold device/event text in alert popovers
+- CPU: alert cache rebuild deferred to coalesce N per-ping rebuilds into 1; RTT rounded in Equatable
+
 ### v0.5.1 — 2026-06-28
 - Alert history box in sidebar showing last 10 alerts; click to open full cross-category history
 - Clicking an alert row focuses the device: inspector opens, canvas pans to it, tile flickers white for 5 seconds

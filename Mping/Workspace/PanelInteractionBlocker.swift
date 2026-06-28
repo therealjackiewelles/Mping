@@ -1,6 +1,16 @@
 import SwiftUI
 import AppKit
 
+// WorkspaceEventNSView intercepts ALL right-mouse events via NSEvent.addLocalMonitorForEvents
+// at the window level — it never sees which SwiftUI view the click landed on. Without this
+// registry, right-clicking anywhere in the window (including the sidebar or inspector) would
+// be captured by the workspace event handler and treated as a canvas right-click.
+//
+// PanelInteractionBlocker is placed inside each panel (sidebar, inspector). It tracks the
+// panel's current frame in window coordinates. WorkspaceEventNSView checks the registry before
+// acting on any right-click: if the click point is inside a registered panel rect, it returns
+// nil from the monitor (allowing normal AppKit/SwiftUI handling) instead of showing the canvas
+// context menu.
 @MainActor
 enum PanelInteractionRegistry {
     private static var blockedPanelRectsByID: [String: CGRect] = [:]

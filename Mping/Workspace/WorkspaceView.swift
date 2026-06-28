@@ -102,9 +102,7 @@ struct WorkspaceView: View {
                             device: device,
                             isSelected: store.selectedDeviceIDs.contains(device.id),
                             shouldShowSecondaryDetail: store.workspaceScale >= 0.52,
-                            hasAlert: store.alertEvents.contains(where: {
-                                $0.deviceID == device.id && $0.kind == .alert && !$0.isAcknowledged && $0.isCurrent
-                            }),
+                            hasAlert: store.deviceIDsWithCurrentAlerts.contains(device.id),
                             isFlashing: store.flashingDeviceIDs.contains(device.id)
                         )
                         .equatable()
@@ -491,18 +489,27 @@ private struct MpingMapDeviceTileView: View, Equatable {
     @State private var flashOpacity: Double = 0.0
 
     static func == (lhs: MpingMapDeviceTileView, rhs: MpingMapDeviceTileView) -> Bool {
-        // Keep the map tile stable during SNMP/LLDP polling.
-        // The full MonitoredDevice value includes LLDP neighbours, raw SFP telemetry,
-        // and lastSNMPChecked. Comparing the whole struct makes every telemetry pass
-        // invalidate every visible tile even when the displayed tile content is unchanged.
+        // Custom equality so .equatable() suppresses re-renders during SNMP/LLDP polling.
+        // MonitoredDevice is a large struct — comparing it whole would invalidate every tile
+        // on every telemetry pass even when nothing visible changed. Only the fields actually
+        // rendered on the tile are compared here.
+        //
+        // lastRTT is rounded to the nearest ms: RTT micro-fluctuations within a 1ms band
+        // (e.g. 1.1ms → 1.3ms) are invisible on the tile and would otherwise force a
+        // re-render on every ping for every online device.
+        //
+        // pingPulseID is intentionally excluded: the ripple animation's onChange fires because
+        // lastRTT also changes each ping, making pingPulseID redundant in this check.
+        //
+        // pingRTTHistory, pingLossHistory, jitter, uptime, and SNMP port detail are excluded
+        // because they are only shown in the inspector, not on the canvas tile itself.
         lhs.device.id == rhs.device.id
             && lhs.device.displayName == rhs.device.displayName
             && lhs.device.ipAddress == rhs.device.ipAddress
             && lhs.device.x == rhs.device.x
             && lhs.device.y == rhs.device.y
             && lhs.device.status == rhs.device.status
-            && lhs.device.lastRTT == rhs.device.lastRTT
-            && lhs.device.pingPulseID == rhs.device.pingPulseID
+            && lhs.device.lastRTT.map { Int($0.rounded()) } == rhs.device.lastRTT.map { Int($0.rounded()) }
             && lhs.device.deviceType == rhs.device.deviceType
             && lhs.device.switchTelemetry.temperatureCelsius == rhs.device.switchTelemetry.temperatureCelsius
             && lhs.device.lastSeenOnline == rhs.device.lastSeenOnline

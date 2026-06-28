@@ -56,12 +56,20 @@ final class DeviceStore: ObservableObject {
     @Published var devices: [MonitoredDevice] = []
     @Published var shapes: [WorkspaceShape] = []
     @Published private(set) var cachedFibreResults: [FibreLossResult] = []
-    // Debounce flow direction changes: only commit after 2 consecutive polls agree,
-    // to avoid oscillation while STP reconverges after a link state change.
+    // During STP reconvergence (a link going up or down), the designated-bridge OIDs on
+    // Netgear switches return transitional values for several poll cycles while RSTP re-elects.
+    // Reading them during this window produces a direction that flips every poll, causing the
+    // flow animation to oscillate. We require 2 consecutive polls returning the same direction
+    // before committing the change — long enough for RSTP to settle (typically < 1s on RSTP).
     private var pendingFlowDirections: [UUID: (direction: FibreLossResult.FlowDirection, count: Int)] = [:]
     @Published private(set) var temperatureHistoryByDeviceID: [UUID: [TemperatureHistorySample]] = [:]
     @Published private(set) var alertEvents: [MpingAlertEvent] = []
     private var alertAcknowledgeCutoffs: [MpingAlertCategory: Date] = [:]
+    // Derived caches — updated only when alertEvents mutates, never during rendering.
+    @Published private(set) var activeAlertCountByCategory: [MpingAlertCategory: Int] = [:]
+    @Published private(set) var deviceIDsWithCurrentAlerts: Set<UUID> = []
+    @Published private(set) var cachedSortedAlerts: [MpingAlertEvent] = []
+    private var alertCacheRebuildPending = false
     @Published private(set) var flashingDeviceIDs: Set<UUID> = []
     @Published var pendingFocusDeviceID: UUID? = nil
     @Published var inspectorWidth: CGFloat = 280
@@ -291,8 +299,11 @@ final class DeviceStore: ObservableObject {
 
         markDevicesAsPinging(ids: snapshot.map(\.id), checkedAt: Date())
 
-        // Run all pings concurrently, then apply ALL results in a single MainActor block.
-        // This reduces SwiftUI render passes from N (one per ping result) to 1 per cycle.
+        // Fire all N pings concurrently so the cycle wall-clock time equals one timeout, not N.
+        // Collect into batchResults first, then apply everything in one MainActor.run block.
+        // Applying inside one synchronous block lets SwiftUI coalesce all @Published mutations
+        // into a single render pass — without this, each ping result would trigger its own
+        // render, producing N redraws per cycle and making the canvas visibly stutter.
         typealias PingBatchItem = (id: UUID, ip: String, sourceIP: String?, sourceInterfaceName: String?, name: String, result: PingEngine.PingResult)
         var batchResults: [PingBatchItem] = []
         await withTaskGroup(of: PingBatchItem.self) { group in
@@ -458,6 +469,12 @@ final class DeviceStore: ObservableObject {
         markWorkspaceDirty()
     }
 
+    // A single missed ping is not treated as offline — Wi-Fi, QoS bursts, and switch CPU spikes
+    // on AVB networks routinely drop one ICMP echo without the device actually going down.
+    // When a ping fails, we fire a burst of 4 rapid verification pings before declaring offline.
+    // All 4 must fail before the status changes; one success aborts and the device stays online.
+    // This eliminates false-offline alerts during live shows, at the cost of a ~1s confirmation
+    // delay — acceptable because the tile shows "verifying" during the burst window.
     private func startOfflinePingVerification(
         id: UUID,
         ipAddress: String,
@@ -1023,22 +1040,12 @@ final class DeviceStore: ObservableObject {
     /// New/unacknowledged alert count for red visual state only.
     /// Recovery/OK rows are history events and should not keep the UI in an alarming state.
     func newAlertCount(for category: MpingAlertCategory) -> Int {
-        Set(
-            alertEvents
-                .filter { $0.category == category && $0.kind == .alert && !$0.isAcknowledged }
-                .map { $0.conditionKey }
-        ).count
+        activeAlertCountByCategory[category] ?? 0
     }
 
     /// Alert menus are always chronological, newest first.
-    /// They intentionally do not regroup by acknowledged/current state because that makes the log jump around.
     func alerts(for category: MpingAlertCategory) -> [MpingAlertEvent] {
-        alertEvents
-            .filter { $0.category == category }
-            .sorted {
-                if $0.firstTriggeredAt != $1.firstTriggeredAt { return $0.firstTriggeredAt > $1.firstTriggeredAt }
-                return $0.lastUpdatedAt > $1.lastUpdatedAt
-            }
+        cachedSortedAlerts.filter { $0.category == category }
     }
 
     func focusDevice(_ id: UUID) {
@@ -1050,8 +1057,41 @@ final class DeviceStore: ObservableObject {
         }
     }
 
-    func allAlerts() -> [MpingAlertEvent] {
-        alertEvents.sorted {
+    func allAlerts() -> [MpingAlertEvent] { cachedSortedAlerts }
+
+    // evaluatePingAlerts() is called once per device inside a single MainActor.run block,
+    // meaning N devices = N potential calls to raiseAlert/resolveAlert = N immediate rebuilds.
+    // Each rebuild sorts the full alertEvents array and fires 3 @Published mutations.
+    // Scheduling defers the rebuild to the next MainActor iteration: the guard ensures only
+    // one Task is enqueued no matter how many alerts fire in the same synchronous batch,
+    // reducing N rebuilds to 1 per ping cycle.
+    private func scheduleAlertCacheRebuild() {
+        guard !alertCacheRebuildPending else { return }
+        alertCacheRebuildPending = true
+        Task { @MainActor [weak self] in
+            self?.alertCacheRebuildPending = false
+            self?.rebuildAlertCaches()
+        }
+    }
+
+    private func rebuildAlertCaches() {
+        // Active counts per category — deduped by conditionKey, matching newAlertCount semantics.
+        var counts: [MpingAlertCategory: Int] = [:]
+        var currentDeviceIDs: Set<UUID> = []
+        for category in MpingAlertCategory.allCases {
+            let keys = Set(
+                alertEvents
+                    .filter { $0.category == category && $0.kind == .alert && !$0.isAcknowledged }
+                    .map(\.conditionKey)
+            )
+            if !keys.isEmpty { counts[category] = keys.count }
+        }
+        for event in alertEvents where event.kind == .alert && event.isCurrent && !event.isAcknowledged {
+            if let id = event.deviceID { currentDeviceIDs.insert(id) }
+        }
+        activeAlertCountByCategory = counts
+        deviceIDsWithCurrentAlerts = currentDeviceIDs
+        cachedSortedAlerts = alertEvents.sorted {
             if $0.firstTriggeredAt != $1.firstTriggeredAt { return $0.firstTriggeredAt > $1.firstTriggeredAt }
             return $0.lastUpdatedAt > $1.lastUpdatedAt
         }
@@ -1070,6 +1110,7 @@ final class DeviceStore: ObservableObject {
             guard alertEvents[index].firstTriggeredAt <= acknowledgeTime else { continue }
             alertEvents[index].isAcknowledged = true
         }
+        rebuildAlertCaches()
     }
 
     func clearAlerts(category: MpingAlertCategory? = nil) {
@@ -1247,7 +1288,8 @@ final class DeviceStore: ObservableObject {
             )
         )
 
-        // Intentionally uncapped: alert history is allowed to grow for debugging/event review.
+        trimAlertHistory()
+        scheduleAlertCacheRebuild()
     }
 
     private func shouldKeepAlertAcknowledged(category: MpingAlertCategory, wasResolved: Bool, now: Date) -> Bool {
@@ -1284,6 +1326,8 @@ final class DeviceStore: ObservableObject {
 
         if !recoveryEvents.isEmpty {
             alertEvents.append(contentsOf: recoveryEvents)
+            trimAlertHistory()
+            scheduleAlertCacheRebuild()
         }
     }
 
@@ -1291,10 +1335,16 @@ final class DeviceStore: ObservableObject {
         "\(category.rawValue)|\(deviceID?.uuidString ?? "global")|\(suffix)"
     }
 
-    private func trimAlertHistoryIfNeeded() {
-        // Alert history is intentionally uncapped.
-        // This function is retained as a no-op to keep the alerting code easy to cap again later
-        // if a bounded production history or per-workspace retention policy is added.
+    private func trimAlertHistory() {
+        let cap = 500
+        guard alertEvents.count > cap else { return }
+        // Always retain active unacknowledged alerts regardless of cap.
+        let active = alertEvents.filter { $0.kind == .alert && $0.isCurrent && !$0.isAcknowledged }
+        let rest = alertEvents
+            .filter { !($0.kind == .alert && $0.isCurrent && !$0.isAcknowledged) }
+            .sorted { $0.firstTriggeredAt > $1.firstTriggeredAt }
+            .prefix(max(0, cap - active.count))
+        alertEvents = (active + rest).sorted { $0.firstTriggeredAt > $1.firstTriggeredAt }
     }
 
     private func markDevicesAsPinging(ids: [UUID], checkedAt: Date) {
@@ -2391,6 +2441,12 @@ final class DeviceStore: ObservableObject {
         url.deletingPathExtension().lastPathComponent
     }
 
+    // Strips all runtime-only fields before writing to disk or restoring on boot.
+    // Fields kept: identity (id, name, ip, position), user preferences (type, zone, NIC,
+    //   community, web interface, monitoring toggles), and discovered stable data (macAddress).
+    // Fields zeroed: status, RTT history, ping counters, SNMP telemetry, online timestamp.
+    // This prevents stale "all devices offline" state on next launch — the app always boots
+    // to .unknown status and discovers reality within the first ping cycle.
     private func cleanDeviceForPersistence(_ device: MonitoredDevice) -> MonitoredDevice {
         MonitoredDevice(
             id: device.id,

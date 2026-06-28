@@ -17,6 +17,9 @@ struct MpingApp: App {
             MpingMenuCommands(store: store, showingDeviceView: $showingDeviceView, showingDevicePortsView: $showingDevicePortsView)
         }
 
+        Settings {
+            PreferencesView()
+        }
     }
 }
 
@@ -89,7 +92,7 @@ private struct MpingMenuCommands: Commands {
             Button("Delete") {
                 store.deleteSelection()
             }
-            .keyboardShortcut(.delete, modifiers: [])
+            .keyboardShortcut(.delete, modifiers: [.command])
             .disabled(!store.hasSelection)
         }
 

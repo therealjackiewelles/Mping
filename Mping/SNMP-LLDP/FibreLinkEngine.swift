@@ -877,9 +877,16 @@ enum FibreAutoLinkBuilder {
                        || observation.remoteDevice.switchTelemetry.stpBlockedPorts.contains(observation.remotePort)
 
         // Determine flow direction using STP designated bridge data.
-        // The designated bridge for a port is the switch closer to root on that segment.
-        // We check both sides of the link: local port's designated bridge and remote port's
-        // designated bridge, and count votes to handle cases where only one side has data.
+        //
+        // In RSTP, the designated bridge for a segment is the switch responsible for
+        // forwarding traffic from that segment toward the root. If this switch's own MAC
+        // matches the designated bridge for a port, it is "closer to root" on that segment
+        // and traffic flows toward it (bToA). If the remote MAC matches, traffic flows away (aToB).
+        //
+        // We independently check both ends of the link and tally votes. Using both sides
+        // guards against cases where one switch hasn't yet polled its designated bridge OID
+        // (e.g. during SNMP cycle offset between switches), ensuring direction is still
+        // computed correctly from whichever side has fresh data.
         let flowDirection: FibreLossResult.FlowDirection
         if stpBlocking {
             flowDirection = .none

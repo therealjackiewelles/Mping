@@ -173,7 +173,6 @@ struct AlertingSidebarBox: View {
         .overlay(
             RoundedRectangle(cornerRadius: 14)
                 .stroke(hasActiveAlerts ? Color.red.opacity(alertPulse ? 0.55 : 0.20) : Color.white.opacity(0.09), lineWidth: 1)
-                .animation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true), value: alertPulse)
         )
         .onAppear {
             alertPulse = hasActiveAlerts
@@ -194,7 +193,7 @@ struct AlertingSidebarBox: View {
 
 
     private var hasActiveAlerts: Bool {
-        MpingAlertCategory.allCases.contains { store.newAlertCount(for: $0) > 0 }
+        !store.activeAlertCountByCategory.isEmpty
     }
 
     private var alertingPanelBackground: some View {
@@ -204,7 +203,6 @@ struct AlertingSidebarBox: View {
 
             RoundedRectangle(cornerRadius: 14)
                 .fill(Color.red.opacity(hasActiveAlerts ? (alertPulse ? 0.20 : 0.045) : 0.0))
-                .animation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true), value: alertPulse)
         }
     }
 }
@@ -362,8 +360,8 @@ private struct AlertCategoryPopover: View {
                                     .frame(width: tableWidth, alignment: .leading)
                                     .padding(.vertical, 12)
                             } else {
-                                ForEach(visibleRows) { alert in
-                                    AlertTableRow(alert: alert, timeFormatter: timeFormatter, layout: layout) {
+                                ForEach(Array(visibleRows.enumerated()), id: \.element.id) { index, alert in
+                                    AlertTableRow(alert: alert, timeFormatter: timeFormatter, layout: layout, isAlternate: index.isMultiple(of: 2)) {
                                         if let id = alert.deviceID {
                                             store.focusDevice(id)
                                             dismiss?()
@@ -714,6 +712,7 @@ private struct AlertTableRow: View {
     let alert: MpingAlertEvent
     let timeFormatter: DateFormatter
     let layout: AlertTableColumnLayout
+    var isAlternate: Bool = false
     var onTap: (() -> Void)? = nil
 
     private var isNew: Bool {
@@ -726,11 +725,12 @@ private struct AlertTableRow: View {
     }
 
     private var rowFill: Color {
-        isNew ? Color.red.opacity(0.52) : Color.white.opacity(0.055)
+        if isNew { return Color.red.opacity(isAlternate ? 0.38 : 0.52) }
+        return Color.white.opacity(isAlternate ? 0.025 : 0.055)
     }
 
     private var rowStroke: Color {
-        isNew ? Color.red.opacity(0.75) : Color.white.opacity(0.07)
+        isNew ? Color.red.opacity(isAlternate ? 0.55 : 0.75) : Color.white.opacity(0.07)
     }
 
     var body: some View {
@@ -740,6 +740,7 @@ private struct AlertTableRow: View {
                 .monospacedDigit()
 
             Text(alert.deviceName)
+                .font(.system(size: 11, weight: .bold, design: .rounded))
                 .frame(width: layout.device, alignment: .leading)
                 .lineLimit(1)
                 .truncationMode(.middle)
@@ -751,15 +752,16 @@ private struct AlertTableRow: View {
 
             Text(acknowledgedLabel)
                 .frame(width: layout.acknowledged, alignment: .leading)
-                .font(.system(size: 10, weight: .black, design: .rounded))
+                .font(.system(size: 10, weight: .regular, design: .rounded))
                 .foregroundStyle(isNew ? .white : .white.opacity(0.58))
 
             Text(alert.detail)
+                .font(.system(size: 11, weight: .bold, design: .rounded))
                 .frame(width: layout.event, alignment: .leading)
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .font(.system(size: 11, weight: .semibold, design: .rounded))
+        .font(.system(size: 11, weight: .regular, design: .rounded))
         .foregroundStyle(isNew ? .white : .white.opacity(0.58))
         .padding(.horizontal, 8)
         .padding(.vertical, 7)
@@ -791,7 +793,7 @@ struct AlertHistoryBox: View {
     }()
 
     private var recentAlerts: [MpingAlertEvent] {
-        Array(store.allAlerts().prefix(10))
+        Array(store.cachedSortedAlerts.prefix(10))
     }
 
     var body: some View {
@@ -834,7 +836,7 @@ struct AlertHistoryBox: View {
                 .font(.system(size: 11, weight: .black, design: .rounded))
                 .foregroundStyle(.white.opacity(0.70))
             Spacer()
-            Text("\(store.allAlerts().count) total")
+            Text("\(store.cachedSortedAlerts.count) total")
                 .font(.system(size: 9, weight: .bold, design: .rounded))
                 .foregroundStyle(.white.opacity(0.28))
             Image(systemName: "chevron.right")
@@ -923,7 +925,7 @@ private struct AlertFullHistoryPopover: View {
         return f
     }()
 
-    private var allRows: [MpingAlertEvent] { store.allAlerts() }
+    private var allRows: [MpingAlertEvent] { store.cachedSortedAlerts }
     private var visibleRows: [MpingAlertEvent] { Array(allRows.prefix(displayedRowLimit)) }
     private var hiddenCount: Int { max(0, allRows.count - visibleRows.count) }
 
@@ -968,8 +970,8 @@ private struct AlertFullHistoryPopover: View {
                                     .frame(width: tableWidth, alignment: .leading)
                                     .padding(.vertical, 12)
                             } else {
-                                ForEach(visibleRows) { alert in
-                                    fullHistoryRow(alert, layout: layout)
+                                ForEach(Array(visibleRows.enumerated()), id: \.element.id) { index, alert in
+                                    fullHistoryRow(alert, layout: layout, isAlternate: index.isMultiple(of: 2))
                                 }
                                 if hiddenCount > 0 {
                                     AlertHistoryLoadMoreRow(
@@ -1015,8 +1017,8 @@ private struct AlertFullHistoryPopover: View {
         .frame(width: layout.totalWidth + 130 + layout.spacing + 6, alignment: .leading)
     }
 
-    private func fullHistoryRow(_ alert: MpingAlertEvent, layout: AlertTableColumnLayout) -> some View {
-        FullHistoryRow(alert: alert, layout: layout, timeFormatter: timeFormatter) {
+    private func fullHistoryRow(_ alert: MpingAlertEvent, layout: AlertTableColumnLayout, isAlternate: Bool = false) -> some View {
+        FullHistoryRow(alert: alert, layout: layout, timeFormatter: timeFormatter, isAlternate: isAlternate) {
             if let id = alert.deviceID {
                 store.focusDevice(id)
                 dismiss?()
@@ -1034,19 +1036,20 @@ private struct FullHistoryRow: View {
     let alert: MpingAlertEvent
     let layout: AlertTableColumnLayout
     let timeFormatter: DateFormatter
+    var isAlternate: Bool = false
     var onTap: (() -> Void)? = nil
 
     private var isNew: Bool { alert.kind == .alert && !alert.isAcknowledged }
     private var isRecovery: Bool { alert.kind == .recovery }
 
     private var rowFill: Color {
-        if isNew { return Color.red.opacity(0.52) }
-        if isRecovery { return Color.green.opacity(0.10) }
-        return Color.white.opacity(0.055)
+        if isNew { return Color.red.opacity(isAlternate ? 0.38 : 0.52) }
+        if isRecovery { return Color.green.opacity(isAlternate ? 0.06 : 0.10) }
+        return Color.white.opacity(isAlternate ? 0.025 : 0.055)
     }
 
     private var rowStroke: Color {
-        if isNew { return Color.red.opacity(0.75) }
+        if isNew { return Color.red.opacity(isAlternate ? 0.55 : 0.75) }
         if isRecovery { return Color.green.opacity(0.30) }
         return Color.white.opacity(0.07)
     }
@@ -1062,6 +1065,7 @@ private struct FullHistoryRow: View {
             categoryCell
 
             Text(alert.deviceName)
+                .font(.system(size: 11, weight: .bold, design: .rounded))
                 .frame(width: layout.device, alignment: .leading)
                 .lineLimit(1)
                 .truncationMode(.middle)
@@ -1074,11 +1078,12 @@ private struct FullHistoryRow: View {
             ackedCell
 
             Text(alert.detail)
+                .font(.system(size: 11, weight: .bold, design: .rounded))
                 .frame(width: layout.event, alignment: .leading)
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .font(.system(size: 11, weight: .semibold, design: .rounded))
+        .font(.system(size: 11, weight: .regular, design: .rounded))
         .foregroundStyle(isNew ? .white : .white.opacity(0.55))
         .padding(.leading, 14)
         .padding(.trailing, 8)

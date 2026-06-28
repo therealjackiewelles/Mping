@@ -5,6 +5,34 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.5.2 — 2026-06-28
+
+### Inspector
+- Device info section (Name, IP, Type, Zone, NIC) redesigned as compact stat cards matching the sparkline aesthetic — labels above fields, dark backgrounds, IP and Type side by side in one row
+- Delete Device moved to the bottom of the inspector with a two-step confirmation panel — warning icon, device name, consequence text, Cancel and Delete buttons
+- Delete requires ⌘⌫ keyboard shortcut (was plain ⌫, too easy to trigger accidentally)
+- MAC address lookup removed from the ping monitoring section
+- Preferences window now accessible via Mping → Preferences… (⌘,) using the standard macOS Settings scene
+
+### Graphs
+- Min/max labels moved outside the graph box — max above, min below — so the line never overlaps them
+- Temperature graph min/max now reflects the visible 20-sample window, not all-time history
+- Both graphs use the same valueFormatter for label text so units are always consistent
+
+### Alerts
+- Alternating row shading in both alert popovers for easier cross-column reading
+- Device name and event description bold; time, category, port, and acknowledged columns normal weight
+
+### CPU Optimisation
+- Alert cache rebuild deferred with `scheduleAlertCacheRebuild()` — coalesces N per-device rebuilds into 1 per ping cycle via Task scheduling
+- `lastRTT` rounded to nearest ms in tile Equatable check — prevents re-renders when RTT fluctuates within a 1ms band on stable connections
+- `pingPulseID` removed from Equatable (redundant alongside `lastRTT`)
+
+### Code Annotations
+- Non-obvious sections annotated: ping verification burst rationale, STP flow direction voting, alert cache deferral, tile Equatable exclusions, `cleanDeviceForPersistence` field contracts, ping batch coalescing, `PanelInteractionBlocker` registry design
+
+---
+
 ## v0.5.1 — 2026-06-28
 
 ### Alerting
