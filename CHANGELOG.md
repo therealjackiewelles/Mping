@@ -5,6 +5,37 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.5.5 — 2026-06-29
+
+### Performance — GPU Animation & CPU Reduction (40% → 5% baseline)
+
+Instruments `sample` trace identified the remaining CPU load. All animation hot paths moved off the CPU onto the Core Animation GPU render server.
+
+**Fibre link dash animation (was: TimelineView + Canvas at 20fps CPU)**
+- Replaced with `FibreDashAnimatorView` (`NSViewRepresentable`) — one `CAShapeLayer` per link (outer dark + inner light) each driven by `CABasicAnimation(keyPath: "lineDashPhase")` running indefinitely on the render server
+- Zero CPU wakeups per frame; the animation runs entirely in the GPU compositor
+- Y-coordinate flip applied in path construction to reconcile CALayer's bottom-left origin with SwiftUI's top-left device position space
+
+**Ping ripple animation (was: `@State pulseScale/pulseOpacity` + `withAnimation`)**
+- Replaced with `PingRippleLayerView` (`NSViewRepresentable`) — fires a `CAAnimationGroup` (scale 0.45→1.55, opacity→0, easeOut 0.82s) on the GPU render server when `pingPulseID` changes
+- Applied to both `MpingMapDeviceTileView` (canvas tile) and `DeviceTileView` (sidebar/inspector tile)
+- Eliminates SwiftUI `@State` mutation and view-graph re-evaluation on every animation frame
+
+**SNMP sequential polling (was: `withTaskGroup` concurrent)**
+- Replaced with sequential `for` loop — naturally staggers switch polls without adding artificial delay, preventing all switches from hammering the network simultaneously while keeping the effective per-device interval exactly as configured
+
+**`FibreAutoLinkBuilder.buildResults` offloaded to background**
+- Moved topology rebuild off MainActor into `Task.detached(priority: .utility)`, eliminating the ~150% CPU spike every SNMP cycle
+
+**`MiniMapView` rewritten as Canvas**
+- Replaced per-device SwiftUI view with a single `Canvas` draw pass — eliminates `N` view allocations and their associated SwiftUI layout overhead
+
+**`FibreLinksLayer` Equatable + single TimelineView**
+- Added `Equatable` conformance so `.equatable()` suppresses re-renders when device positions and topology are unchanged
+- Was: one 60fps `TimelineView` per link; reduced to a single 20fps loop before being replaced entirely by CALayer
+
+---
+
 ## v0.5.4 — 2026-06-29
 
 ### Dual-NIC Static Route Management
