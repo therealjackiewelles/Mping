@@ -81,3 +81,10 @@ xcuserdata/
 
 # Event logs
 *.csv
+
+# Xcode shared data (build schemes etc — local only)
+*.xcodeproj/xcshareddata/
+
+# Workspace save files — these are runtime data, not source
+*.mpw
+*.mpingstate
