@@ -822,9 +822,17 @@ final class DeviceStore: ObservableObject {
         let snmpTimeoutSeconds = Int(ceil(max(0.5, min(5.0, telemetryPollingSettings.snmpTimeoutSeconds))))
         var results: [(UUID, SNMPEngine.SwitchTemperatureResult)] = []
 
+        // Stagger poll starts by 300 ms per switch. All polls still run concurrently —
+        // the last switch starts (N-1 × 300 ms) after the first — but the thundering-herd
+        // effect of all switches sending SNMP bursts simultaneously is spread across time,
+        // smoothing CPU usage from a spike to a lower constant plateau.
+        let staggerMs: UInt64 = 300
         await withTaskGroup(of: (UUID, SNMPEngine.SwitchTemperatureResult).self) { group in
-            for item in switches {
+            for (index, item) in switches.enumerated() {
                 group.addTask {
+                    if index > 0 {
+                        try? await Task.sleep(nanoseconds: UInt64(index) * staggerMs * 1_000_000)
+                    }
                     let result = await SNMPEngine.readSwitchTemperature(
                         ipAddress: item.ip,
                         community: item.community,
