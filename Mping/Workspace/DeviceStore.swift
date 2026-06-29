@@ -159,6 +159,7 @@ final class DeviceStore: ObservableObject {
 
     private var monitorTask: Task<Void, Never>? = nil
     private var snmpTask: Task<Void, Never>? = nil
+    private var topologyRebuildTask: Task<Void, Never>? = nil
     private let telemetryPollingSettings = TelemetryPollingDebugSettings.shared
     private var pingVerificationTasks: [UUID: Task<Void, Never>] = [:]
     private var pingVerificationFailuresByDeviceID: [UUID: [PingFailureRecord]] = [:]
@@ -740,53 +741,65 @@ final class DeviceStore: ObservableObject {
     }
 
     private func refreshCachedFibreResults(forceAlertEvaluation: Bool = false) {
-        var rebuiltResults = FibreAutoLinkBuilder.buildResults(from: devices)
+        // Snapshot devices (value type) so the background task doesn't access MainActor state.
+        // buildResults is a pure computation — offloading it unblocks the main thread during
+        // SNMP poll completion, eliminating the CPU spike every poll cycle.
+        let snapshot = devices
+        topologyRebuildTask?.cancel()
+        topologyRebuildTask = Task.detached(priority: .utility) { [weak self] in
+            guard !Task.isCancelled else { return }
+            let rebuiltResults = FibreAutoLinkBuilder.buildResults(from: snapshot)
+            guard !Task.isCancelled else { return }
+            await MainActor.run { [weak self] in
+                self?.applyRebuiltFibreResults(rebuiltResults, forceAlertEvaluation: forceAlertEvaluation)
+            }
+        }
+    }
+
+    private func applyRebuiltFibreResults(_ rebuiltResults: [FibreLossResult], forceAlertEvaluation: Bool) {
+        var results = rebuiltResults
 
         // Debounce flow direction changes. STP reconvergence causes the designated-bridge
         // OIDs to oscillate across polls while RSTP is still electing. Only commit a
         // direction change after it has been consistent for 2 consecutive polls.
         let requiredStablePolls = 2
-        for i in rebuiltResults.indices {
-            let result = rebuiltResults[i]
+        for i in results.indices {
+            let result = results[i]
             let key = result.connection.id
             let currentDirection = cachedFibreResults.first(where: { $0.connection.id == key })?.flowDirection
 
             guard let current = currentDirection, result.flowDirection != current else {
-                // No prior direction, or direction unchanged — clear any pending and keep result.
                 pendingFlowDirections.removeValue(forKey: key)
                 continue
             }
 
-            // Direction changed — require stability before committing.
             let pending = pendingFlowDirections[key]
             if pending?.direction == result.flowDirection {
                 let newCount = (pending?.count ?? 0) + 1
                 if newCount >= requiredStablePolls {
                     pendingFlowDirections.removeValue(forKey: key)
-                    // Commit the new direction — leave rebuiltResults[i] as-is.
                 } else {
                     pendingFlowDirections[key] = (result.flowDirection, newCount)
-                    rebuiltResults[i].flowDirection = current  // hold old direction
+                    results[i].flowDirection = current
                 }
             } else {
-                // Different pending direction — reset counter.
                 pendingFlowDirections[key] = (result.flowDirection, 1)
-                rebuiltResults[i].flowDirection = current  // hold old direction
+                results[i].flowDirection = current
             }
         }
 
         // LLDP polling can run even when the physical topology has not changed.
         // Re-publishing an identical fibre result array forces the workspace/link layer
         // to redraw and is a common source of visible SwiftUI jitter.
-        guard rebuiltResults != cachedFibreResults else {
+        guard results != cachedFibreResults else {
             if forceAlertEvaluation {
                 evaluateFibreAlerts(from: cachedFibreResults)
             }
             return
         }
 
-        cachedFibreResults = rebuiltResults
-        evaluateFibreAlerts(from: rebuiltResults)
+        cachedFibreResults = results
+        evaluateFibreAlerts(from: results)
     }
 
     private func pollSwitchTelemetry() async {
