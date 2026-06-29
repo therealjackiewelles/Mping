@@ -60,6 +60,8 @@ struct PulsingBorderView: NSViewRepresentable {
             refreshPath()
         }
 
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
         private func refreshPath() {
             guard let layer = self.layer else { return }
             shapeLayer.frame = layer.bounds

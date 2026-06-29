@@ -18,7 +18,7 @@ struct MpingApp: App {
         }
 
         Settings {
-            PreferencesView()
+            PreferencesView(deviceStore: store)
         }
     }
 }

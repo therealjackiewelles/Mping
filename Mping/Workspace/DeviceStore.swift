@@ -1063,6 +1063,14 @@ final class DeviceStore: ObservableObject {
 
     func allAlerts() -> [MpingAlertEvent] { cachedSortedAlerts }
 
+    /// Devices that have an explicit NIC configured — used to build static host routes.
+    func devicesWithExplicitNIC() -> [(ip: String, interfaceName: String)] {
+        devices.compactMap { device in
+            guard let nic = device.sourceInterfaceName, !nic.isEmpty, !device.requiresSetup else { return nil }
+            return (device.ipAddress, nic)
+        }
+    }
+
     // evaluatePingAlerts() is called once per device inside a single MainActor.run block,
     // meaning N devices = N potential calls to raiseAlert/resolveAlert = N immediate rebuilds.
     // Each rebuild sorts the full alertEvents array and fires 3 @Published mutations.

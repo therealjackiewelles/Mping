@@ -831,8 +831,28 @@ enum FibreAutoLinkBuilder {
         var observations: [LinkObservation] = []
 
         for local in switches {
+            if local.switchTelemetry.lldpNeighbours.isEmpty {
+                ConsoleOutputStore.log(
+                    subsystem: "SNMP LLDP",
+                    direction: .info,
+                    deviceID: local.id,
+                    deviceLabel: local.name,
+                    ipAddress: local.ipAddress,
+                    message: "No LLDP neighbours stored for this switch"
+                )
+            }
             for neighbour in local.switchTelemetry.lldpNeighbours {
-                guard let remote = matchingDevice(for: neighbour, localDevice: local, devices: switches) else { continue }
+                guard let remote = matchingDevice(for: neighbour, localDevice: local, devices: switches) else {
+                    ConsoleOutputStore.log(
+                        subsystem: "SNMP LLDP",
+                        direction: .error,
+                        deviceID: local.id,
+                        deviceLabel: local.name,
+                        ipAddress: local.ipAddress,
+                        message: "Unmatched neighbour on port \(neighbour.localPort) — sysName: '\(neighbour.remoteSystemName ?? "nil")' chassisID: '\(neighbour.remoteChassisID ?? "nil")'"
+                    )
+                    continue
+                }
 
                 let localPort = neighbour.localPort
                 let remotePort = bestRemotePort(for: neighbour, remoteDevice: remote, localDevice: local, allSwitches: switches) ?? neighbour.localPort
@@ -905,9 +925,10 @@ enum FibreAutoLinkBuilder {
                 else if desig == rMAC { aToBVotes += 1 }
             }
             if let desig = designatedForRemotePort, let lMAC = localMAC, let rMAC = remoteMAC {
-                // Remote port's designated bridge being remote MAC → remote is designated → bToA
-                if desig == rMAC { bToAVotes += 1 }
-                else if desig == lMAC { aToBVotes += 1 }
+                // Remote port's designated bridge == remoteMAC → remote is designated → remote is closer to root → aToB
+                // Remote port's designated bridge == localMAC  → local is designated  → local is closer to root  → bToA
+                if desig == rMAC { aToBVotes += 1 }
+                else if desig == lMAC { bToAVotes += 1 }
             }
 
             if bToAVotes > aToBVotes {
@@ -1016,24 +1037,52 @@ enum FibreAutoLinkBuilder {
 
     private static func matchingDevice(for neighbour: LLDPNeighbour, localDevice: MonitoredDevice, devices: [MonitoredDevice]) -> MonitoredDevice? {
         let remoteSystemName = neighbour.remoteSystemName?.normalisedForMatching ?? ""
+        let remoteChassisMac = neighbour.remoteChassisID?.normalisedForMatching ?? ""
         let remotePortText = neighbour.bestRemotePortText.normalisedForMatching
 
-        guard !remoteSystemName.isEmpty || !remotePortText.isEmpty else { return nil }
+        guard !remoteSystemName.isEmpty || !remoteChassisMac.isEmpty || !remotePortText.isEmpty else { return nil }
 
         return devices.first { candidate in
             guard candidate.id != localDevice.id else { return false }
 
             let candidateName = candidate.name.normalisedForMatching
+            // When nameSource == .automatic, the effective identity of the device is
+            // its LLDP-discovered name, not the user-entered name. Include both so
+            // matching works regardless of which name source the user has chosen.
+            let candidateDiscoveredName = candidate.discoveredName?.normalisedForMatching ?? ""
             let candidateIP = candidate.ipAddress.normalisedForMatching
+            let candidateMac = candidate.macAddress?.normalisedForMatching ?? ""
+
+            // Strip generic switch words to allow partial hostname matching
             let candidateHostLike = candidateName
                 .replacingOccurrences(of: "switch", with: "")
                 .replacingOccurrences(of: "sw", with: "")
+            let candidateDiscoveredHostLike = candidateDiscoveredName
+                .replacingOccurrences(of: "switch", with: "")
+                .replacingOccurrences(of: "sw", with: "")
 
+            // Primary match: system name against both user name and discovered name
             if !remoteSystemName.isEmpty {
+                // Exact match
                 if remoteSystemName == candidateName { return true }
+                if !candidateDiscoveredName.isEmpty && remoteSystemName == candidateDiscoveredName { return true }
+                // Substring match (handles prefix/suffix differences)
                 if remoteSystemName.contains(candidateName) || candidateName.contains(remoteSystemName) { return true }
+                if !candidateDiscoveredName.isEmpty &&
+                    (remoteSystemName.contains(candidateDiscoveredName) || candidateDiscoveredName.contains(remoteSystemName)) { return true }
+                // Host-like (stripped) match
                 if !candidateHostLike.isEmpty && (remoteSystemName.contains(candidateHostLike) || candidateHostLike.contains(remoteSystemName)) { return true }
+                if !candidateDiscoveredHostLike.isEmpty && (remoteSystemName.contains(candidateDiscoveredHostLike) || candidateDiscoveredHostLike.contains(remoteSystemName)) { return true }
+                // IP match
                 if remoteSystemName == candidateIP { return true }
+            }
+
+            // Fallback: chassis MAC vs device MAC.
+            // Many switches report an empty LLDP system name but always include
+            // their chassis MAC. Matching by MAC is reliable as long as the device
+            // has been seen on the network and its MAC resolved via ARP.
+            if !remoteChassisMac.isEmpty && !candidateMac.isEmpty {
+                if remoteChassisMac == candidateMac { return true }
             }
 
             return false
