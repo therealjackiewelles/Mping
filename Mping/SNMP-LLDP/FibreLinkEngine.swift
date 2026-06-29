@@ -1469,7 +1469,7 @@ struct FibreLinksLayer: View {
             // TimelineView per link, cutting concurrent render loops from N down to 1.
             // 20fps is imperceptibly different from 60fps for slow-moving dashed lines.
             if !animatedItems.isEmpty {
-                TimelineView(.periodic(interval: 1.0 / 20.0)) { timeline in
+                TimelineView(.periodic(from: .now, by: 1.0 / 20.0)) { timeline in
                     let elapsed = timeline.date.timeIntervalSinceReferenceDate
                     Canvas { ctx, _ in
                         let cycleDuration: Double = 0.6
