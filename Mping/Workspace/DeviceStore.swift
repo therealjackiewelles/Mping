@@ -822,33 +822,22 @@ final class DeviceStore: ObservableObject {
         let snmpTimeoutSeconds = Int(ceil(max(0.5, min(5.0, telemetryPollingSettings.snmpTimeoutSeconds))))
         var results: [(UUID, SNMPEngine.SwitchTemperatureResult)] = []
 
-        // Stagger poll starts by 300 ms per switch. All polls still run concurrently —
-        // the last switch starts (N-1 × 300 ms) after the first — but the thundering-herd
-        // effect of all switches sending SNMP bursts simultaneously is spread across time,
-        // smoothing CPU usage from a spike to a lower constant plateau.
-        let staggerMs: UInt64 = 300
-        await withTaskGroup(of: (UUID, SNMPEngine.SwitchTemperatureResult).self) { group in
-            for (index, item) in switches.enumerated() {
-                group.addTask {
-                    if index > 0 {
-                        try? await Task.sleep(nanoseconds: UInt64(index) * staggerMs * 1_000_000)
-                    }
-                    let result = await SNMPEngine.readSwitchTemperature(
-                        ipAddress: item.ip,
-                        community: item.community,
-                        timeoutSeconds: snmpTimeoutSeconds,
-                        sourceInterfaceName: item.sourceInterfaceName,
-                        sourceIPAddress: item.sourceIPAddress,
-                        deviceID: item.id,
-                        deviceLabel: item.name
-                    )
-                    return (item.id, result)
-                }
-            }
-
-            for await result in group {
-                results.append(result)
-            }
+        // Poll switches sequentially — each switch starts only after the previous
+        // finishes, naturally spreading load without adding any artificial delays.
+        // The configured interval (snmpLLDPPollIntervalSeconds) is applied after all
+        // switches complete, so it is fully respected.
+        for item in switches {
+            guard !Task.isCancelled else { break }
+            let result = await SNMPEngine.readSwitchTemperature(
+                ipAddress: item.ip,
+                community: item.community,
+                timeoutSeconds: snmpTimeoutSeconds,
+                sourceInterfaceName: item.sourceInterfaceName,
+                sourceIPAddress: item.sourceIPAddress,
+                deviceID: item.id,
+                deviceLabel: item.name
+            )
+            results.append((item.id, result))
         }
 
         guard !results.isEmpty else { return }
