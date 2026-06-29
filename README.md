@@ -137,6 +137,12 @@ Mping is built in Xcode. There is no package manager or CLI build step.
 
 ## Changelog
 
+### v0.5.5 — 2026-06-29
+- CPU baseline dropped from ~40% to ~5% — fibre link dash animation and ping ripple moved entirely to the GPU via `CAShapeLayer` + `CABasicAnimation`, eliminating all CPU wakeups per animation frame
+- SNMP polling switched from concurrent to sequential — prevents simultaneous switch polls, smooths CPU across the cycle
+- `FibreAutoLinkBuilder.buildResults` offloaded to background task — removes ~150% CPU spike every SNMP cycle
+- `MiniMapView` rewritten as a single `Canvas` draw pass
+
 ### v0.5.4 — 2026-06-29
 - New **Network Routing** pane in Preferences — Apply/Remove static host routes for dual-NIC setups via clipboard + Terminal
 - LLDP topology matching now checks the SNMP/LLDP auto-discovered name (`discoveredName`) alongside the user-entered name, fixing links for devices using auto-naming
