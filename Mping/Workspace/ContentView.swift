@@ -653,12 +653,17 @@ private struct MiniMapView: View {
     @ObservedObject var store: DeviceStore
 
     private let canvasSize = CGSize(width: 5000, height: 3000)
+    private let approximateWorkspaceViewSize = CGSize(width: 900, height: 700)
 
     var body: some View {
         GeometryReader { proxy in
             let sx = proxy.size.width / canvasSize.width
             let sy = proxy.size.height / canvasSize.height
             let scale = max(0.25, store.workspaceScale)
+            let visibleX = (-store.workspaceOffset.width / scale) * sx
+            let visibleY = (-store.workspaceOffset.height / scale) * sy
+            let visibleW = max(10, (approximateWorkspaceViewSize.width / scale) * sx)
+            let visibleH = max(10, (approximateWorkspaceViewSize.height / scale) * sy)
 
             ZStack(alignment: .topLeading) {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
@@ -669,77 +674,53 @@ private struct MiniMapView: View {
                     )
                     .shadow(color: .black.opacity(0.35), radius: 12, x: 0, y: 6)
 
+                // Single Canvas for all shapes and device dots — eliminates N SwiftUI
+                // views being created/diffed/laid out on every ping cycle.
+                Canvas { ctx, _ in
+                    // Location boxes
+                    for shape in store.shapes {
+                        let rect = CGRect(
+                            x: shape.x * sx,
+                            y: shape.y * sy,
+                            width: max(4, shape.width * sx),
+                            height: max(4, shape.height * sy)
+                        )
+                        ctx.fill(Path(roundedRect: rect, cornerRadius: 2), with: .color(.white.opacity(0.10)))
+                        ctx.stroke(Path(roundedRect: rect, cornerRadius: 2), with: .color(.white.opacity(0.55)), lineWidth: 1)
+                    }
+
+                    // Device dots
+                    for device in store.devices {
+                        let cx = device.x * sx
+                        let cy = device.y * sy
+                        let dot = CGRect(x: cx - 4, y: cy - 4, width: 8, height: 8)
+                        ctx.fill(Path(ellipseIn: dot), with: .color(dotColor(for: device.status)))
+                        ctx.stroke(Path(ellipseIn: dot), with: .color(.white.opacity(0.75)), lineWidth: 1)
+                    }
+
+                    // Viewport box
+                    let vpRect = CGRect(x: visibleX, y: visibleY, width: visibleW, height: visibleH)
+                    ctx.fill(Path(vpRect), with: .color(.yellow.opacity(0.08)))
+                    ctx.stroke(Path(vpRect), with: .color(.yellow.opacity(0.95)), lineWidth: 2)
+                }
+                .allowsHitTesting(false)
+
                 Text("MINI MAP")
                     .font(.system(size: 13, weight: .black, design: .rounded))
                     .foregroundStyle(.cyan)
                     .padding(.top, 10)
                     .padding(.leading, 12)
-
-                ForEach(store.shapes) { shape in
-                    RoundedRectangle(cornerRadius: 3)
-                        .stroke(Color.white.opacity(0.55), lineWidth: 1)
-                        .background(
-                            RoundedRectangle(cornerRadius: 3)
-                                .fill(Color.white.opacity(0.10))
-                        )
-                        .frame(
-                            width: max(4, shape.width * sx),
-                            height: max(4, shape.height * sy)
-                        )
-                        .position(
-                            x: (shape.x + shape.width / 2) * sx,
-                            y: (shape.y + shape.height / 2) * sy
-                        )
-                }
-
-                ForEach(store.devices) { device in
-                    Circle()
-                        .fill(color(for: device.status))
-                        .frame(width: 8, height: 8)
-                        .overlay(Circle().stroke(Color.white.opacity(0.75), lineWidth: 1))
-                        .position(
-                            x: device.x * sx,
-                            y: device.y * sy
-                        )
-                }
-
-                viewportBox(proxySize: proxy.size, sx: sx, sy: sy, scale: scale)
             }
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
     }
 
-    private func viewportBox(proxySize: CGSize, sx: CGFloat, sy: CGFloat, scale: Double) -> some View {
-        let approximateWorkspaceViewSize = CGSize(width: 900, height: 700)
-
-        let visibleX = (-store.workspaceOffset.width / scale) * sx
-        let visibleY = (-store.workspaceOffset.height / scale) * sy
-        let visibleW = (approximateWorkspaceViewSize.width / scale) * sx
-        let visibleH = (approximateWorkspaceViewSize.height / scale) * sy
-
-        return Rectangle()
-            .stroke(Color.yellow.opacity(0.95), lineWidth: 2)
-            .background(Color.yellow.opacity(0.08))
-            .frame(
-                width: max(10, visibleW),
-                height: max(10, visibleH)
-            )
-            .position(
-                x: visibleX + visibleW / 2,
-                y: visibleY + visibleH / 2
-            )
-    }
-
-    private func color(for status: DeviceStatus) -> Color {
+    private func dotColor(for status: DeviceStatus) -> Color {
         switch status {
-        case .healthy:
-            return .green
-        case .slow:
-            return .yellow
-        case .offline:
-            return .red
-        case .unknown:
-            return .gray
+        case .healthy: return .green
+        case .slow:    return .yellow
+        case .offline: return .red
+        case .unknown: return .gray
         }
     }
 }

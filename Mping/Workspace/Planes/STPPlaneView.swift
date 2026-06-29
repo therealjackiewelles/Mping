@@ -21,13 +21,14 @@ struct STPPlaneView: View {
 
                 ZStack(alignment: .topLeading) {
                     FibreLinksLayer(
-                        devices: store.devices,
+                        devicePositions: Dictionary(uniqueKeysWithValues: store.devices.map { ($0.id, CGPoint(x: $0.x, y: $0.y)) }),
                         links: store.cachedFibreResults,
                         fibreLabelOffset: store.fibreLabelOffset,
                         setFibreLabelOffset: store.setFibreLabelOffset,
                         showLines: true,
                         showLabels: true
                     )
+                    .equatable()
                     .frame(width: canvasSize.width, height: canvasSize.height)
                     .allowsHitTesting(false)
 

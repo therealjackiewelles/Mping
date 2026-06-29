@@ -35,15 +35,16 @@ struct WorkspaceView: View {
                     grid
 
                     FibreLinksLayer(
-                        devices: store.devices,
+                        devicePositions: Dictionary(uniqueKeysWithValues: store.devices.map { ($0.id, CGPoint(x: $0.x, y: $0.y)) }),
                         links: store.cachedFibreResults,
                         fibreLabelOffset: store.fibreLabelOffset,
                         setFibreLabelOffset: store.setFibreLabelOffset,
                         showLines: true,
                         showLabels: false
                     )
-                        .frame(width: canvasSize.width, height: canvasSize.height)
-                        .allowsHitTesting(false)
+                    .equatable()
+                    .frame(width: canvasSize.width, height: canvasSize.height)
+                    .allowsHitTesting(false)
 
                     ForEach(store.shapes) { shape in
                         WorkspaceShapeView(
@@ -121,15 +122,16 @@ struct WorkspaceView: View {
                     }
 
                     FibreLinksLayer(
-                        devices: store.devices,
+                        devicePositions: Dictionary(uniqueKeysWithValues: store.devices.map { ($0.id, CGPoint(x: $0.x, y: $0.y)) }),
                         links: store.cachedFibreResults,
                         fibreLabelOffset: store.fibreLabelOffset,
                         setFibreLabelOffset: store.setFibreLabelOffset,
                         showLines: false,
                         showLabels: true
                     )
-                        .frame(width: canvasSize.width, height: canvasSize.height)
-                        .zIndex(9999)
+                    .equatable()
+                    .frame(width: canvasSize.width, height: canvasSize.height)
+                    .zIndex(9999)
                 }
                 .frame(
                     width: canvasSize.width,

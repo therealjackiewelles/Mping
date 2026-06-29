@@ -1220,32 +1220,8 @@ struct FibreLinkLine: View {
                     )
                 )
 
-                // Animated flow dashes toward root bridge.
-                // TimelineView+Canvas keeps the 60fps update isolated to this Canvas only —
-                // the parent view graph is never re-evaluated per frame.
-                if result.flowDirection != .none {
-                    let lw = result.topologyLineWidth
-                    let direction = result.flowDirection
-                    let cycleDuration: Double = 0.6
-                    let period: Double = 14.0
-                    TimelineView(.animation) { timeline in
-                        let elapsed = timeline.date.timeIntervalSinceReferenceDate
-                        let raw = (elapsed.truncatingRemainder(dividingBy: cycleDuration) / cycleDuration) * period
-                        let phase = CGFloat(direction == .aToB ? -raw : raw)
-                        Canvas { ctx, _ in
-                            var p = Path()
-                            p.move(to: start)
-                            p.addLine(to: end)
-                            ctx.stroke(p, with: .color(.black.opacity(0.85)),
-                                       style: StrokeStyle(lineWidth: lw * 1.7, lineCap: .butt,
-                                                          dash: [4, 10], dashPhase: phase))
-                            ctx.stroke(p, with: .color(Color(white: 0.65).opacity(0.95)),
-                                       style: StrokeStyle(lineWidth: lw * 1.0, lineCap: .butt,
-                                                          dash: [4, 10], dashPhase: phase))
-                        }
-                        .allowsHitTesting(false)
-                    }
-                }
+                // Animated flow dashes are drawn by the single TimelineView in FibreLinksLayer,
+                // not here — one 60fps Canvas loop for all links instead of one per link.
             }
 
             if showLabels {
@@ -1465,7 +1441,9 @@ private struct FibreLinkRenderItem: Identifiable {
 }
 
 struct FibreLinksLayer: View {
-    let devices: [MonitoredDevice]
+    // Positions-only dict instead of full [MonitoredDevice] — prevents re-renders on
+    // every ping cycle (ping updates don't change device positions or link topology).
+    let devicePositions: [UUID: CGPoint]
     let links: [FibreLossResult]
     let fibreLabelOffset: (FibreLossResult, String) -> CGSize
     let setFibreLabelOffset: (CGSize, FibreLossResult, String) -> Void
@@ -1476,20 +1454,43 @@ struct FibreLinksLayer: View {
     @ObservedObject private var deviceTileSettings = DeviceTileEditorSettings.shared
     @State private var deletedMissingLinkIDs: Set<UUID> = []
 
-    private var devicePositionByID: [UUID: CGPoint] {
-        Dictionary(uniqueKeysWithValues: devices.map { device in
-            (device.id, CGPoint(x: device.x, y: device.y))
-        })
-    }
-
     var body: some View {
-        let items = renderItems(positions: devicePositionByID)
+        let items = renderItems(positions: devicePositions)
             .filter { !deletedMissingLinkIDs.contains($0.result.id) }
         let labelOffsets = automaticLabelOffsets(for: items)
+        let animatedItems = showLines ? items.filter { $0.result.flowDirection != .none } : []
 
         ZStack(alignment: .topLeading) {
             ForEach(items) { item in
                 linkView(for: item, labelOffsets: labelOffsets)
+            }
+
+            // Single Canvas for ALL animated flow dashes at 20fps — replaces one 60fps
+            // TimelineView per link, cutting concurrent render loops from N down to 1.
+            // 20fps is imperceptibly different from 60fps for slow-moving dashed lines.
+            if !animatedItems.isEmpty {
+                TimelineView(.periodic(interval: 1.0 / 20.0)) { timeline in
+                    let elapsed = timeline.date.timeIntervalSinceReferenceDate
+                    Canvas { ctx, _ in
+                        let cycleDuration: Double = 0.6
+                        let period: Double = 14.0
+                        for item in animatedItems {
+                            let lw = item.result.topologyLineWidth
+                            let raw = (elapsed.truncatingRemainder(dividingBy: cycleDuration) / cycleDuration) * period
+                            let phase = CGFloat(item.result.flowDirection == .aToB ? -raw : raw)
+                            var p = Path()
+                            p.move(to: item.start)
+                            p.addLine(to: item.end)
+                            ctx.stroke(p, with: .color(.black.opacity(0.85)),
+                                       style: StrokeStyle(lineWidth: lw * 1.7, lineCap: .butt,
+                                                          dash: [4, 10], dashPhase: phase))
+                            ctx.stroke(p, with: .color(Color(white: 0.65).opacity(0.95)),
+                                       style: StrokeStyle(lineWidth: lw * 1.0, lineCap: .butt,
+                                                          dash: [4, 10], dashPhase: phase))
+                        }
+                    }
+                    .allowsHitTesting(false)
+                }
             }
         }
     }
@@ -1534,10 +1535,10 @@ struct FibreLinksLayer: View {
 
         let halfTileW = deviceTileSettings.tileWidth / 2 + 2
         let halfTileH = deviceTileSettings.tileHeight / 2 + 2
-        let deviceRects = devices.map { device in
+        let deviceRects = devicePositions.values.map { point in
             CGRect(
-                x: CGFloat(device.x) - halfTileW,
-                y: CGFloat(device.y) - halfTileH,
+                x: point.x - halfTileW,
+                y: point.y - halfTileH,
                 width: halfTileW * 2,
                 height: halfTileH * 2
             )
@@ -1758,6 +1759,17 @@ struct FibreLinksLayer: View {
         let left = aID.uuidString
         let right = bID.uuidString
         return left < right ? "\(left)|\(right)" : "\(right)|\(left)"
+    }
+}
+
+extension FibreLinksLayer: Equatable {
+    // SwiftUI uses this to skip body re-evaluation when the parent re-renders due to
+    // ping updates. Closures are excluded — they're only called on user interaction.
+    static func == (lhs: FibreLinksLayer, rhs: FibreLinksLayer) -> Bool {
+        lhs.devicePositions == rhs.devicePositions &&
+        lhs.links == rhs.links &&
+        lhs.showLines == rhs.showLines &&
+        lhs.showLabels == rhs.showLabels
     }
 }
 
