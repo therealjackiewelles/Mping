@@ -1117,7 +1117,6 @@ struct FibreLinkLine: View {
     @State private var bLabelOffset: CGSize
     @State private var aDragStartOffset: CGSize?
     @State private var bDragStartOffset: CGSize?
-    @State private var dashPhase: CGFloat = 0
     @AppStorage("Mping.fibreLabelOpacity") private var fibreLabelOpacity: Double = 0.5
     @ObservedObject private var fibreBoxSettings = FibreBoxEditorSettings.shared
     @ObservedObject private var deviceTileSettings = DeviceTileEditorSettings.shared
@@ -1172,39 +1171,31 @@ struct FibreLinkLine: View {
                     )
                 )
 
-                // Animated grey dot arrows showing quickest path to root (AVB clock direction).
-                // GPU-driven dash phase — zero CPU per frame.
+                // Animated flow dashes toward root bridge.
+                // TimelineView+Canvas keeps the 60fps update isolated to this Canvas only —
+                // the parent view graph is never re-evaluated per frame.
                 if result.flowDirection != .none {
-                    // Black border layer — slightly wider, same dash pattern
-                    Path { path in
-                        path.move(to: start)
-                        path.addLine(to: end)
+                    let lw = result.topologyLineWidth
+                    let direction = result.flowDirection
+                    let cycleDuration: Double = 0.6
+                    let period: Double = 14.0
+                    TimelineView(.animation) { timeline in
+                        let elapsed = timeline.date.timeIntervalSinceReferenceDate
+                        let raw = (elapsed.truncatingRemainder(dividingBy: cycleDuration) / cycleDuration) * period
+                        let phase = CGFloat(direction == .aToB ? -raw : raw)
+                        Canvas { ctx, _ in
+                            var p = Path()
+                            p.move(to: start)
+                            p.addLine(to: end)
+                            ctx.stroke(p, with: .color(.black.opacity(0.85)),
+                                       style: StrokeStyle(lineWidth: lw * 1.7, lineCap: .butt,
+                                                          dash: [4, 10], dashPhase: phase))
+                            ctx.stroke(p, with: .color(Color(white: 0.65).opacity(0.95)),
+                                       style: StrokeStyle(lineWidth: lw * 1.0, lineCap: .butt,
+                                                          dash: [4, 10], dashPhase: phase))
+                        }
+                        .allowsHitTesting(false)
                     }
-                    .stroke(
-                        Color.black.opacity(0.85),
-                        style: StrokeStyle(
-                            lineWidth: result.topologyLineWidth * 1.7,
-                            lineCap: .butt,
-                            dash: [4, 10],
-                            dashPhase: dashPhase
-                        )
-                    )
-                    // Grey rectangle on top
-                    Path { path in
-                        path.move(to: start)
-                        path.addLine(to: end)
-                    }
-                    .stroke(
-                        Color(white: 0.65).opacity(0.95),
-                        style: StrokeStyle(
-                            lineWidth: result.topologyLineWidth * 1.0,
-                            lineCap: .butt,
-                            dash: [4, 10],
-                            dashPhase: dashPhase
-                        )
-                    )
-                    .onAppear { startFlowAnimation() }
-                    .onChange(of: result.flowDirection) { _, _ in startFlowAnimation() }
                 }
             }
 
@@ -1269,18 +1260,6 @@ struct FibreLinkLine: View {
                     onDeleteMissingLink()
                 }
             }
-        }
-    }
-
-    private func startFlowAnimation() {
-        guard result.flowDirection != .none else { return }
-        dashPhase = 0
-        // Dash period = 7 (dash) + 9 (gap) = 16px. Animating by 16px per cycle
-        // moves one full pattern length. Speed tunable via duration.
-        let period: CGFloat = 14  // dash (2) + gap (12) = 14px
-        let target: CGFloat = result.flowDirection == .aToB ? -period : period
-        withAnimation(.linear(duration: 0.6).repeatForever(autoreverses: false)) {
-            dashPhase = target
         }
     }
 

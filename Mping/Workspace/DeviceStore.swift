@@ -284,7 +284,7 @@ final class DeviceStore: ObservableObject {
         let timeout = effectivePingTimeoutMilliseconds()
 
         let snapshot = devices
-            .filter { $0.pingMonitoringEnabled && !$0.isPinging && pingVerificationTasks[$0.id] == nil }
+            .filter { $0.pingMonitoringEnabled && !$0.isPinging && !$0.requiresSetup && pingVerificationTasks[$0.id] == nil }
             .map { device in
                 (
                     id: device.id,
@@ -416,6 +416,7 @@ final class DeviceStore: ObservableObject {
         var deviceType: MonitoredDeviceType? = nil  // nil = no change
         var pingMonitoringEnabled: Bool? = nil      // nil = no change
         var snmpMonitoringEnabled: Bool? = nil      // nil = no change
+        var interfaceID: String? = nil              // nil = no change, "AUTO" = clear to auto
     }
 
     func bulkUpdateDevices(ids: Set<UUID>, edit: BulkDeviceEdit) {
@@ -434,6 +435,9 @@ final class DeviceStore: ObservableObject {
             }
             if let snmpEnabled = edit.snmpMonitoringEnabled {
                 updateDeviceSNMPMonitoring(id: id, enabled: snmpEnabled)
+            }
+            if let interfaceID = edit.interfaceID {
+                updateDeviceInterface(id: id, interfaceID: interfaceID)
             }
         }
     }
@@ -1052,7 +1056,7 @@ final class DeviceStore: ObservableObject {
         pendingFocusDeviceID = id
         selectOnlyDevice(id)
         flashingDeviceIDs.insert(id)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) { [weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
             self?.flashingDeviceIDs.remove(id)
         }
     }
@@ -1089,12 +1093,16 @@ final class DeviceStore: ObservableObject {
         for event in alertEvents where event.kind == .alert && event.isCurrent && !event.isAcknowledged {
             if let id = event.deviceID { currentDeviceIDs.insert(id) }
         }
-        activeAlertCountByCategory = counts
-        deviceIDsWithCurrentAlerts = currentDeviceIDs
-        cachedSortedAlerts = alertEvents.sorted {
+        // Only assign if the value changed — @Published fires objectWillChange on every
+        // assignment regardless of whether the value is different, causing a spurious
+        // SwiftUI render pass after every ping cycle even when no alerts have changed.
+        if counts != activeAlertCountByCategory { activeAlertCountByCategory = counts }
+        if currentDeviceIDs != deviceIDsWithCurrentAlerts { deviceIDsWithCurrentAlerts = currentDeviceIDs }
+        let sorted = alertEvents.sorted {
             if $0.firstTriggeredAt != $1.firstTriggeredAt { return $0.firstTriggeredAt > $1.firstTriggeredAt }
             return $0.lastUpdatedAt > $1.lastUpdatedAt
         }
+        if sorted != cachedSortedAlerts { cachedSortedAlerts = sorted }
     }
 
     func acknowledgeAlerts(category: MpingAlertCategory? = nil) {
@@ -1495,10 +1503,31 @@ final class DeviceStore: ObservableObject {
     }
 
     func addDevice() {
-        devices.append(MonitoredDevice(name: "New Device", ipAddress: "192.168.1.100", x: 300, y: 260))
+        devices.append(MonitoredDevice(
+            name: "New Device",
+            ipAddress: "192.168.1.100",
+            x: 300, y: 260,
+            pingMonitoringEnabled: false,
+            requiresSetup: true,
+            pingNICConfigured: false
+        ))
         if let id = devices.last?.id {
             selectOnlyDevice(id)
         }
+        markWorkspaceDirty()
+    }
+
+    func completeDeviceSetup(id: UUID) {
+        updateDeviceRuntime(id: id) { device in
+            device.requiresSetup = false
+            device.pingMonitoringEnabled = true
+        }
+        markWorkspaceDirty()
+    }
+
+    func markNICConfigured(id: UUID) {
+        guard let index = devices.firstIndex(where: { $0.id == id }) else { return }
+        devices[index].pingNICConfigured = true
         markWorkspaceDirty()
     }
 
@@ -2475,7 +2504,9 @@ final class DeviceStore: ObservableObject {
             macAddress: device.macAddress,
             zoneName: device.zoneName,
             pingMonitoringEnabled: device.pingMonitoringEnabled,
-            snmpMonitoringEnabled: device.snmpMonitoringEnabled
+            snmpMonitoringEnabled: device.snmpMonitoringEnabled,
+            requiresSetup: device.requiresSetup,
+            pingNICConfigured: device.pingNICConfigured
         )
     }
 

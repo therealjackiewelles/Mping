@@ -86,7 +86,6 @@ struct AlertingSidebarBox: View {
     @Binding var openCategory: MpingAlertCategory?
     let sidebarWidth: CGFloat
     @State private var showingThresholds = false
-    @State private var alertPulse = false
 
     private var sidebarScale: CGFloat {
         min(1.65, max(1.0, sidebarWidth / 230.0))
@@ -164,31 +163,28 @@ struct AlertingSidebarBox: View {
                     )
                 }
             }
-            .animation(nil, value: alertPulse)
         }
         .padding(panelPadding)
         .frame(maxWidth: .infinity)
         .frame(minHeight: 112 * sidebarScale, alignment: .top)
         .background(alertingPanelBackground)
         .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(hasActiveAlerts ? Color.red.opacity(alertPulse ? 0.55 : 0.20) : Color.white.opacity(0.09), lineWidth: 1)
-        )
-        .onAppear {
-            alertPulse = hasActiveAlerts
-        }
-        .onChange(of: hasActiveAlerts) { _, isActive in
-            if isActive {
-                alertPulse = false
-                withAnimation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true)) {
-                    alertPulse = true
-                }
-            } else {
-                withAnimation(.easeOut(duration: 0.25)) {
-                    alertPulse = false
+            Group {
+                if hasActiveAlerts {
+                    PulsingBorderView(
+                        color: NSColor.systemRed,
+                        lineWidth: 1,
+                        cornerRadius: 14,
+                        minOpacity: 0.20,
+                        maxOpacity: 0.55,
+                        duration: 1.4
+                    )
+                } else {
+                    RoundedRectangle(cornerRadius: 14)
+                        .stroke(Color.white.opacity(0.09), lineWidth: 1)
                 }
             }
-        }
+        )
     }
 
 
@@ -197,13 +193,8 @@ struct AlertingSidebarBox: View {
     }
 
     private var alertingPanelBackground: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 14)
-                .fill(Color.white.opacity(0.055))
-
-            RoundedRectangle(cornerRadius: 14)
-                .fill(Color.red.opacity(hasActiveAlerts ? (alertPulse ? 0.20 : 0.045) : 0.0))
-        }
+        RoundedRectangle(cornerRadius: 14)
+            .fill(hasActiveAlerts ? Color.red.opacity(0.10) : Color.white.opacity(0.055))
     }
 }
 

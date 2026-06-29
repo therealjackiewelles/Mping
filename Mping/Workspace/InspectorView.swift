@@ -48,6 +48,7 @@ private struct MultiSelectionInspector: View {
     @State private var deviceTypeSelection: MonitoredDeviceType? = nil
     @State private var pingMonitoringSelection: Bool? = nil
     @State private var snmpMonitoringSelection: Bool? = nil
+    @State private var nicSelection: String? = nil
     @State private var applied: Bool = false
 
     private var selectedDevices: [MonitoredDevice] {
@@ -66,6 +67,7 @@ private struct MultiSelectionInspector: View {
     private var anyFieldDirty: Bool {
         zoneFieldDirty || snmpFieldDirty || deviceTypeSelection != nil
         || pingMonitoringSelection != nil || snmpMonitoringSelection != nil
+        || nicSelection != nil
     }
 
     var body: some View {
@@ -183,6 +185,32 @@ private struct MultiSelectionInspector: View {
                     }
                 }
 
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text("Ping NIC")
+                            .foregroundStyle(.white.opacity(0.7))
+                        Spacer()
+                        Button("Refresh") { store.refreshNetworkInterfaces() }
+                            .font(.caption)
+                    }
+                    Picker("Ping NIC", selection: Binding(
+                        get: { nicSelection ?? "NOCHANGE" },
+                        set: { nicSelection = $0 == "NOCHANGE" ? nil : $0 }
+                    )) {
+                        Text("No change").tag("NOCHANGE")
+                        Text("Auto Routing").tag("AUTO")
+                        ForEach(store.networkInterfaces) { nic in
+                            Text(nic.pickerTitle).tag(nic.id)
+                        }
+                    }
+                    .labelsHidden()
+                    if let nic = nicSelection {
+                        Text(nic == "AUTO" ? "Will set all selected devices to auto routing." : "Will set NIC on all selected devices.")
+                            .font(.system(size: 10, design: .rounded))
+                            .foregroundStyle(.green)
+                    }
+                }
+
                 HStack(spacing: 10) {
                     Button("Apply") {
                         var edit = DeviceStore.BulkDeviceEdit()
@@ -191,6 +219,7 @@ private struct MultiSelectionInspector: View {
                         edit.deviceType = deviceTypeSelection
                         edit.pingMonitoringEnabled = pingMonitoringSelection
                         edit.snmpMonitoringEnabled = snmpMonitoringSelection
+                        edit.interfaceID = nicSelection
                         store.bulkUpdateDevices(ids: store.selectedDeviceIDs, edit: edit)
                         applied = true
                         resetFields()
@@ -216,6 +245,8 @@ private struct MultiSelectionInspector: View {
                 Spacer(minLength: 12)
             }
             .padding(18)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(OverlayScrollbarFixer())
         }
         .onChange(of: store.selectedDeviceIDs) { _, _ in
             resetFields()
@@ -230,6 +261,7 @@ private struct MultiSelectionInspector: View {
         deviceTypeSelection = nil
         pingMonitoringSelection = nil
         snmpMonitoringSelection = nil
+        nicSelection = nil
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { applied = false }
     }
 }
@@ -252,6 +284,22 @@ private struct DeviceInspector: View {
     @State private var showDeleteConfirmation: Bool = false
     @FocusState private var focusedField: DeviceInspectorField?
 
+    // Use the live @State text fields so setup completes without requiring Enter.
+    private var setupNameDone: Bool {
+        let n = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return n != "New Device" && !n.isEmpty
+    }
+    private var setupIPDone: Bool {
+        let i = ip.trimmingCharacters(in: .whitespacesAndNewlines)
+        return i != "192.168.1.100" && !i.isEmpty
+    }
+    private var setupNICDone: Bool { device.pingNICConfigured }
+
+    private func checkSetupComplete() {
+        guard device.requiresSetup, setupNameDone, setupIPDone, setupNICDone else { return }
+        store.completeDeviceSetup(id: device.id)
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
@@ -259,76 +307,79 @@ private struct DeviceInspector: View {
                     .font(.title2.bold())
                     .foregroundStyle(.white)
 
-                monitoringControlsSection
-
-                // Name
-                compactCard {
-                    HStack(spacing: 6) {
-                        Text("NAME")
-                            .font(.system(size: 9, weight: .medium, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.46))
-                            .textCase(.uppercase)
-                        Spacer()
-                        Toggle("SNMP/LLDP", isOn: Binding(
-                            get: { selectedNameSource == .automatic },
-                            set: { useAutomatic in
-                                commitDeviceTextFields()
-                                let src: DeviceNameSource = useAutomatic ? .automatic : .manual
-                                selectedNameSource = src
-                                store.updateDeviceNameSource(id: device.id, source: src)
-                            }
-                        ))
-                        .toggleStyle(.checkbox)
-                        .font(.system(size: 10, weight: .medium, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.60))
-                    }
-                    TextField("Name", text: $name)
-                        .textFieldStyle(.plain)
-                        .font(.system(size: 12, weight: .medium, design: .rounded))
-                        .foregroundStyle(selectedNameSource == .automatic ? .white.opacity(0.45) : .white.opacity(0.92))
-                        .focused($focusedField, equals: .name)
-                        .disabled(selectedNameSource == .automatic)
-                        .onSubmit { commitDeviceTextFields() }
+                if device.requiresSetup {
+                    setupBanner
                 }
 
-                // IP + Device Type
-                HStack(spacing: 8) {
-                    compactCard {
-                        Text("IP ADDRESS")
-                            .font(.system(size: 9, weight: .medium, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.46))
-                        TextField("IP", text: $ip)
+                monitoringControlsSection
+                    .opacity(device.requiresSetup ? 0.35 : 1)
+                    .allowsHitTesting(!device.requiresSetup)
+
+                // Name + IP + Type — tightly grouped as a unit
+                VStack(spacing: 6) {
+                    compactCard(setupAlert: device.requiresSetup && !setupNameDone) {
+                        HStack(spacing: 6) {
+                            Text("NAME")
+                                .font(.system(size: 9, weight: .medium, design: .rounded))
+                                .foregroundStyle(.white.opacity(0.46))
+                                .textCase(.uppercase)
+                            Spacer()
+                            Toggle("SNMP/LLDP", isOn: Binding(
+                                get: { selectedNameSource == .automatic },
+                                set: { useAutomatic in
+                                    commitDeviceTextFields()
+                                    let src: DeviceNameSource = useAutomatic ? .automatic : .manual
+                                    selectedNameSource = src
+                                    store.updateDeviceNameSource(id: device.id, source: src)
+                                }
+                            ))
+                            .toggleStyle(.checkbox)
+                            .font(.system(size: 10, weight: .medium, design: .rounded))
+                            .foregroundStyle(.white.opacity(0.60))
+                        }
+                        TextField("Name", text: $name)
                             .textFieldStyle(.plain)
                             .font(.system(size: 12, weight: .medium, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.92))
-                            .focused($focusedField, equals: .ipAddress)
-                            .onSubmit { commitDeviceTextFields() }
+                            .foregroundStyle(selectedNameSource == .automatic ? .white.opacity(0.45) : .white.opacity(0.92))
+                            .focused($focusedField, equals: .name)
+                            .disabled(selectedNameSource == .automatic)
+                            .onSubmit { commitDeviceTextFields(); checkSetupComplete() }
                     }
 
-                    compactCard {
-                        Text("TYPE")
-                            .font(.system(size: 9, weight: .medium, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.46))
-                        Picker("", selection: $selectedDeviceType) {
-                            ForEach(MonitoredDeviceType.allCases, id: \.self) { type in
-                                Text(type.label).tag(type)
+                    HStack(spacing: 6) {
+                        compactCard(setupAlert: device.requiresSetup && !setupIPDone) {
+                            Text("IP ADDRESS")
+                                .font(.system(size: 9, weight: .medium, design: .rounded))
+                                .foregroundStyle(.white.opacity(0.46))
+                            TextField("IP", text: $ip)
+                                .textFieldStyle(.plain)
+                                .font(.system(size: 12, weight: .medium, design: .rounded))
+                                .foregroundStyle(.white.opacity(0.92))
+                                .focused($focusedField, equals: .ipAddress)
+                                .onSubmit { commitDeviceTextFields(); checkSetupComplete() }
+                        }
+
+                        compactCard {
+                            Text("TYPE")
+                                .font(.system(size: 9, weight: .medium, design: .rounded))
+                                .foregroundStyle(.white.opacity(0.46))
+                            Picker("", selection: $selectedDeviceType) {
+                                ForEach(MonitoredDeviceType.allCases, id: \.self) { type in
+                                    Text(type.label).tag(type)
+                                }
+                            }
+                            .labelsHidden()
+                            .font(.system(size: 12, weight: .medium, design: .rounded))
+                            .onChange(of: selectedDeviceType) { _, newValue in
+                                guard newValue != device.deviceType else { return }
+                                store.updateDeviceType(id: device.id, type: newValue)
                             }
                         }
-                        .labelsHidden()
-                        .font(.system(size: 12, weight: .medium, design: .rounded))
-                        .onChange(of: selectedDeviceType) { _, newValue in
-                            guard newValue != device.deviceType else { return }
-                            store.updateDeviceType(id: device.id, type: newValue)
-                        }
                     }
                 }
 
-                if selectedDeviceType == .netgearSwitch {
-                    temperatureHistorySection
-                    fibreLossSection
-                }
-
-                // Zone
+                // Zone + NIC — tightly grouped to match name/ip/type
+                VStack(spacing: 6) {
                 compactCard {
                     Text("ZONE")
                         .font(.system(size: 9, weight: .medium, design: .rounded))
@@ -340,8 +391,7 @@ private struct DeviceInspector: View {
                         .onSubmit { commitZoneName() }
                 }
 
-                // NIC
-                compactCard {
+                compactCard(setupAlert: device.requiresSetup && !setupNICDone) {
                     HStack(spacing: 6) {
                         Text("PING NIC")
                             .font(.system(size: 9, weight: .medium, design: .rounded))
@@ -356,6 +406,9 @@ private struct DeviceInspector: View {
                         .buttonStyle(.plain)
                     }
                     Picker("", selection: $selectedInterfaceID) {
+                        if device.requiresSetup && !device.pingNICConfigured {
+                            Text("Not configured").tag("NONE")
+                        }
                         Text("Auto Routing").tag("AUTO")
                         ForEach(store.networkInterfaces) { nic in
                             Text(nic.pickerTitle).tag(nic.id)
@@ -364,21 +417,30 @@ private struct DeviceInspector: View {
                     .labelsHidden()
                     .font(.system(size: 12, weight: .medium, design: .rounded))
                     .onChange(of: selectedInterfaceID) { _, newValue in
+                        guard newValue != "NONE" else { return }
                         let currentID: String
                         if let sourceIPAddress = device.sourceIPAddress,
                            let match = store.networkInterfaces.first(where: { $0.ipv4Address == sourceIPAddress }) {
                             currentID = match.id
                         } else {
-                            currentID = "AUTO"
+                            currentID = device.pingNICConfigured ? "AUTO" : "NONE"
                         }
                         guard newValue != currentID else { return }
                         store.updateDeviceInterface(id: device.id, interfaceID: newValue)
+                        if device.requiresSetup { store.markNICConfigured(id: device.id) }
+                        checkSetupComplete()
                     }
                 }
+                } // Zone + NIC group
 
                 Divider()
 
                 pingStatusSection
+
+                if selectedDeviceType == .netgearSwitch {
+                    temperatureHistorySection
+                    fibreLossSection
+                }
 
                 if let lastChecked = device.lastChecked {
                     Text("Last checked: \(lastChecked.formatted(date: .omitted, time: .standard))")
@@ -390,6 +452,8 @@ private struct DeviceInspector: View {
                 deleteSection
             }
             .padding(18)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(OverlayScrollbarFixer())
         }
         .onAppear {
             syncFromDevice()
@@ -407,51 +471,58 @@ private struct DeviceInspector: View {
         .onChange(of: focusedField) { oldValue, newValue in
             if oldValue != nil && newValue == nil {
                 commitDeviceTextFields()
+                checkSetupComplete()
             }
         }
     }
 
 
     private var monitoringControlsSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Toggle(isOn: Binding(
-                get: { device.pingMonitoringEnabled },
-                set: { store.updateDevicePingMonitoring(id: device.id, enabled: $0) }
-            )) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Ping Monitoring")
-                        .font(.system(size: 13, weight: .medium, design: .rounded))
-                        .foregroundStyle(.white)
-                    if !device.pingMonitoringEnabled {
-                        Text("Device is excluded from all ping cycles.")
-                            .font(.system(size: 10, design: .rounded))
-                            .foregroundStyle(.orange)
-                    }
-                }
-            }
-            .toggleStyle(.switch)
+        HStack(spacing: 6) {
+            monitoringToggleCard(
+                label: "PING",
+                isOn: Binding(
+                    get: { device.pingMonitoringEnabled },
+                    set: { store.updateDevicePingMonitoring(id: device.id, enabled: $0) }
+                ),
+                offWarning: "Excluded from ping"
+            )
 
-            if device.deviceType == .netgearSwitch {
-                Toggle(isOn: Binding(
+            monitoringToggleCard(
+                label: "SNMP / LLDP",
+                isOn: Binding(
                     get: { device.snmpMonitoringEnabled },
                     set: { store.updateDeviceSNMPMonitoring(id: device.id, enabled: $0) }
-                )) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("SNMP / LLDP")
-                            .font(.system(size: 13, weight: .medium, design: .rounded))
-                            .foregroundStyle(.white)
-                        if !device.snmpMonitoringEnabled {
-                            Text("Device is excluded from telemetry polling.")
-                                .font(.system(size: 10, design: .rounded))
-                                .foregroundStyle(.orange)
-                        }
-                    }
-                }
+                ),
+                offWarning: "Excluded from polling"
+            )
+            .opacity(device.deviceType == .netgearSwitch ? 1 : 0)
+            .allowsHitTesting(device.deviceType == .netgearSwitch)
+        }
+    }
+
+    private func monitoringToggleCard(label: String, isOn: Binding<Bool>, offWarning: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label)
+                .font(.system(size: 9, weight: .medium, design: .rounded))
+                .foregroundStyle(.white.opacity(0.46))
+            Toggle("", isOn: isOn)
                 .toggleStyle(.switch)
+                .labelsHidden()
+                .scaleEffect(0.85, anchor: .leading)
+            if !isOn.wrappedValue {
+                Text(offWarning)
+                    .font(.system(size: 9, weight: .medium, design: .rounded))
+                    .foregroundStyle(.orange.opacity(0.85))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
         }
-        .padding(10)
-        .background(RoundedRectangle(cornerRadius: 12).fill(Color.white.opacity(0.045)))
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 7)
+        .background(Color.black.opacity(0.18), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 9, style: .continuous).stroke(Color.white.opacity(0.08), lineWidth: 1))
     }
 
     private var pingStatusSection: some View {
@@ -836,16 +907,56 @@ private struct DeviceInspector: View {
         .onChange(of: device.id) { _, _ in showDeleteConfirmation = false }
     }
 
+    private var setupBanner: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "exclamationmark.circle")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.orange)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Setup required before monitoring")
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.92))
+                Text("Set a name, IP address and Ping NIC to activate this device.")
+                    .font(.system(size: 10, weight: .medium, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.55))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.orange.opacity(0.10), in: RoundedRectangle(cornerRadius: 10))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.orange.opacity(0.30), lineWidth: 1))
+    }
+
     @ViewBuilder
-    private func compactCard<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+    private func compactCard<Content: View>(setupAlert: Bool = false, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             content()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 8)
         .padding(.vertical, 7)
-        .background(Color.black.opacity(0.18), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 9, style: .continuous).stroke(Color.white.opacity(0.08), lineWidth: 1))
+        .background(
+            setupAlert ? Color.red.opacity(0.10) : Color.black.opacity(0.18),
+            in: RoundedRectangle(cornerRadius: 9, style: .continuous)
+        )
+        .overlay(
+            Group {
+                if setupAlert {
+                    PulsingBorderView(
+                        color: NSColor.systemRed,
+                        lineWidth: 1.5,
+                        cornerRadius: 9,
+                        minOpacity: 0.25,
+                        maxOpacity: 0.75,
+                        duration: 1.1
+                    )
+                } else {
+                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                }
+            }
+        )
     }
 
     private func commitZoneName() {
@@ -872,8 +983,10 @@ private struct DeviceInspector: View {
     }
 
     private func syncInterfaceSelection() {
-        if let sourceIPAddress = device.sourceIPAddress,
-           let match = store.networkInterfaces.first(where: { $0.ipv4Address == sourceIPAddress }) {
+        if device.requiresSetup && !device.pingNICConfigured {
+            selectedInterfaceID = "NONE"
+        } else if let sourceIPAddress = device.sourceIPAddress,
+                  let match = store.networkInterfaces.first(where: { $0.ipv4Address == sourceIPAddress }) {
             selectedInterfaceID = match.id
         } else {
             selectedInterfaceID = "AUTO"
@@ -1100,5 +1213,25 @@ private struct ShapeInspector: View {
         guard finalTitle != shape.title else { return }
         store.updateShape(id: shape.id, title: finalTitle)
         title = finalTitle
+    }
+}
+
+// Forces the enclosing NSScrollView to use overlay scroller style so the scrollbar
+// floats on top of content rather than reserving gutter space. Without this, a legacy
+// scrollbar (mouse users with "Always show scroll bars") narrows the content area,
+// causing all inspector cards to shift left or change width when the bar appears.
+private struct OverlayScrollbarFixer: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView { NSView() }
+    func updateNSView(_ nsView: NSView, context: Context) {
+        DispatchQueue.main.async {
+            var view: NSView? = nsView.superview
+            while let v = view {
+                if let scrollView = v as? NSScrollView {
+                    scrollView.scrollerStyle = .overlay
+                    return
+                }
+                view = v.superview
+            }
+        }
     }
 }

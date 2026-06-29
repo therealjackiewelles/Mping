@@ -224,6 +224,7 @@ struct WorkspaceView: View {
             .onChange(of: store.pendingFocusDeviceID) { _, id in
                 guard let id,
                       let device = store.devices.first(where: { $0.id == id }) else { return }
+                let savedOffset = store.workspaceOffset
                 let inspectorWidth: CGFloat = store.hasSelection ? store.inspectorWidth : 0
                 let visibleWidth = proxy.size.width - inspectorWidth
                 let targetOffsetX = visibleWidth / 2 - device.x * store.workspaceScale
@@ -232,6 +233,11 @@ struct WorkspaceView: View {
                     store.workspaceOffset = CGSize(width: targetOffsetX, height: targetOffsetY)
                 }
                 store.pendingFocusDeviceID = nil
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                    withAnimation(.easeInOut(duration: 0.55)) {
+                        store.workspaceOffset = savedOffset
+                    }
+                }
             }
             .clipped()
             .background(Color(red: 0.055, green: 0.055, blue: 0.06))
@@ -485,7 +491,6 @@ private struct MpingMapDeviceTileView: View, Equatable {
 
     @State private var pulseScale: CGFloat = 0.45
     @State private var pulseOpacity: Double = 0.0
-    @State private var alertPulse: Bool = false
     @State private var flashOpacity: Double = 0.0
 
     static func == (lhs: MpingMapDeviceTileView, rhs: MpingMapDeviceTileView) -> Bool {
@@ -503,6 +508,11 @@ private struct MpingMapDeviceTileView: View, Equatable {
         //
         // pingRTTHistory, pingLossHistory, jitter, uptime, and SNMP port detail are excluded
         // because they are only shown in the inspector, not on the canvas tile itself.
+        //
+        // lastSeenOnline is intentionally excluded: it updates to Date() on every successful
+        // ping, which would force every online tile to re-render every cycle. The tile only
+        // displays lastSeenOnline when status == .offline, and status IS compared here —
+        // so the tile re-renders on the online→offline transition that makes the value relevant.
         lhs.device.id == rhs.device.id
             && lhs.device.displayName == rhs.device.displayName
             && lhs.device.ipAddress == rhs.device.ipAddress
@@ -512,7 +522,6 @@ private struct MpingMapDeviceTileView: View, Equatable {
             && lhs.device.lastRTT.map { Int($0.rounded()) } == rhs.device.lastRTT.map { Int($0.rounded()) }
             && lhs.device.deviceType == rhs.device.deviceType
             && lhs.device.switchTelemetry.temperatureCelsius == rhs.device.switchTelemetry.temperatureCelsius
-            && lhs.device.lastSeenOnline == rhs.device.lastSeenOnline
             && lhs.device.verificationState == rhs.device.verificationState
             && lhs.device.zoneName == rhs.device.zoneName
             && lhs.device.switchTelemetry.stpIsRootBridge == rhs.device.switchTelemetry.stpIsRootBridge
@@ -661,24 +670,19 @@ private struct MpingMapDeviceTileView: View, Equatable {
         }
         .frame(width: tileWidth, height: tileHeight)
         .overlay(
-            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .stroke(Color.yellow.opacity(hasAlert ? (alertPulse ? 0.85 : 0.1) : 0.0), lineWidth: 2.5)
-                .animation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true), value: alertPulse)
+            Group {
+                if hasAlert {
+                    PulsingBorderView(
+                        color: NSColor.systemYellow,
+                        lineWidth: 2.5,
+                        cornerRadius: cornerRadius,
+                        minOpacity: 0.10,
+                        maxOpacity: 0.85,
+                        duration: 1.4
+                    )
+                }
+            }
         )
-        .onAppear {
-            if hasAlert {
-                alertPulse = false
-                withAnimation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true)) { alertPulse = true }
-            }
-        }
-        .onChange(of: hasAlert) { _, active in
-            if active {
-                alertPulse = false
-                withAnimation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true)) { alertPulse = true }
-            } else {
-                withAnimation(.easeOut(duration: 0.3)) { alertPulse = false }
-            }
-        }
         .overlay(alignment: .leading) {
             if let zone = device.zoneName, !zone.isEmpty {
                 RoundedRectangle(cornerRadius: 2, style: .continuous)
@@ -694,7 +698,7 @@ private struct MpingMapDeviceTileView: View, Equatable {
         )
         .onChange(of: isFlashing) { _, flashing in
             if flashing {
-                withAnimation(.easeInOut(duration: 0.3).repeatCount(17, autoreverses: true)) {
+                withAnimation(.easeInOut(duration: 0.3).repeatCount(10, autoreverses: true)) {
                     flashOpacity = 0.55
                 }
             } else {

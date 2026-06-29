@@ -209,6 +209,13 @@ struct MonitoredDevice: Identifiable, Codable, Equatable, Sendable {
     var zoneName: String?
     var pingMonitoringEnabled: Bool
     var snmpMonitoringEnabled: Bool
+    // True for newly added devices until name, IP, and NIC have all been explicitly set.
+    // The ping cycle skips devices where requiresSetup is true.
+    var requiresSetup: Bool
+    // Tracks whether the user has explicitly chosen a NIC (including AUTO) for this device.
+    // Kept separate from sourceInterfaceName because nil = AUTO for existing devices but
+    // nil = "not yet chosen" for new devices.
+    var pingNICConfigured: Bool
 
     init(
         id: UUID = UUID(),
@@ -239,7 +246,9 @@ struct MonitoredDevice: Identifiable, Codable, Equatable, Sendable {
         macAddress: String? = nil,
         zoneName: String? = nil,
         pingMonitoringEnabled: Bool = true,
-        snmpMonitoringEnabled: Bool = true
+        snmpMonitoringEnabled: Bool = true,
+        requiresSetup: Bool = false,
+        pingNICConfigured: Bool = true
     ) {
         self.id = id
         self.name = name
@@ -270,6 +279,8 @@ struct MonitoredDevice: Identifiable, Codable, Equatable, Sendable {
         self.zoneName = zoneName
         self.pingMonitoringEnabled = pingMonitoringEnabled
         self.snmpMonitoringEnabled = snmpMonitoringEnabled
+        self.requiresSetup = requiresSetup
+        self.pingNICConfigured = pingNICConfigured
     }
 
     enum CodingKeys: String, CodingKey {
@@ -302,6 +313,8 @@ struct MonitoredDevice: Identifiable, Codable, Equatable, Sendable {
         case zoneName
         case pingMonitoringEnabled
         case snmpMonitoringEnabled
+        case requiresSetup
+        case pingNICConfigured
     }
 
     init(from decoder: Decoder) throws {
@@ -345,6 +358,8 @@ struct MonitoredDevice: Identifiable, Codable, Equatable, Sendable {
         zoneName = try c.decodeIfPresent(String.self, forKey: .zoneName)
         pingMonitoringEnabled = try c.decodeIfPresent(Bool.self, forKey: .pingMonitoringEnabled) ?? true
         snmpMonitoringEnabled = try c.decodeIfPresent(Bool.self, forKey: .snmpMonitoringEnabled) ?? true
+        requiresSetup = try c.decodeIfPresent(Bool.self, forKey: .requiresSetup) ?? false
+        pingNICConfigured = try c.decodeIfPresent(Bool.self, forKey: .pingNICConfigured) ?? true
     }
 
 

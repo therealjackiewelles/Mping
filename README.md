@@ -137,6 +137,11 @@ Mping is built in Xcode. There is no package manager or CLI build step.
 
 ## Changelog
 
+### v0.5.3 — 2026-06-29
+- CPU reduced from 60% constant to near-zero baseline — `repeatForever` animations moved off SwiftUI `@State` onto `CALayer`/`CABasicAnimation` and `TimelineView { Canvas }`
+- Ping cycle no longer forces full tile re-renders — `lastSeenOnline` removed from Equatable, alert cache guards prevent spurious `objectWillChange` when nothing changed
+- New device setup flow: device excluded from pinging until Name, IP, and NIC are configured; fields pulse red until filled
+
 ### v0.5.2 — 2026-06-28
 - Inspector device info redesigned as compact stat cards (Name, IP+Type side-by-side, Zone, NIC)
 - Delete Device moved to bottom with two-step confirmation; requires ⌘⌫

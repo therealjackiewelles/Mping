@@ -5,6 +5,33 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.5.3 — 2026-06-29
+
+### Performance — CPU Reduction (60% → near zero baseline)
+
+Instruments Time Profiler identified 39% of CPU being spent in SwiftUI's `ViewGraph.renderDisplayList` — caused by `@State`-driven `repeatForever` animations forcing the entire view graph to re-evaluate at 60fps.
+
+**Animation hot paths eliminated:**
+- Alert pulse on device tiles (`alertPulse: Bool`) replaced with `CABasicAnimation` on a `CAShapeLayer` — animation now runs entirely in the render server with zero CPU per frame
+- Fibre flow dashes (`dashPhase: CGFloat`) replaced with `TimelineView { Canvas }` — 60fps updates now isolated to the Canvas only, parent view graph is never re-evaluated
+- Alert panel pulse and inspector setup pulse converted to the same `CALayer` approach
+- `PulsingBorderView` created as a reusable `NSViewRepresentable` for all pulsing border animations
+
+**Ping cycle render suppression:**
+- `lastSeenOnline` removed from tile Equatable check — it updates to `Date()` on every successful ping, which was forcing all online tiles to re-render every cycle. The tile only displays it when offline, and `status` (which is compared) triggers the re-render at the moment it matters
+- `rebuildAlertCaches()` now guards all three `@Published` assignments with equality checks — previously fired `objectWillChange` every ping cycle even when no alerts changed, causing a spurious SwiftUI render pass after each cycle
+
+**Result:** CPU goes from 60% constant to near-zero baseline with short spikes on ping cycle completion.
+
+### New Device Setup Flow (issue #50 — partial)
+- New devices default to `requiresSetup = true` and are excluded from ping cycles until Name, IP, and Ping NIC are all configured
+- Inspector shows setup banner and pulses unfilled fields red
+- Setup auto-completes on focus loss without requiring Enter
+- Ping NIC defaults to "Not configured" for new devices
+- Multi-select group edit now includes Ping NIC picker
+
+---
+
 ## v0.5.2 — 2026-06-28
 
 ### Inspector
