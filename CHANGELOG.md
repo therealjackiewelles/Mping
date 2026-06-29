@@ -5,6 +5,26 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.5.4 — 2026-06-29
+
+### Dual-NIC Static Route Management
+
+- New **Network Routing** pane in Preferences for managing static host routes on dual-NIC setups
+- Apply and Remove buttons copy the `sudo route` commands to the clipboard and open Terminal — avoids macOS Automation permission blocks on unsigned apps
+- Apply always runs a remove pass before adding, so stale routes from prior NIC assignments don't accumulate or conflict
+- Orange warning note: remove routes before disconnecting a NIC to prevent connectivity loss
+- `devicesWithExplicitNIC()` on DeviceStore supplies the route target list
+
+### LLDP Topology Link Matching
+
+- `matchingDevice` now checks `candidate.discoveredName` (LLDP-polled system name) alongside `candidate.name` — devices using **SNMP/LLDP auto-naming** are now correctly matched by the name the switch actually broadcasts, not the user-entered label
+- Added chassis MAC fallback: LLDP neighbours that report no system name are now matched against the device's ARP-resolved MAC address, fixing topology links on switches that omit their LLDP sysName
+- Fixed STP flow direction vote: `aToB`/`bToA` assignments for the remote-port designated bridge check were inverted, causing incorrect arrow directions on some fibre links
+- Added Console Output diagnostic logging for switches with no stored LLDP neighbours and for unmatched neighbours (shows sysName and chassisID) to assist future debugging
+- `PulsingBorderView` hit-test now returns `nil` to prevent the pulsing border overlay from intercepting pointer events
+
+---
+
 ## v0.5.3 — 2026-06-29
 
 ### Performance — CPU Reduction (60% → near zero baseline)
