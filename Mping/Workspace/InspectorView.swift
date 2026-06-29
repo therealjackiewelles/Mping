@@ -1177,8 +1177,14 @@ private struct ShapeInspector: View {
         .onDisappear {
             commitShapeTitle()
         }
-        .onChange(of: shape.id) { _, _ in
-            commitShapeTitle()
+        .onChange(of: shape.id) { oldID, _ in
+            // Commit pending title to the box we're leaving (oldID).
+            // shape.id is already the newly-selected box here, so calling
+            // commitShapeTitle() would write the old title onto the wrong box.
+            let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmedTitle.isEmpty {
+                store.updateShape(id: oldID, title: trimmedTitle)
+            }
             syncFromShape()
         }
         .onChange(of: focusedField) { oldValue, newValue in

@@ -225,7 +225,7 @@ private struct SNMPTemperatureCandidate {
 }
 
 private struct FibreOpticsReading {
-    let port: Int
+    var port: Int
     var temperature: String?
     var voltage: String?
     var biasCurrent: String?
@@ -319,6 +319,24 @@ private func readFibreOpticsSummary(
 
     raw += "--- Fibre optics/DDM probe using Netgear table 1.3.6.1.4.1.4526.10.43.1.18 ---\n"
 
+    // Walk column 1 first to map SFP slot indices → real switch port/ifIndex numbers.
+    // The DDM table is indexed by SFP slot (1, 2, 3…), not by ifIndex. Without this
+    // mapping, slot 1 is mistaken for copper port 1 on a 48+4 switch.
+    var slotToPort: [Int: Int] = [:]
+    do {
+        let portIndexValues = try await client.walk(baseOID: "1.3.6.1.4.1.4526.10.43.1.18.1.1", maxResults: 20)
+        raw += "--- Fibre optics port index 1.3.6.1.4.1.4526.10.43.1.18.1.1 ---\n"
+        for value in portIndexValues {
+            raw += "\(value.oid) = \(value.value.debugDescription)\n"
+            if let slot = lastOIDComponent(value.oid), case .integer(let portIndex) = value.value, portIndex > 0 {
+                slotToPort[slot] = portIndex
+            }
+        }
+        raw += "\n"
+    } catch {
+        raw += "Fibre port index probe: \(snmpErrorText(error))\n"
+    }
+
     for column in fibreColumns {
         do {
         ConsoleOutputStore.log(
@@ -359,6 +377,17 @@ private func readFibreOpticsSummary(
             message: line
         )
         }
+    }
+
+    // Remap readingsByPort from SFP slot keys to real ifIndex port keys.
+    if !slotToPort.isEmpty {
+        var remapped: [Int: FibreOpticsReading] = [:]
+        for (slot, var reading) in readingsByPort {
+            let realPort = slotToPort[slot] ?? slot
+            reading.port = realPort
+            remapped[realPort] = reading
+        }
+        readingsByPort = remapped
     }
 
     let readings = readingsByPort

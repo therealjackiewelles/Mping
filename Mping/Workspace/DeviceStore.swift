@@ -119,6 +119,9 @@ final class DeviceStore: ObservableObject {
     @Published private(set) var fibreLabelOffsets: [String: PersistedFibreLabelOffset] = [:]
     @Published var snapToGridEnabled: Bool = false
     @Published var snapGridSize: CGFloat = 40
+    @Published var redundantModeActive: Bool = false
+
+    var hasRedundantPairs: Bool { devices.contains { $0.redundancyRole == .primary } }
 
     private var copiedDevices: [MonitoredDevice] = []
     private var copiedShapes: [WorkspaceShape] = []
@@ -1461,7 +1464,24 @@ final class DeviceStore: ObservableObject {
         guard hasSelection else { return }
 
         let removedDeviceIDs = selectedDeviceIDs
-        devices.removeAll { removedDeviceIDs.contains($0.id) }
+
+        // Redundant pair cleanup: removing a primary also removes its secondary;
+        // removing a secondary resets the primary back to standalone.
+        var extraRemovals = Set<UUID>()
+        for id in removedDeviceIDs {
+            guard let device = devices.first(where: { $0.id == id }),
+                  let peerID = device.redundantPeerID else { continue }
+            if device.redundancyRole == .primary {
+                extraRemovals.insert(peerID)
+            } else if device.redundancyRole == .secondary {
+                if let idx = devices.firstIndex(where: { $0.id == peerID }) {
+                    devices[idx].redundancyRole = .none
+                    devices[idx].redundantPeerID = nil
+                }
+            }
+        }
+
+        devices.removeAll { removedDeviceIDs.contains($0.id) || extraRemovals.contains($0.id) }
         for id in removedDeviceIDs {
             temperatureHistoryByDeviceID[id] = nil
         }
@@ -1535,6 +1555,45 @@ final class DeviceStore: ObservableObject {
         markWorkspaceDirty()
     }
 
+    func enableRedundancy(for deviceID: UUID) {
+        guard let idx = devices.firstIndex(where: { $0.id == deviceID }),
+              devices[idx].redundancyRole == .none else { return }
+        let primary = devices[idx]
+        var secondary = MonitoredDevice(
+            name: "\(primary.displayName) (Secondary)",
+            ipAddress: "",
+            x: primary.x,
+            y: primary.y,
+            deviceType: primary.deviceType,
+            snmpCommunity: primary.snmpCommunity,
+            webInterfacePrefix: primary.webInterfacePrefix,
+            webInterfacePath: primary.webInterfacePath,
+            pingMonitoringEnabled: false,
+            snmpMonitoringEnabled: primary.snmpMonitoringEnabled,
+            requiresSetup: true,
+            pingNICConfigured: false,
+            redundancyRole: .secondary,
+            redundantPeerID: deviceID
+        )
+        let secondaryID = secondary.id
+        secondary.zoneName = primary.zoneName
+        devices.append(secondary)
+        devices[idx].redundancyRole = .primary
+        devices[idx].redundantPeerID = secondaryID
+        markWorkspaceDirty()
+    }
+
+    func disableRedundancy(for deviceID: UUID) {
+        guard let idx = devices.firstIndex(where: { $0.id == deviceID }),
+              devices[idx].redundancyRole == .primary else { return }
+        if let peerID = devices[idx].redundantPeerID {
+            devices.removeAll { $0.id == peerID }
+        }
+        devices[idx].redundancyRole = .none
+        devices[idx].redundantPeerID = nil
+        markWorkspaceDirty()
+    }
+
     func completeDeviceSetup(id: UUID) {
         updateDeviceRuntime(id: id) { device in
             device.requiresSetup = false
@@ -1551,6 +1610,18 @@ final class DeviceStore: ObservableObject {
 
     func deleteSelectedDevice() {
         guard let id = selectedDeviceID else { return }
+        // Redundant pair cleanup
+        if let device = devices.first(where: { $0.id == id }), let peerID = device.redundantPeerID {
+            if device.redundancyRole == .primary {
+                devices.removeAll { $0.id == peerID }
+                temperatureHistoryByDeviceID[peerID] = nil
+            } else if device.redundancyRole == .secondary {
+                if let idx = devices.firstIndex(where: { $0.id == peerID }) {
+                    devices[idx].redundancyRole = .none
+                    devices[idx].redundantPeerID = nil
+                }
+            }
+        }
         devices.removeAll { $0.id == id }
         temperatureHistoryByDeviceID[id] = nil
         selectedDeviceIDs.remove(id)
@@ -1560,8 +1631,17 @@ final class DeviceStore: ObservableObject {
 
     func moveDevice(id: UUID, x: Double, y: Double) {
         guard let index = devices.firstIndex(where: { $0.id == id }) else { return }
-        devices[index].x = Double(snapped(CGFloat(x)))
-        devices[index].y = Double(snapped(CGFloat(y)))
+        let snappedX = Double(snapped(CGFloat(x)))
+        let snappedY = Double(snapped(CGFloat(y)))
+        devices[index].x = snappedX
+        devices[index].y = snappedY
+        // Secondary tiles mirror their primary's position so the two network planes share the same layout.
+        if devices[index].redundancyRole == .primary,
+           let peerID = devices[index].redundantPeerID,
+           let peerIndex = devices.firstIndex(where: { $0.id == peerID }) {
+            devices[peerIndex].x = snappedX
+            devices[peerIndex].y = snappedY
+        }
         markWorkspaceDirty()
     }
 
@@ -1584,6 +1664,7 @@ final class DeviceStore: ObservableObject {
         guard let index = devices.firstIndex(where: { $0.id == id }) else { return }
         devices[index].name = name
         devices[index].ipAddress = ipAddress
+        checkAndCompleteSetupIfReady(index: index)
         markWorkspaceDirty()
     }
 
@@ -1597,9 +1678,24 @@ final class DeviceStore: ObservableObject {
             devices[index].sourceInterfaceName = nic.bsdName
             devices[index].sourceIPAddress = nic.ipv4Address
         }
+        devices[index].pingNICConfigured = true
+        checkAndCompleteSetupIfReady(index: index)
 
         markWorkspaceDirty()
         restartMonitoring()
+    }
+
+    private func checkAndCompleteSetupIfReady(index: Int) {
+        guard devices[index].requiresSetup else { return }
+        let d = devices[index]
+        let nameDone = !d.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && d.name != "New Device"
+        let ipDone = !d.ipAddress.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && d.ipAddress != "192.168.1.100"
+        let nicDone = d.pingNICConfigured
+        guard nameDone && ipDone && nicDone else { return }
+        devices[index].requiresSetup = false
+        devices[index].pingMonitoringEnabled = true
     }
 
     func updateDeviceType(id: UUID, type: MonitoredDeviceType) {
@@ -1909,6 +2005,8 @@ final class DeviceStore: ObservableObject {
         var fibreLossAlertThresholdDb: Double
         var fibreBoxStyle: PersistedFibreBoxStyle
         var fibreLabelOffsets: [String: PersistedFibreLabelOffset]
+        var redundantPrimaryTintRGBA: [Double]?
+        var redundantSecondaryTintRGBA: [Double]?
 
         init(
             version: Int = 1,
@@ -1926,7 +2024,9 @@ final class DeviceStore: ObservableObject {
             sfpTemperatureAlertThresholdCelsius: Double = 75.0,
             fibreLossAlertThresholdDb: Double = 4.0,
             fibreBoxStyle: PersistedFibreBoxStyle = PersistedFibreBoxStyle(),
-            fibreLabelOffsets: [String: PersistedFibreLabelOffset] = [:]
+            fibreLabelOffsets: [String: PersistedFibreLabelOffset] = [:],
+            redundantPrimaryTintRGBA: [Double]? = nil,
+            redundantSecondaryTintRGBA: [Double]? = nil
         ) {
             self.version = version
             self.name = name
@@ -1944,6 +2044,8 @@ final class DeviceStore: ObservableObject {
             self.fibreLossAlertThresholdDb = fibreLossAlertThresholdDb
             self.fibreBoxStyle = fibreBoxStyle
             self.fibreLabelOffsets = fibreLabelOffsets
+            self.redundantPrimaryTintRGBA = redundantPrimaryTintRGBA
+            self.redundantSecondaryTintRGBA = redundantSecondaryTintRGBA
         }
 
         enum CodingKeys: String, CodingKey {
@@ -1963,6 +2065,8 @@ final class DeviceStore: ObservableObject {
             case fibreLossAlertThresholdDb
             case fibreBoxStyle
             case fibreLabelOffsets
+            case redundantPrimaryTintRGBA
+            case redundantSecondaryTintRGBA
         }
 
         init(from decoder: Decoder) throws {
@@ -1983,6 +2087,8 @@ final class DeviceStore: ObservableObject {
             fibreLossAlertThresholdDb = try c.decodeIfPresent(Double.self, forKey: .fibreLossAlertThresholdDb) ?? DeviceStore.persistedAlertThreshold(key: DeviceStore.fibreLossAlertThresholdKey, defaultValue: 4.0)
             fibreBoxStyle = try c.decodeIfPresent(PersistedFibreBoxStyle.self, forKey: .fibreBoxStyle) ?? PersistedFibreBoxStyle()
             fibreLabelOffsets = try c.decodeIfPresent([String: PersistedFibreLabelOffset].self, forKey: .fibreLabelOffsets) ?? [:]
+            redundantPrimaryTintRGBA = try c.decodeIfPresent([Double].self, forKey: .redundantPrimaryTintRGBA)
+            redundantSecondaryTintRGBA = try c.decodeIfPresent([Double].self, forKey: .redundantSecondaryTintRGBA)
         }
     }
 
@@ -2352,7 +2458,8 @@ final class DeviceStore: ObservableObject {
     }
 
     private func makePersistedWorkspace(named name: String) -> PersistedWorkspace {
-        PersistedWorkspace(
+        let prefs = AppPreferences.shared
+        return PersistedWorkspace(
             name: name,
             devices: devices.map(cleanDeviceForPersistence),
             shapes: shapes,
@@ -2367,7 +2474,9 @@ final class DeviceStore: ObservableObject {
             sfpTemperatureAlertThresholdCelsius: sfpTemperatureAlertThresholdCelsius,
             fibreLossAlertThresholdDb: fibreLossAlertThresholdDb,
             fibreBoxStyle: PersistedFibreBoxStyle(settings: FibreBoxEditorSettings.shared),
-            fibreLabelOffsets: fibreLabelOffsets
+            fibreLabelOffsets: fibreLabelOffsets,
+            redundantPrimaryTintRGBA: AppPreferences.colorToRGBA(prefs.redundantPrimaryTintColor),
+            redundantSecondaryTintRGBA: AppPreferences.colorToRGBA(prefs.redundantSecondaryTintColor)
         )
     }
 
@@ -2385,6 +2494,12 @@ final class DeviceStore: ObservableObject {
         fibreLossAlertThresholdDb = workspace.fibreLossAlertThresholdDb
         fibreLabelOffsets = workspace.fibreLabelOffsets
         workspace.fibreBoxStyle.apply(to: FibreBoxEditorSettings.shared)
+        if let rgba = workspace.redundantPrimaryTintRGBA {
+            AppPreferences.shared.redundantPrimaryTintColor = AppPreferences.rgbaToColor(rgba)
+        }
+        if let rgba = workspace.redundantSecondaryTintRGBA {
+            AppPreferences.shared.redundantSecondaryTintColor = AppPreferences.rgbaToColor(rgba)
+        }
         clearSelection()
         refreshCachedFibreResults()
     }
@@ -2524,7 +2639,9 @@ final class DeviceStore: ObservableObject {
             pingMonitoringEnabled: device.pingMonitoringEnabled,
             snmpMonitoringEnabled: device.snmpMonitoringEnabled,
             requiresSetup: device.requiresSetup,
-            pingNICConfigured: device.pingNICConfigured
+            pingNICConfigured: device.pingNICConfigured,
+            redundancyRole: device.redundancyRole,
+            redundantPeerID: device.redundantPeerID
         )
     }
 

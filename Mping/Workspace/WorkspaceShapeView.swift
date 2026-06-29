@@ -73,6 +73,7 @@ enum ShapeResizeAnchor: String, CaseIterable, Sendable {
 struct WorkspaceShapeView: View {
     let shape: WorkspaceShape
     let isSelected: Bool
+    var tint: Color? = nil
     let onResizeStart: () -> Void
     let onResize: (ShapeResizeAnchor, CGSize) -> Void
     let onResizeEnd: () -> Void
@@ -88,6 +89,12 @@ struct WorkspaceShapeView: View {
                             lineWidth: isSelected ? 2 : 1
                         )
                 )
+
+            if let tint {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(tint)
+                    .allowsHitTesting(false)
+            }
 
             Text(shape.title)
                 .font(.system(size: 13, weight: .bold, design: .rounded))

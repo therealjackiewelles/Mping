@@ -15,6 +15,11 @@ struct PreferencesView: View {
                     Label("Network Routing", systemImage: "network")
                 }
 
+            RedundantNetworksPreferencesPane()
+                .tabItem {
+                    Label("Redundant Networks", systemImage: "arrow.triangle.2.circlepath")
+                }
+
             CredentialsPreferencesPane()
                 .tabItem {
                     Label("Switch Credentials", systemImage: "key.fill")
@@ -146,6 +151,66 @@ private struct CredentialsPreferencesPane: View {
         password = ""
         confirmPassword = ""
         hasExistingPassword = false
+    }
+}
+
+// MARK: - Redundant Networks
+
+private struct RedundantNetworksPreferencesPane: View {
+    @ObservedObject private var preferences = AppPreferences.shared
+
+    var body: some View {
+        Form {
+            Section {
+                Text("When Redundant Mode is active, each tile is given a colour tint to indicate which network plane it belongs to. Choose the tint colours below.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } header: { Text("Tile Tint Colours") }
+
+            Section {
+                ColorPicker("Primary network", selection: $preferences.redundantPrimaryTintColor, supportsOpacity: true)
+                ColorPicker("Secondary network", selection: $preferences.redundantSecondaryTintColor, supportsOpacity: true)
+
+                HStack(spacing: 8) {
+                    Button("Reset to defaults") {
+                        preferences.redundantPrimaryTintColor   = Color(red: 0.80, green: 0.10, blue: 0.10, opacity: 0.35)
+                        preferences.redundantSecondaryTintColor = Color(red: 0.10, green: 0.30, blue: 0.85, opacity: 0.35)
+                    }
+                    .buttonStyle(.bordered)
+                    Spacer()
+                }
+                .padding(.top, 4)
+            } header: { Text("Colours") }
+
+            Section {
+                HStack(spacing: 12) {
+                    tilePreview(label: "Primary", color: preferences.redundantPrimaryTintColor)
+                    tilePreview(label: "Secondary", color: preferences.redundantSecondaryTintColor)
+                    Spacer()
+                }
+            } header: { Text("Preview") }
+        }
+        .formStyle(.grouped)
+        .frame(minHeight: 320)
+        .padding()
+    }
+
+    private func tilePreview(label: String, color: Color) -> some View {
+        VStack(spacing: 6) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(Color(red: 0.060, green: 0.195, blue: 0.105))
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(color)
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(Color.green.opacity(0.6), lineWidth: 1.5)
+            }
+            .frame(width: 90, height: 52)
+            Text(label)
+                .font(.system(size: 10, weight: .medium, design: .rounded))
+                .foregroundStyle(.secondary)
+        }
     }
 }
 

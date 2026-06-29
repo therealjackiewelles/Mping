@@ -5,6 +5,35 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.5.6 — 2026-06-29
+
+### Bug Fixes & Redundant Network Enhancements
+
+**Location box name overwrite when switching boxes**
+- Fixed inspector `ShapeInspector` committing the pending title to the wrong box — `onChange(of: shape.id)` now commits to the *old* box ID before syncing from the newly selected one, preventing box A's name from being written onto box B
+
+**Heartbeat ripple not firing simultaneously across all tiles**
+- Added `pingPulseID` to `MpingMapDeviceTileView`'s Equatable check — all tiles now re-render in the same SwiftUI pass when `markDevicesAsPinging` fires, producing a synchronised ripple across the canvas instead of per-tile staggering driven by RTT rounding
+
+**Copper ports showing fibre DDM signal strength**
+- Fixed port-index mismatch in Netgear DDM table (`1.3.6.1.4.1.4526.10.43.1.18`) — the table is indexed by SFP slot (1, 2, 3…) not ifIndex; column 1 is now walked first to map slot → real port number, so DDM data (TX/RX dBm, temperature) is assigned to the actual SFP uplink ports and never lands on copper ports
+
+**Secondary device PING NIC not saving**
+- `updateDeviceInterface` now sets `pingNICConfigured = true` so NIC changes from Inspector and Device Manager both mark the NIC as configured
+- New `checkAndCompleteSetupIfReady` helper auto-clears the setup alert once name, IP, and NIC are all set — works from any entry point, not just the Inspector
+
+**Secondary device tiles now mirror primary position**
+- `moveDevice` propagates XY coordinates to the redundant peer when a primary device is dragged, keeping primary/secondary tiles co-located at all times; new pairs are placed at `x: primary.x` instead of offset
+
+### Redundant Network Workspace Tinting
+
+- Primary workspace location boxes receive a configurable red tint; secondary workspace boxes receive a configurable blue tint when redundant pairs exist
+- New **Redundant Networks** tab in Preferences with `ColorPicker` (with opacity) for each tint and a Reset to Defaults button
+- Tint colours are persisted to the `.mpw` workspace file as RGBA arrays and restored on load
+- Tinting uses `store.hasRedundantPairs` (not the non-persisted `redundantModeActive`) so colours appear correctly after relaunch
+
+---
+
 ## v0.5.5 — 2026-06-29
 
 ### Performance — GPU Animation & CPU Reduction (40% → 5% baseline)

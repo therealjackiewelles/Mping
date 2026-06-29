@@ -419,6 +419,25 @@ enum FibreTelemetryExtractor {
     static func extractPorts(deviceID: UUID, rawOutput: String) -> [FibrePortTelemetry] {
         var ports: [Int: FibrePortTelemetry] = [:]
 
+        // Build SFP slot → real ifIndex mapping from column 1 OID lines.
+        // The Netgear DDM table (.43.1.18) is indexed by SFP slot (1, 2…), not ifIndex.
+        // Column 1 (agentPhysicalPortIndex) carries the actual switch port number for each slot.
+        var slotToPort: [Int: Int] = [:]
+        for rawLine in rawOutput.components(separatedBy: .newlines) {
+            let line = rawLine.trimmingCharacters(in: .whitespacesAndNewlines).trimmedLeadingDot
+            guard line.hasPrefix("1.3.6.1.4.1.4526.10.43.1.18.1.") else { continue }
+            guard let oidAndValue = splitOIDLine(line) else { continue }
+            let oidParts = oidAndValue.oid.split(separator: ".").compactMap { Int($0) }
+            guard oidParts.count >= 14 else { continue }
+            let column = oidParts[oidParts.count - 2]
+            let slot   = oidParts[oidParts.count - 1]
+            if column == 1, let portIndex = parseNumber(oidAndValue.value).map({ Int($0) }), portIndex > 0 {
+                slotToPort[slot] = portIndex
+            }
+        }
+
+        func realPort(_ slot: Int) -> Int { slotToPort[slot] ?? slot }
+
         func upsert(port: Int, update: (inout FibrePortTelemetry) -> Void) {
             var telemetry = ports[port] ?? FibrePortTelemetry(deviceID: deviceID, port: port)
             update(&telemetry)
@@ -431,10 +450,13 @@ enum FibreTelemetryExtractor {
             guard let oidAndValue = splitOIDLine(line) else { continue }
 
             let oidParts = oidAndValue.oid.split(separator: ".").compactMap { Int($0) }
-            guard oidParts.count >= 14, let port = oidParts.last else { continue }
+            guard oidParts.count >= 14 else { continue }
+            let slot   = oidParts[oidParts.count - 1]
             let column = oidParts[oidParts.count - 2]
 
-            upsert(port: port) { telemetry in
+            if column == 1 { continue }  // already handled above as slot-to-port mapping
+
+            upsert(port: realPort(slot)) { telemetry in
                 switch column {
                 case 2: telemetry.temperatureCelsius = parseNumber(oidAndValue.value).map { $0 / 10.0 }
                 case 3: telemetry.voltage = parseNumber(oidAndValue.value).map { $0 / 1000.0 }
@@ -629,7 +651,9 @@ enum LLDPTelemetryExtractor {
 }
 
 enum FibreAutoLinkBuilder {
-    static func buildResults(from devices: [MonitoredDevice]) -> [FibreLossResult] {
+    // nonisolated: takes a Sendable value-type snapshot and does pure computation.
+    // Must be callable from Task.detached (off the main actor) to avoid CPU spikes on the main thread.
+    nonisolated static func buildResults(from devices: [MonitoredDevice]) -> [FibreLossResult] {
         let switches = devices.filter { $0.deviceType == .netgearSwitch }
         guard switches.count >= 2 else { return [] }
 
@@ -758,7 +782,7 @@ enum FibreAutoLinkBuilder {
         saveRememberedLinks(Array(byPhysicalKey.values))
     }
 
-    private static func rememberedLinks(devices: [MonitoredDevice]) -> [FibreLossResult] {
+    private nonisolated static func rememberedLinks(devices: [MonitoredDevice]) -> [FibreLossResult] {
         let deviceNames = Dictionary(uniqueKeysWithValues: devices.map { ($0.id, $0.name) })
         let deleted = deletedLinkIDs()
 
@@ -800,7 +824,7 @@ enum FibreAutoLinkBuilder {
             }
     }
 
-    private static func loadRememberedLinks() -> [RememberedTopologyLink] {
+    private nonisolated static func loadRememberedLinks() -> [RememberedTopologyLink] {
         guard let data = UserDefaults.standard.data(forKey: rememberedLinksKey) else { return [] }
         return (try? JSONDecoder().decode([RememberedTopologyLink].self, from: data)) ?? []
     }
@@ -810,7 +834,7 @@ enum FibreAutoLinkBuilder {
         UserDefaults.standard.set(data, forKey: rememberedLinksKey)
     }
 
-    private static func deletedLinkIDs() -> Set<UUID> {
+    private nonisolated static func deletedLinkIDs() -> Set<UUID> {
         guard let strings = UserDefaults.standard.array(forKey: deletedLinksKey) as? [String] else { return [] }
         return Set(strings.compactMap(UUID.init(uuidString:)))
     }
@@ -828,7 +852,7 @@ enum FibreAutoLinkBuilder {
         let quality: Int
     }
 
-    private static func lldpLinkObservations(from switches: [MonitoredDevice]) -> [LinkObservation] {
+    private nonisolated static func lldpLinkObservations(from switches: [MonitoredDevice]) -> [LinkObservation] {
         var observations: [LinkObservation] = []
 
         for local in switches {
@@ -873,7 +897,7 @@ enum FibreAutoLinkBuilder {
         return observations
     }
 
-    private static func result(from observation: LinkObservation) -> FibreLossResult {
+    private nonisolated static func result(from observation: LinkObservation) -> FibreLossResult {
         let key = canonicalKey(
             observation.localDevice.id,
             observation.localPort,
@@ -1136,7 +1160,7 @@ enum FibreAutoLinkBuilder {
         return left < right ? "\(left)|\(right)" : "\(right)|\(left)"
     }
 
-    private static func canonicalKey(_ aID: UUID, _ aPort: Int, _ bID: UUID, _ bPort: Int) -> String {
+    private nonisolated static func canonicalKey(_ aID: UUID, _ aPort: Int, _ bID: UUID, _ bPort: Int) -> String {
         let left = "\(aID.uuidString)-\(aPort)"
         let right = "\(bID.uuidString)-\(bPort)"
         return left < right ? "\(left)|\(right)" : "\(right)|\(left)"

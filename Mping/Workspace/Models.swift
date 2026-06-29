@@ -64,6 +64,12 @@ enum DeviceNameSource: String, Codable, CaseIterable, Sendable {
     }
 }
 
+enum RedundancyRole: String, Codable, Sendable {
+    case none      // standard device, not part of a redundant pair
+    case primary   // primary device in a redundant pair
+    case secondary // secondary/backup counterpart
+}
+
 
 struct DevicePortTelemetry: Identifiable, Codable, Equatable, Hashable, Sendable {
     var deviceID: UUID
@@ -216,6 +222,8 @@ struct MonitoredDevice: Identifiable, Codable, Equatable, Sendable {
     // Kept separate from sourceInterfaceName because nil = AUTO for existing devices but
     // nil = "not yet chosen" for new devices.
     var pingNICConfigured: Bool
+    var redundancyRole: RedundancyRole
+    var redundantPeerID: UUID?
 
     init(
         id: UUID = UUID(),
@@ -248,7 +256,9 @@ struct MonitoredDevice: Identifiable, Codable, Equatable, Sendable {
         pingMonitoringEnabled: Bool = true,
         snmpMonitoringEnabled: Bool = true,
         requiresSetup: Bool = false,
-        pingNICConfigured: Bool = true
+        pingNICConfigured: Bool = true,
+        redundancyRole: RedundancyRole = .none,
+        redundantPeerID: UUID? = nil
     ) {
         self.id = id
         self.name = name
@@ -281,6 +291,8 @@ struct MonitoredDevice: Identifiable, Codable, Equatable, Sendable {
         self.snmpMonitoringEnabled = snmpMonitoringEnabled
         self.requiresSetup = requiresSetup
         self.pingNICConfigured = pingNICConfigured
+        self.redundancyRole = redundancyRole
+        self.redundantPeerID = redundantPeerID
     }
 
     enum CodingKeys: String, CodingKey {
@@ -315,6 +327,8 @@ struct MonitoredDevice: Identifiable, Codable, Equatable, Sendable {
         case snmpMonitoringEnabled
         case requiresSetup
         case pingNICConfigured
+        case redundancyRole
+        case redundantPeerID
     }
 
     init(from decoder: Decoder) throws {
@@ -360,6 +374,8 @@ struct MonitoredDevice: Identifiable, Codable, Equatable, Sendable {
         snmpMonitoringEnabled = try c.decodeIfPresent(Bool.self, forKey: .snmpMonitoringEnabled) ?? true
         requiresSetup = try c.decodeIfPresent(Bool.self, forKey: .requiresSetup) ?? false
         pingNICConfigured = try c.decodeIfPresent(Bool.self, forKey: .pingNICConfigured) ?? true
+        redundancyRole = try c.decodeIfPresent(RedundancyRole.self, forKey: .redundancyRole) ?? .none
+        redundantPeerID = try c.decodeIfPresent(UUID.self, forKey: .redundantPeerID)
     }
 
 

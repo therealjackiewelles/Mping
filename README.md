@@ -137,6 +137,15 @@ Mping is built in Xcode. There is no package manager or CLI build step.
 
 ## Changelog
 
+### v0.5.6 — 2026-06-29
+- Fixed location box name being overwritten when clicking between boxes in the inspector
+- Fixed ping ripple heartbeat not firing simultaneously — all tiles now animate in sync at cycle start
+- Fixed copper ports showing fibre DDM signal strength — Netgear DDM slot index now correctly mapped to switch ifIndex via column 1 walk
+- Fixed secondary device PING NIC not saving and setup alert not clearing
+- Secondary device tiles now mirror the primary tile's XY position when moved
+- Redundant network workspace tinting — primary workspace boxes tint red, secondary boxes tint blue (configurable per-workspace in new Preferences tab)
+- Tint colours persist to the `.mpw` file and restore on load
+
 ### v0.5.5 — 2026-06-29
 - CPU baseline dropped from ~40% to ~5% — fibre link dash animation and ping ripple moved entirely to the GPU via `CAShapeLayer` + `CABasicAnimation`, eliminating all CPU wakeups per animation frame
 - SNMP polling switched from concurrent to sequential — prevents simultaneous switch polls, smooths CPU across the cycle

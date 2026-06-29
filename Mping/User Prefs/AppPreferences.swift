@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import AppKit
 import Combine
 
 @MainActor
@@ -38,6 +39,14 @@ final class AppPreferences: ObservableObject {
         didSet { save() }
     }
 
+    @Published var redundantPrimaryTintColor: Color {
+        didSet { save() }
+    }
+
+    @Published var redundantSecondaryTintColor: Color {
+        didSet { save() }
+    }
+
     private let fileURL: URL
 
     private struct Payload: Codable {
@@ -49,7 +58,12 @@ final class AppPreferences: ObservableObject {
         var deviceManagerColumnOrder: [String]?
         var deviceManagerColumnWidths: [String: Double]?
         var switchUsername: String?
+        var redundantPrimaryTintRGBA: [Double]?
+        var redundantSecondaryTintRGBA: [Double]?
     }
+
+    private static let defaultPrimaryTint  = Color(red: 0.80, green: 0.10, blue: 0.10, opacity: 0.35)
+    private static let defaultSecondaryTint = Color(red: 0.10, green: 0.30, blue: 0.85, opacity: 0.35)
 
     private init() {
         let supportDirectory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
@@ -66,6 +80,8 @@ final class AppPreferences: ObservableObject {
         deviceManagerColumnOrder = payload.deviceManagerColumnOrder ?? []
         deviceManagerColumnWidths = payload.deviceManagerColumnWidths ?? [:]
         switchUsername = payload.switchUsername ?? ""
+        redundantPrimaryTintColor   = payload.redundantPrimaryTintRGBA.map(AppPreferences.rgbaToColor) ?? AppPreferences.defaultPrimaryTint
+        redundantSecondaryTintColor = payload.redundantSecondaryTintRGBA.map(AppPreferences.rgbaToColor) ?? AppPreferences.defaultSecondaryTint
     }
 
     func setSidebarWidth(_ width: CGFloat) {
@@ -84,7 +100,9 @@ final class AppPreferences: ObservableObject {
             devicePortsColumnWidths: devicePortsColumnWidths,
             deviceManagerColumnOrder: deviceManagerColumnOrder,
             deviceManagerColumnWidths: deviceManagerColumnWidths,
-            switchUsername: switchUsername
+            switchUsername: switchUsername,
+            redundantPrimaryTintRGBA:   AppPreferences.colorToRGBA(redundantPrimaryTintColor),
+            redundantSecondaryTintRGBA: AppPreferences.colorToRGBA(redundantSecondaryTintColor)
         )
 
         do {
@@ -97,6 +115,18 @@ final class AppPreferences: ObservableObject {
         } catch {
             print("Mping preferences save failed: \(error)")
         }
+    }
+
+    static func colorToRGBA(_ color: Color) -> [Double] {
+        guard let ns = NSColor(color).usingColorSpace(.sRGB) else {
+            return [1, 0, 0, 0.35]
+        }
+        return [Double(ns.redComponent), Double(ns.greenComponent), Double(ns.blueComponent), Double(ns.alphaComponent)]
+    }
+
+    static func rgbaToColor(_ rgba: [Double]) -> Color {
+        guard rgba.count == 4 else { return defaultPrimaryTint }
+        return Color(red: rgba[0], green: rgba[1], blue: rgba[2], opacity: rgba[3])
     }
 
     private static func loadPayload(from url: URL) -> Payload {
@@ -132,7 +162,9 @@ final class AppPreferences: ObservableObject {
                 devicePortsColumnWidths: decoded.devicePortsColumnWidths,
                 deviceManagerColumnOrder: decoded.deviceManagerColumnOrder,
                 deviceManagerColumnWidths: decoded.deviceManagerColumnWidths,
-                switchUsername: decoded.switchUsername
+                switchUsername: decoded.switchUsername,
+                redundantPrimaryTintRGBA:   decoded.redundantPrimaryTintRGBA,
+                redundantSecondaryTintRGBA: decoded.redundantSecondaryTintRGBA
             )
         } catch {
             return defaultPayload

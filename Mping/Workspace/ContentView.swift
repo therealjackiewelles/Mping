@@ -217,11 +217,16 @@ private struct SidebarResizeHandle: View {
 
 // MARK: - Device Manager Column
 
-private enum DeviceManagerColumn: String, CaseIterable {
+private enum DeviceManagerColumn: String {
+    case redundant
     case name, nameSource, ipAddress, deviceType, snmpCommunity, urlPrefix, webUIPath, pingNIC
+
+    // Standard columns that appear in all modes (excludes redundant which is conditional).
+    static let standardCases: [DeviceManagerColumn] = [.name, .nameSource, .ipAddress, .deviceType, .snmpCommunity, .urlPrefix, .webUIPath, .pingNIC]
 
     var title: String {
         switch self {
+        case .redundant: return "Redundant"
         case .name: return "Name"
         case .nameSource: return "SNMP/LLDP Name"
         case .ipAddress: return "IP Address"
@@ -235,6 +240,7 @@ private enum DeviceManagerColumn: String, CaseIterable {
 
     var defaultWidth: CGFloat {
         switch self {
+        case .redundant: return 90
         case .name: return 200
         case .nameSource: return 110
         case .ipAddress: return 150
@@ -248,14 +254,15 @@ private enum DeviceManagerColumn: String, CaseIterable {
 
     var minWidth: CGFloat {
         switch self {
+        case .redundant: return 80
         case .nameSource: return 90
         case .urlPrefix: return 80
         default: return 80
         }
     }
 
-    static var defaultOrder: [String] { allCases.map(\.rawValue) }
-    static var totalDefaultWidth: CGFloat { allCases.reduce(0) { $0 + $1.defaultWidth } }
+    static var defaultOrder: [String] { standardCases.map(\.rawValue) }
+    static var totalDefaultWidth: CGFloat { standardCases.reduce(0) { $0 + $1.defaultWidth } }
 }
 
 // MARK: - Device Manager Sheet
@@ -276,6 +283,14 @@ private struct DeviceViewSheet: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
+                Button {
+                    store.redundantModeActive.toggle()
+                } label: {
+                    Label("Redundant Mode", systemImage: "arrow.triangle.2.circlepath")
+                        .font(.system(size: 13, weight: .medium))
+                }
+                .buttonStyle(.bordered)
+                .tint(store.redundantModeActive ? .blue : .secondary)
                 Button("Done") { dismiss() }
                     .keyboardShortcut(.defaultAction)
             }
@@ -293,11 +308,12 @@ private struct DeviceViewSheet: View {
 
     private var idealWidth: CGFloat {
         let screen = NSScreen.main?.visibleFrame.width ?? 1440
-        let total = DeviceManagerColumn.allCases.reduce(CGFloat(0)) { sum, col in
+        let total = DeviceManagerColumn.standardCases.reduce(CGFloat(0)) { sum, col in
             let saved = preferences.deviceManagerColumnWidths[col.rawValue].map { CGFloat($0) }
             return sum + (saved ?? col.defaultWidth)
         }
-        return min(screen * 0.97, total + 48)
+        let redundantExtra: CGFloat = store.redundantModeActive ? DeviceManagerColumn.redundant.defaultWidth : 0
+        return min(screen * 0.97, total + redundantExtra + 48)
     }
 
     private var idealHeight: CGFloat {
@@ -370,8 +386,8 @@ private struct DeviceManagerTableView: NSViewRepresentable {
         guard let table = scroll.documentView as? NSTableView else { return }
         context.coordinator.store = store
         context.coordinator.preferences = preferences
-        context.coordinator.configureColumns(on: table)
-        table.reloadData()
+        let columnsChanged = context.coordinator.configureColumns(on: table)
+        context.coordinator.reloadIfNeeded(table: table, scroll: scroll, columnsChanged: columnsChanged)
     }
 
     // MARK: Coordinator
@@ -381,29 +397,59 @@ private struct DeviceManagerTableView: NSViewRepresentable {
         var preferences: AppPreferences
         weak var tableView: NSTableView?
         private var isConfiguringColumns = false
+        // Track row structure so we only call reloadData() when it actually changes.
+        private var lastRowIDs: [UUID] = []
+        private var lastRedundantMode: Bool = false
 
         init(store: DeviceStore, preferences: AppPreferences) {
             self.store = store
             self.preferences = preferences
         }
 
+        // Only reload when the visible row set changes or columns were rebuilt.
+        // Never interrupts an active text-field edit — that would steal first responder
+        // and discard in-progress input on every ping tick.
+        func reloadIfNeeded(table: NSTableView, scroll: NSScrollView, columnsChanged: Bool) {
+            let currentIDs = orderedDevices().map(\.id)
+            let currentMode = store.redundantModeActive
+            let rowsChanged = currentIDs != lastRowIDs || currentMode != lastRedundantMode
+            guard columnsChanged || rowsChanged else { return }
+
+            // When only row data changed (not column structure), protect any active edit.
+            if !columnsChanged {
+                if let fr = table.window?.firstResponder as? NSView, fr.isDescendant(of: scroll) {
+                    return
+                }
+            }
+
+            lastRowIDs = currentIDs
+            lastRedundantMode = currentMode
+            table.reloadData()
+        }
+
         // MARK: Column setup
 
-        func configureColumns(on table: NSTableView) {
-            guard !isConfiguringColumns else { return }
+        @discardableResult
+        func configureColumns(on table: NSTableView) -> Bool {
+            guard !isConfiguringColumns else { return false }
             isConfiguringColumns = true
             defer { isConfiguringColumns = false }
 
             let savedOrder = preferences.deviceManagerColumnOrder
-            let order: [DeviceManagerColumn] = savedOrder.isEmpty
-                ? DeviceManagerColumn.allCases
-                : savedOrder.compactMap { DeviceManagerColumn(rawValue: $0) }
-            let allCovered = DeviceManagerColumn.allCases.allSatisfy { col in order.contains(col) }
-            let finalOrder = allCovered ? order : DeviceManagerColumn.allCases
+            let standardOrder: [DeviceManagerColumn] = savedOrder.isEmpty
+                ? DeviceManagerColumn.standardCases
+                : savedOrder.compactMap { DeviceManagerColumn(rawValue: $0) }.filter { $0 != .redundant }
+            let allCovered = DeviceManagerColumn.standardCases.allSatisfy { col in standardOrder.contains(col) }
+            var finalOrder = allCovered ? standardOrder : DeviceManagerColumn.standardCases
+
+            // Redundant column always appears first when mode is active; never persisted to order prefs.
+            if store.redundantModeActive {
+                finalOrder.insert(.redundant, at: 0)
+            }
 
             let existing = table.tableColumns.map { $0.identifier.rawValue }
             let desired  = finalOrder.map { $0.rawValue }
-            if existing == desired { return }
+            if existing == desired { return false }
 
             table.tableColumns.forEach { table.removeTableColumn($0) }
 
@@ -413,24 +459,80 @@ private struct DeviceManagerTableView: NSViewRepresentable {
                 let saved = preferences.deviceManagerColumnWidths[col.rawValue].map { CGFloat($0) }
                 tc.width = max(col.minWidth, saved ?? col.defaultWidth)
                 tc.minWidth = col.minWidth
-                tc.maxWidth = 600
+                tc.maxWidth = col == .redundant ? 100 : 600
                 table.addTableColumn(tc)
             }
+            return true
         }
 
         // MARK: Data source
 
-        func numberOfRows(in tableView: NSTableView) -> Int { store.devices.count }
+        // When redundant mode is active, secondary devices appear immediately below their primary.
+        private func orderedDevices() -> [MonitoredDevice] {
+            guard store.redundantModeActive else { return store.devices }
+            var result = [MonitoredDevice]()
+            var secondaryIDs = Set<UUID>()
+            for device in store.devices {
+                if device.redundancyRole == .secondary { secondaryIDs.insert(device.id); continue }
+                result.append(device)
+                if device.redundancyRole == .primary, let peerID = device.redundantPeerID,
+                   let secondary = store.devices.first(where: { $0.id == peerID }) {
+                    result.append(secondary)
+                }
+            }
+            // Append any secondary devices whose primary wasn't found (orphan guard)
+            for device in store.devices where device.redundancyRole == .secondary && !result.contains(where: { $0.id == device.id }) {
+                result.append(device)
+            }
+            return result
+        }
+
+        func numberOfRows(in tableView: NSTableView) -> Int { orderedDevices().count }
 
         func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
-            guard row < store.devices.count,
+            let ordered = orderedDevices()
+            guard row < ordered.count,
                   let id = tableColumn?.identifier.rawValue,
                   let col = DeviceManagerColumn(rawValue: id) else { return nil }
 
-            let device = store.devices[row]
+            let device = ordered[row]
             let cellID = NSUserInterfaceItemIdentifier("DevMgrCell-\(id)")
 
             switch col {
+            case .redundant:
+                let cell = tableView.makeView(withIdentifier: NSUserInterfaceItemIdentifier("DevMgrRedundant-\(row)"), owner: self) as? NSTableCellView ?? NSTableCellView()
+                cell.identifier = NSUserInterfaceItemIdentifier("DevMgrRedundant-\(row)")
+                let btn: NSButton
+                if let existing = cell.subviews.first as? NSButton {
+                    btn = existing
+                } else {
+                    btn = NSButton(checkboxWithTitle: "", target: nil, action: nil)
+                    btn.translatesAutoresizingMaskIntoConstraints = false
+                    cell.addSubview(btn)
+                    NSLayoutConstraint.activate([
+                        btn.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 10),
+                        btn.centerYAnchor.constraint(equalTo: cell.centerYAnchor)
+                    ])
+                }
+                switch device.redundancyRole {
+                case .none:
+                    btn.state = .off
+                    btn.isEnabled = true
+                    btn.title = ""
+                case .primary:
+                    btn.state = .on
+                    btn.isEnabled = true
+                    btn.title = "P"
+                case .secondary:
+                    btn.state = .on
+                    btn.isEnabled = false
+                    btn.title = "↳ S"
+                }
+                btn.tag = row
+                btn.target = self
+                btn.action = #selector(toggleRedundancy(_:))
+                return cell
+
             case .nameSource:
                 let cell = tableView.makeView(withIdentifier: NSUserInterfaceItemIdentifier("DevMgrCheck-\(id)"), owner: self) as? NSTableCellView ?? NSTableCellView()
                 cell.identifier = NSUserInterfaceItemIdentifier("DevMgrCheck-\(id)")
@@ -581,8 +683,9 @@ private struct DeviceManagerTableView: NSViewRepresentable {
             guard let tf = obj.object as? NSTextField else { return }
             let row = tf.tag / 100
             let colTag = tf.tag % 100
-            guard row >= 0, row < store.devices.count else { return }
-            let device = store.devices[row]
+            let ordered = orderedDevices()
+            guard row >= 0, row < ordered.count else { return }
+            let device = ordered[row]
             let value = tf.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
 
             DispatchQueue.main.async { [weak self] in
@@ -600,18 +703,33 @@ private struct DeviceManagerTableView: NSViewRepresentable {
 
         // MARK: Popup actions
 
+        @objc private func toggleRedundancy(_ sender: NSButton) {
+            let row = sender.tag
+            let ordered = orderedDevices()
+            guard row < ordered.count else { return }
+            let device = ordered[row]
+            if device.redundancyRole == .none {
+                store.enableRedundancy(for: device.id)
+            } else if device.redundancyRole == .primary {
+                store.disableRedundancy(for: device.id)
+            }
+            tableView?.reloadData()
+        }
+
         @objc private func toggleNameSource(_ sender: NSButton) {
             let row = sender.tag
-            guard row < store.devices.count else { return }
-            let device = store.devices[row]
+            let ordered = orderedDevices()
+            guard row < ordered.count else { return }
+            let device = ordered[row]
             let newSource: DeviceNameSource = sender.state == .on ? .automatic : .manual
             store.updateDeviceNameSource(id: device.id, source: newSource)
         }
 
         @objc private func deviceTypeChanged(_ sender: NSPopUpButton) {
             let row = sender.tag
-            guard row < store.devices.count else { return }
-            let device = store.devices[row]
+            let ordered = orderedDevices()
+            guard row < ordered.count else { return }
+            let device = ordered[row]
             guard let title = sender.selectedItem?.title,
                   let type = MonitoredDeviceType.allCases.first(where: { $0.label == title }) else { return }
             store.updateDeviceType(id: device.id, type: type)
@@ -620,8 +738,9 @@ private struct DeviceManagerTableView: NSViewRepresentable {
 
         @objc private func nicChanged(_ sender: NSPopUpButton) {
             let row = sender.tag
-            guard row < store.devices.count else { return }
-            let device = store.devices[row]
+            let ordered = orderedDevices()
+            guard row < ordered.count else { return }
+            let device = ordered[row]
             guard let title = sender.selectedItem?.title else { return }
             if title == "Auto" {
                 store.updateDeviceInterface(id: device.id, interfaceID: "AUTO")

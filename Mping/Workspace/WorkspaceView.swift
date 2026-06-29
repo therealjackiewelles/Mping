@@ -4,6 +4,10 @@ import AppKit
 struct WorkspaceView: View {
     @ObservedObject var store: DeviceStore
     var searchText: String = ""
+    // Pre-filtered by the active redundant network tab (passed from WorkspacePlaneCoordinator).
+    // When there are no redundant pairs this is always store.devices.
+    var visibleDevices: [MonitoredDevice]
+    var boxTint: Color? = nil
 
 
     @State private var deviceDragStart: [UUID: CGPoint] = [:]
@@ -13,11 +17,9 @@ struct WorkspaceView: View {
     @State private var hoverPoint: CGPoint? = nil
     @State private var resizingShapeID: UUID? = nil
     @State private var shapeResizeStartFrames: [UUID: CGRect] = [:]
-    @State private var pendingPanDelta: CGSize = .zero
-    @State private var panFlushScheduled: Bool = false
-    @State private var pendingZoomDelta: Double = 0
-    @State private var pendingZoomPoint: CGPoint = .zero
-    @State private var zoomFlushScheduled: Bool = false
+    @State private var liveOffset: CGSize = .zero
+    @State private var liveScale: Double = 1.0
+    @State private var syncTask: Task<Void, Never>? = nil
 
     private let canvasSize = CGSize(width: 5000, height: 3000)
 
@@ -35,7 +37,7 @@ struct WorkspaceView: View {
                     grid
 
                     FibreLinksLayer(
-                        devicePositions: Dictionary(uniqueKeysWithValues: store.devices.map { ($0.id, CGPoint(x: $0.x, y: $0.y)) }),
+                        devicePositions: Dictionary(uniqueKeysWithValues: visibleDevices.map { ($0.id, CGPoint(x: $0.x, y: $0.y)) }),
                         links: store.cachedFibreResults,
                         fibreLabelOffset: store.fibreLabelOffset,
                         setFibreLabelOffset: store.setFibreLabelOffset,
@@ -50,6 +52,7 @@ struct WorkspaceView: View {
                         WorkspaceShapeView(
                             shape: shape,
                             isSelected: store.selectedShapeIDs.contains(shape.id),
+                            tint: boxTint,
                             onResizeStart: {
                                 resizingShapeID = shape.id
                                 shapeResizeStartFrames[shape.id] = CGRect(
@@ -76,7 +79,7 @@ struct WorkspaceView: View {
                                     anchor: anchor,
                                     startFrame: startFrame,
                                     translation: translation,
-                                    scale: store.workspaceScale
+                                    scale: liveScale
                                 )
                             },
                             onResizeEnd: {
@@ -98,13 +101,14 @@ struct WorkspaceView: View {
                         .gesture(shapeDragGesture(shape))
                     }
 
-                    ForEach(store.devices) { device in
+                    ForEach(visibleDevices) { device in
                         MpingMapDeviceTileView(
                             device: device,
                             isSelected: store.selectedDeviceIDs.contains(device.id),
-                            shouldShowSecondaryDetail: store.workspaceScale >= 0.52,
+                            shouldShowSecondaryDetail: liveScale >= 0.52,
                             hasAlert: store.deviceIDsWithCurrentAlerts.contains(device.id),
-                            isFlashing: store.flashingDeviceIDs.contains(device.id)
+                            isFlashing: store.flashingDeviceIDs.contains(device.id),
+                            redundantModeActive: store.redundantModeActive
                         )
                         .equatable()
                         .opacity(deviceMatchesSearch(device) ? 1.0 : 0.22)
@@ -122,7 +126,7 @@ struct WorkspaceView: View {
                     }
 
                     FibreLinksLayer(
-                        devicePositions: Dictionary(uniqueKeysWithValues: store.devices.map { ($0.id, CGPoint(x: $0.x, y: $0.y)) }),
+                        devicePositions: Dictionary(uniqueKeysWithValues: visibleDevices.map { ($0.id, CGPoint(x: $0.x, y: $0.y)) }),
                         links: store.cachedFibreResults,
                         fibreLabelOffset: store.fibreLabelOffset,
                         setFibreLabelOffset: store.setFibreLabelOffset,
@@ -138,8 +142,8 @@ struct WorkspaceView: View {
                     height: canvasSize.height,
                     alignment: .topLeading
                 )
-                .scaleEffect(store.workspaceScale, anchor: .topLeading)
-                .offset(store.workspaceOffset)
+                .scaleEffect(liveScale, anchor: .topLeading)
+                .offset(liveOffset)
 
                 if let rect = selectionRect {
                     Rectangle()
@@ -168,10 +172,12 @@ struct WorkspaceView: View {
                     hasClipboardContent: store.hasClipboardContent,
                     onScroll: { delta in
                         let point = hoverPoint ?? CGPoint(x: proxy.size.width / 2, y: proxy.size.height / 2)
-                        queueWorkspaceZoom(delta: delta, around: point)
+                        applyLiveZoom(delta: delta, around: point)
                     },
                     onRightPan: { delta in
-                        queueWorkspacePan(delta)
+                        liveOffset.width += delta.width
+                        liveOffset.height += delta.height
+                        scheduleSyncToStore()
                     },
                     onToggleSnapToGrid: {
                         store.snapToGridEnabled.toggle()
@@ -190,13 +196,13 @@ struct WorkspaceView: View {
                         store.clearAllTopologyLinks()
                     },
                     deviceAt: { swiftUIPoint in
-                        let scale = store.workspaceScale
-                        let offset = store.workspaceOffset
+                        let scale = liveScale
+                        let offset = liveOffset
                         let canvasX = (swiftUIPoint.x - offset.width) / scale
                         let canvasY = (swiftUIPoint.y - offset.height) / scale
                         let halfW = DeviceTileEditorSettings.shared.tileWidth / 2
                         let halfH = DeviceTileEditorSettings.shared.tileHeight / 2
-                        return store.devices.first {
+                        return visibleDevices.first {
                             abs(CGFloat($0.x) - canvasX) <= halfW &&
                             abs(CGFloat($0.y) - canvasY) <= halfH
                         }
@@ -226,62 +232,53 @@ struct WorkspaceView: View {
             .onChange(of: store.pendingFocusDeviceID) { _, id in
                 guard let id,
                       let device = store.devices.first(where: { $0.id == id }) else { return }
-                let savedOffset = store.workspaceOffset
+                let savedOffset = liveOffset
                 let inspectorWidth: CGFloat = store.hasSelection ? store.inspectorWidth : 0
                 let visibleWidth = proxy.size.width - inspectorWidth
-                let targetOffsetX = visibleWidth / 2 - device.x * store.workspaceScale
-                let targetOffsetY = proxy.size.height / 2 - device.y * store.workspaceScale
+                let targetOffsetX = visibleWidth / 2 - device.x * liveScale
+                let targetOffsetY = proxy.size.height / 2 - device.y * liveScale
+                let targetOffset = CGSize(width: targetOffsetX, height: targetOffsetY)
                 withAnimation(.easeInOut(duration: 0.55)) {
-                    store.workspaceOffset = CGSize(width: targetOffsetX, height: targetOffsetY)
+                    liveOffset = targetOffset
                 }
                 store.pendingFocusDeviceID = nil
                 DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
                     withAnimation(.easeInOut(duration: 0.55)) {
-                        store.workspaceOffset = savedOffset
+                        liveOffset = savedOffset
                     }
                 }
+            }
+            .onAppear {
+                liveOffset = store.workspaceOffset
+                liveScale = store.workspaceScale
             }
             .clipped()
             .background(Color(red: 0.055, green: 0.055, blue: 0.06))
         }
     }
 
-    private func queueWorkspacePan(_ delta: CGSize) {
-        guard delta.width != 0 || delta.height != 0 else { return }
-
-        pendingPanDelta.width += delta.width
-        pendingPanDelta.height += delta.height
-
-        guard !panFlushScheduled else { return }
-        panFlushScheduled = true
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + (1.0 / 60.0)) {
-            let delta = pendingPanDelta
-            pendingPanDelta = .zero
-            panFlushScheduled = false
-
-            guard delta.width != 0 || delta.height != 0 else { return }
-            store.panWorkspace(by: delta)
-        }
+    private func applyLiveZoom(delta: Double, around point: CGPoint) {
+        guard delta != 0 else { return }
+        let step = 0.01
+        let direction = delta > 0 ? 1.0 : -1.0
+        let oldScale = liveScale
+        let newScale = min(3.5, max(0.25, oldScale + (step * direction)))
+        guard newScale != oldScale else { return }
+        let worldX = (point.x - liveOffset.width) / oldScale
+        let worldY = (point.y - liveOffset.height) / oldScale
+        liveScale = newScale
+        liveOffset.width = point.x - (worldX * newScale)
+        liveOffset.height = point.y - (worldY * newScale)
+        scheduleSyncToStore()
     }
 
-    private func queueWorkspaceZoom(delta: Double, around point: CGPoint) {
-        guard delta != 0 else { return }
-
-        pendingZoomDelta += delta
-        pendingZoomPoint = point
-
-        guard !zoomFlushScheduled else { return }
-        zoomFlushScheduled = true
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + (1.0 / 60.0)) {
-            let delta = pendingZoomDelta
-            let point = pendingZoomPoint
-            pendingZoomDelta = 0
-            zoomFlushScheduled = false
-
-            guard delta != 0 else { return }
-            store.zoomWorkspace(by: delta, around: point)
+    private func scheduleSyncToStore() {
+        syncTask?.cancel()
+        syncTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(200))
+            guard !Task.isCancelled else { return }
+            store.workspaceOffset = liveOffset
+            store.workspaceScale = liveScale
         }
     }
 
@@ -329,8 +326,14 @@ struct WorkspaceView: View {
                     return
                 }
 
-                let worldTopLeft = store.viewportPointToWorld(CGPoint(x: viewRect.minX, y: viewRect.minY))
-                let worldBottomRight = store.viewportPointToWorld(CGPoint(x: viewRect.maxX, y: viewRect.maxY))
+                let worldTopLeft = CGPoint(
+                    x: (viewRect.minX - liveOffset.width) / liveScale,
+                    y: (viewRect.minY - liveOffset.height) / liveScale
+                )
+                let worldBottomRight = CGPoint(
+                    x: (viewRect.maxX - liveOffset.width) / liveScale,
+                    y: (viewRect.maxY - liveOffset.height) / liveScale
+                )
 
                 let worldRect = CGRect(
                     x: min(worldTopLeft.x, worldBottomRight.x),
@@ -340,7 +343,7 @@ struct WorkspaceView: View {
                 )
 
                 let selectedDevices = Set(
-                    store.devices
+                    visibleDevices
                         .filter { device in
                             let rect = CGRect(x: device.x - 85, y: device.y - 52, width: 170, height: 104)
                             return worldRect.intersects(rect)
@@ -419,7 +422,7 @@ struct WorkspaceView: View {
                     deviceStartPositions: deviceDragStart,
                     shapeStartPositions: shapeDragStart,
                     translation: value.translation,
-                    scale: store.workspaceScale
+                    scale: liveScale
                 )
             }
             .onEnded { _ in
@@ -462,7 +465,7 @@ struct WorkspaceView: View {
                     deviceStartPositions: deviceDragStart,
                     shapeStartPositions: shapeDragStart,
                     translation: value.translation,
-                    scale: store.workspaceScale
+                    scale: liveScale
                 )
             }
             .onEnded { _ in
@@ -488,6 +491,7 @@ private struct MpingMapDeviceTileView: View, Equatable {
     let shouldShowSecondaryDetail: Bool
     let hasAlert: Bool
     let isFlashing: Bool
+    let redundantModeActive: Bool
 
     @ObservedObject private var tileStyle = DeviceTileEditorSettings.shared
 
@@ -503,9 +507,6 @@ private struct MpingMapDeviceTileView: View, Equatable {
         // (e.g. 1.1ms → 1.3ms) are invisible on the tile and would otherwise force a
         // re-render on every ping for every online device.
         //
-        // pingPulseID is intentionally excluded: the ripple animation's onChange fires because
-        // lastRTT also changes each ping, making pingPulseID redundant in this check.
-        //
         // pingRTTHistory, pingLossHistory, jitter, uptime, and SNMP port detail are excluded
         // because they are only shown in the inspector, not on the canvas tile itself.
         //
@@ -519,6 +520,7 @@ private struct MpingMapDeviceTileView: View, Equatable {
             && lhs.device.x == rhs.device.x
             && lhs.device.y == rhs.device.y
             && lhs.device.status == rhs.device.status
+            && lhs.device.pingPulseID == rhs.device.pingPulseID
             && lhs.device.lastRTT.map { Int($0.rounded()) } == rhs.device.lastRTT.map { Int($0.rounded()) }
             && lhs.device.deviceType == rhs.device.deviceType
             && lhs.device.switchTelemetry.temperatureCelsius == rhs.device.switchTelemetry.temperatureCelsius
@@ -530,6 +532,8 @@ private struct MpingMapDeviceTileView: View, Equatable {
             && lhs.shouldShowSecondaryDetail == rhs.shouldShowSecondaryDetail
             && lhs.hasAlert == rhs.hasAlert
             && lhs.isFlashing == rhs.isFlashing
+            && lhs.device.redundancyRole == rhs.device.redundancyRole
+            && lhs.redundantModeActive == rhs.redundantModeActive
     }
 
     private var isPingOnly: Bool { device.deviceType == .pingOnly }
@@ -708,16 +712,29 @@ private struct MpingMapDeviceTileView: View, Equatable {
             }
         }
         .overlay(alignment: .topTrailing) {
-            if device.switchTelemetry.stpIsRootBridge {
-                Text("ROOT")
-                    .font(.system(size: 7, weight: .black, design: .rounded))
-                    .foregroundStyle(.black)
-                    .padding(.horizontal, 4)
-                    .padding(.vertical, 2)
-                    .background(Color.yellow, in: RoundedRectangle(cornerRadius: 3, style: .continuous))
-                    .padding(.top, 5)
-                    .padding(.trailing, 5)
+            HStack(spacing: 3) {
+                if device.redundancyRole != .none {
+                    Text(device.redundancyRole == .primary ? "P" : "S")
+                        .font(.system(size: 7, weight: .black, design: .rounded))
+                        .foregroundStyle(.black)
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 2)
+                        .background(
+                            device.redundancyRole == .primary ? Color.cyan : Color.mint,
+                            in: RoundedRectangle(cornerRadius: 3, style: .continuous)
+                        )
+                }
+                if device.switchTelemetry.stpIsRootBridge {
+                    Text("ROOT")
+                        .font(.system(size: 7, weight: .black, design: .rounded))
+                        .foregroundStyle(.black)
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 2)
+                        .background(Color.yellow, in: RoundedRectangle(cornerRadius: 3, style: .continuous))
+                }
             }
+            .padding(.top, 5)
+            .padding(.trailing, 5)
         }
         .contentShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         .animation(.easeOut(duration: 0.16), value: isSelected)
