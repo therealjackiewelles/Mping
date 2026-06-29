@@ -137,6 +137,12 @@ Mping is built in Xcode. There is no package manager or CLI build step.
 
 ## Changelog
 
+### v0.5.4 — 2026-06-29
+- New **Network Routing** pane in Preferences — Apply/Remove static host routes for dual-NIC setups via clipboard + Terminal
+- LLDP topology matching now checks the SNMP/LLDP auto-discovered name (`discoveredName`) alongside the user-entered name, fixing links for devices using auto-naming
+- Chassis MAC fallback in LLDP matching — neighbours with no sysName are now matched by ARP-resolved MAC
+- STP flow direction vote fixed — arrow directions on some fibre links were inverted
+
 ### v0.5.3 — 2026-06-29
 - CPU reduced from 60% constant to near-zero baseline — `repeatForever` animations moved off SwiftUI `@State` onto `CALayer`/`CABasicAnimation` and `TimelineView { Canvas }`
 - Ping cycle no longer forces full tile re-renders — `lastSeenOnline` removed from Equatable, alert cache guards prevent spurious `objectWillChange` when nothing changed
