@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import AppKit
 
 // MARK: - Fibre Box Baked Defaults
 
@@ -1220,8 +1221,8 @@ struct FibreLinkLine: View {
                     )
                 )
 
-                // Animated flow dashes are drawn by the single TimelineView in FibreLinksLayer,
-                // not here — one 60fps Canvas loop for all links instead of one per link.
+                // Animated flow dashes are drawn by FibreDashAnimatorView (CAShapeLayer/GPU),
+                // not here — zero CPU cost per frame.
             }
 
             if showLabels {
@@ -1440,6 +1441,108 @@ private struct FibreLinkRenderItem: Identifiable {
     var id: UUID { result.id }
 }
 
+// MARK: - FibreDashAnimatorView
+// CAShapeLayer-based animated fibre link dashes. Each animated link gets two CAShapeLayers
+// (outer dark + inner light) driven by CABasicAnimation on lineDashPhase. The animation
+// runs on the GPU render server with zero CPU involvement per frame — replaces the
+// TimelineView+Canvas loop that woke the CPU 20 times/second.
+//
+// Coordinate system note: CAShapeLayer uses bottom-left origin; device positions are in
+// SwiftUI's top-left space. makePath() flips Y via (bounds.height - y). syncLayers() is
+// called both from update() and layout() so paths are recomputed once bounds are valid.
+private struct FibreDashAnimatorView: NSViewRepresentable {
+    let items: [FibreLinkRenderItem]
+
+    func makeNSView(context: Context) -> FibreDashNSView { FibreDashNSView() }
+    func updateNSView(_ nsView: FibreDashNSView, context: Context) { nsView.update(items: items) }
+
+    final class FibreDashNSView: NSView {
+        private var layersByID: [UUID: (CAShapeLayer, CAShapeLayer)] = [:]
+        private var pendingItems: [FibreLinkRenderItem] = []
+
+        override init(frame: CGRect) {
+            super.init(frame: frame)
+            wantsLayer = true
+        }
+        required init?(coder: NSCoder) { fatalError() }
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+        func update(items: [FibreLinkRenderItem]) {
+            pendingItems = items
+            syncLayers()
+        }
+
+        override func layout() {
+            super.layout()
+            layer?.frame = bounds
+            syncLayers()
+        }
+
+        private func syncLayers() {
+            guard let hostLayer = layer, bounds.height > 0 else { return }
+            let newIDs = Set(pendingItems.map { $0.id })
+
+            for id in layersByID.keys where !newIDs.contains(id) {
+                let (outer, inner) = layersByID.removeValue(forKey: id)!
+                outer.removeFromSuperlayer()
+                inner.removeFromSuperlayer()
+            }
+
+            for item in pendingItems {
+                let path = makePath(from: item.start, to: item.end)
+                let lw = item.result.topologyLineWidth
+
+                if let (outer, inner) = layersByID[item.id] {
+                    outer.path = path
+                    inner.path = path
+                    outer.lineWidth = lw * 1.7
+                    inner.lineWidth = lw * 1.0
+                } else {
+                    let outer = makeLayer(path: path, color: NSColor.black.withAlphaComponent(0.85), lineWidth: lw * 1.7)
+                    let inner = makeLayer(path: path, color: NSColor(white: 0.65, alpha: 0.95), lineWidth: lw * 1.0)
+                    addDashAnimation(to: outer, direction: item.result.flowDirection)
+                    addDashAnimation(to: inner, direction: item.result.flowDirection)
+                    hostLayer.addSublayer(outer)
+                    hostLayer.addSublayer(inner)
+                    layersByID[item.id] = (outer, inner)
+                }
+            }
+        }
+
+        // Flips Y from SwiftUI top-left → CALayer bottom-left coordinates.
+        private func makePath(from start: CGPoint, to end: CGPoint) -> CGPath {
+            let h = bounds.height
+            let p = CGMutablePath()
+            p.move(to: CGPoint(x: start.x, y: h - start.y))
+            p.addLine(to: CGPoint(x: end.x, y: h - end.y))
+            return p
+        }
+
+        private func makeLayer(path: CGPath, color: NSColor, lineWidth: CGFloat) -> CAShapeLayer {
+            let l = CAShapeLayer()
+            l.path = path
+            l.strokeColor = color.cgColor
+            l.lineWidth = lineWidth
+            l.fillColor = nil
+            l.lineCap = .butt
+            l.lineDashPattern = [4, 10]
+            return l
+        }
+
+        // cycleDuration 0.6s, period 14 — matches the old TimelineView phase math exactly.
+        // aToB = negative phase (dashes travel forward); bToA = positive.
+        private func addDashAnimation(to l: CAShapeLayer, direction: FibreLossResult.FlowDirection) {
+            let anim = CABasicAnimation(keyPath: "lineDashPhase")
+            anim.fromValue = NSNumber(value: 0)
+            anim.toValue = NSNumber(value: direction == .aToB ? -14.0 : 14.0)
+            anim.duration = 0.6
+            anim.repeatCount = .infinity
+            anim.timingFunction = CAMediaTimingFunction(name: .linear)
+            l.add(anim, forKey: "dashPhase")
+        }
+    }
+}
+
 struct FibreLinksLayer: View {
     // Positions-only dict instead of full [MonitoredDevice] — prevents re-renders on
     // every ping cycle (ping updates don't change device positions or link topology).
@@ -1465,32 +1568,9 @@ struct FibreLinksLayer: View {
                 linkView(for: item, labelOffsets: labelOffsets)
             }
 
-            // Single Canvas for ALL animated flow dashes at 20fps — replaces one 60fps
-            // TimelineView per link, cutting concurrent render loops from N down to 1.
-            // 20fps is imperceptibly different from 60fps for slow-moving dashed lines.
             if !animatedItems.isEmpty {
-                TimelineView(.periodic(from: .now, by: 1.0 / 20.0)) { timeline in
-                    let elapsed = timeline.date.timeIntervalSinceReferenceDate
-                    Canvas { ctx, _ in
-                        let cycleDuration: Double = 0.6
-                        let period: Double = 14.0
-                        for item in animatedItems {
-                            let lw = item.result.topologyLineWidth
-                            let raw = (elapsed.truncatingRemainder(dividingBy: cycleDuration) / cycleDuration) * period
-                            let phase = CGFloat(item.result.flowDirection == .aToB ? -raw : raw)
-                            var p = Path()
-                            p.move(to: item.start)
-                            p.addLine(to: item.end)
-                            ctx.stroke(p, with: .color(.black.opacity(0.85)),
-                                       style: StrokeStyle(lineWidth: lw * 1.7, lineCap: .butt,
-                                                          dash: [4, 10], dashPhase: phase))
-                            ctx.stroke(p, with: .color(Color(white: 0.65).opacity(0.95)),
-                                       style: StrokeStyle(lineWidth: lw * 1.0, lineCap: .butt,
-                                                          dash: [4, 10], dashPhase: phase))
-                        }
-                    }
+                FibreDashAnimatorView(items: animatedItems)
                     .allowsHitTesting(false)
-                }
             }
         }
     }

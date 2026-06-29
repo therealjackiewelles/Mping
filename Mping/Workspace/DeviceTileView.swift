@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 struct DeviceTileView: View {
     let device: MonitoredDevice
@@ -7,9 +8,6 @@ struct DeviceTileView: View {
 
     @ObservedObject private var settings = DeviceTileEditorSettings.shared
 
-    @State private var pulseScale: CGFloat = 0.45
-
-    @State private var pulseOpacity: Double = 0.0
 
     var body: some View {
 
@@ -49,22 +47,6 @@ struct DeviceTileView: View {
                     .padding(.trailing, settings.statusTrailingPadding)
 
             }
-            .onChange(of: device.pingPulseID) { _, _ in
-
-                triggerHeartbeat()
-
-            }
-
-            .onAppear {
-
-                if device.pingPulseID > 0 {
-
-                    triggerHeartbeat()
-
-                }
-
-            }
-
     }
 
     private var tileContent: some View {
@@ -211,12 +193,13 @@ struct DeviceTileView: View {
 
         ZStack {
 
-            Circle()
-                .stroke(statusColor.opacity(pulseOpacity), lineWidth: settings.statusRippleLineWidth)
-
-                .frame(width: settings.statusRippleSize, height: settings.statusRippleSize)
-
-                .scaleEffect(pulseScale)
+            PingRippleLayerView(
+                color: statusColor,
+                rippleSize: settings.statusRippleSize,
+                lineWidth: settings.statusRippleLineWidth,
+                startOpacity: 0.85,
+                pulseID: device.pingPulseID
+            )
 
             Circle()
 
@@ -283,21 +266,6 @@ struct DeviceTileView: View {
 
     }
 
-    private func triggerHeartbeat() {
-
-        pulseScale = 0.45
-
-        pulseOpacity = 0.85
-
-        withAnimation(.easeOut(duration: 0.65)) {
-
-            pulseScale = 1.65
-
-            pulseOpacity = 0.0
-
-        }
-
-    }
 
     private var tileFill: Color {
 

@@ -491,8 +491,6 @@ private struct MpingMapDeviceTileView: View, Equatable {
 
     @ObservedObject private var tileStyle = DeviceTileEditorSettings.shared
 
-    @State private var pulseScale: CGFloat = 0.45
-    @State private var pulseOpacity: Double = 0.0
     @State private var flashOpacity: Double = 0.0
 
     static func == (lhs: MpingMapDeviceTileView, rhs: MpingMapDeviceTileView) -> Bool {
@@ -724,14 +722,6 @@ private struct MpingMapDeviceTileView: View, Equatable {
         .contentShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         .animation(.easeOut(duration: 0.16), value: isSelected)
         .animation(.easeOut(duration: 0.16), value: device.status)
-        .onChange(of: device.pingPulseID) { _, _ in
-            runSinglePingRipple()
-        }
-        .onAppear {
-            if device.pingPulseID > 0 {
-                runSinglePingRipple()
-            }
-        }
         .help(helpText)
     }
 
@@ -870,10 +860,13 @@ private struct MpingMapDeviceTileView: View, Equatable {
 
     private var heartbeatIndicator: some View {
         ZStack {
-            Circle()
-                .stroke(statusColor.opacity(pulseOpacity), lineWidth: tileStyle.statusRippleLineWidth)
-                .frame(width: tileStyle.statusRippleSize, height: tileStyle.statusRippleSize)
-                .scaleEffect(pulseScale)
+            PingRippleLayerView(
+                color: statusColor,
+                rippleSize: tileStyle.statusRippleSize,
+                lineWidth: tileStyle.statusRippleLineWidth,
+                startOpacity: device.status == .offline ? 0.42 : 0.84,
+                pulseID: device.pingPulseID
+            )
 
             Circle()
                 .fill(Color.black.opacity(tileStyle.statusBackgroundOpacity))
@@ -890,16 +883,6 @@ private struct MpingMapDeviceTileView: View, Equatable {
         }
         .frame(width: tileStyle.statusOuterFrameSize, height: tileStyle.statusOuterFrameSize)
         .accessibilityLabel("Ping status \(device.status.label)")
-    }
-
-    private func runSinglePingRipple() {
-        pulseScale = 0.45
-        pulseOpacity = device.status == .offline ? 0.42 : 0.84
-
-        withAnimation(.easeOut(duration: 0.82)) {
-            pulseScale = 1.55
-            pulseOpacity = 0.0
-        }
     }
 
     private var shouldShowTemperatureBadge: Bool {
