@@ -5,6 +5,16 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.5.8 — 2026-06-30
+
+### Bug Fix
+
+**Title bar reappearing after context compaction**
+- `WindowTitleBarRemover` had reverted to the intermediate cosmetic approach (`titlebarAppearsTransparent + titleVisibility.hidden + fullSizeContentView`) which hides the buttons and text but leaves the chrome bar visible
+- Restored correct implementation: `window.styleMask.remove(.titled)` — strips the entire NSThemeFrame and reclaims the height as usable screen space
+
+---
+
 ## v0.5.7 — 2026-06-30
 
 ### New Icon & UI Overhaul

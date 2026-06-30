@@ -176,20 +176,15 @@ struct ContentView: View {
 }
 
 
-// Makes the title bar invisible and extends content into that area, without
-// removing .titled from the styleMask (which breaks event routing to the workspace).
-// Native traffic light buttons are hidden — our custom ones in the sidebar replace them.
+// Completely removes the title bar chrome by stripping .titled from the window's
+// styleMask. This reclaims the full title bar height for app content.
+// Custom TrafficLights + WindowDragArea in the sidebar replace the native controls.
 private struct WindowTitleBarRemover: NSViewRepresentable {
     func makeNSView(context: Context) -> NSView {
         let v = NSView()
         DispatchQueue.main.async {
             guard let w = v.window else { return }
-            w.titlebarAppearsTransparent = true
-            w.titleVisibility = .hidden
-            w.styleMask.insert(.fullSizeContentView)
-            w.standardWindowButton(.closeButton)?.isHidden     = true
-            w.standardWindowButton(.miniaturizeButton)?.isHidden = true
-            w.standardWindowButton(.zoomButton)?.isHidden      = true
+            w.styleMask.remove(.titled)
         }
         return v
     }

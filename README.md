@@ -133,6 +133,9 @@ Mping is built in Xcode. There is no package manager or CLI build step.
 
 ## Changelog
 
+### v0.5.8 — 2026-06-30
+- Fixed title bar reappearing — `WindowTitleBarRemover` restored to `window.styleMask.remove(.titled)` to strip the full NSThemeFrame (previous version had reverted to the cosmetic transparent-titlebar approach)
+
 ### v0.5.7 — 2026-06-30
 - New M lettermark app icon — white geometric M on workspace dark background, green status dot with ping rings; all icon sizes and sidebar asset regenerated
 - Title bar removed — `window.styleMask.remove(.titled)` strips chrome entirely; custom traffic light buttons (close / minimise / zoom) embedded at the top of the sidebar with hover icons and a window drag strip
