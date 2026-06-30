@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/therealjackiewelles/Mping/main/docs/icon.png" width="128" alt="Mping icon" />
+  <img src="https://raw.githubusercontent.com/therealjackiewelles/Mping/main/docs/icon.png" width="128" alt="Mping" />
 </p>
 
 <h1 align="center">Mping</h1>
@@ -7,10 +7,6 @@
 <p align="center">
   <strong>Professional network monitoring for live event production.</strong><br/>
   Built for touring, festival, fixed installation, and live broadcast engineers.
-</p>
-
-<p align="center">
-  <img src="https://raw.githubusercontent.com/therealjackiewelles/Mping/main/docs/logo.png" width="72" alt="Mping network topology logo" />
 </p>
 
 ---
@@ -136,6 +132,12 @@ Mping is built in Xcode. There is no package manager or CLI build step.
 ---
 
 ## Changelog
+
+### v0.5.7 — 2026-06-30
+- New M lettermark app icon — white geometric M on workspace dark background, green status dot with ping rings; all icon sizes and sidebar asset regenerated
+- Title bar removed — `window.styleMask.remove(.titled)` strips chrome entirely; custom traffic light buttons (close / minimise / zoom) embedded at the top of the sidebar with hover icons and a window drag strip
+- Device Tile Editor — per-type tab (Netgear vs Ping Only), live preview panel, field reorder controls (↑↓), ping-only-specific settings, slider snap-to-max fix
+- Temperature plane now reflects Tile Editor changes live — `tileSettingsRevision` prop bypasses the `.equatable()` block on `MpingMapDeviceTileView`
 
 ### v0.5.6 — 2026-06-29
 - Fixed location box name being overwritten when clicking between boxes in the inspector

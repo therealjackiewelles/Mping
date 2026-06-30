@@ -60,6 +60,7 @@ struct ContentView: View {
         }
         .frame(minWidth: 1100, minHeight: 700)
         .background(Color.black)
+        .background(WindowTitleBarRemover())
         .sheet(isPresented: $showingDeviceView) {
             DeviceViewSheet(store: store)
         }
@@ -77,6 +78,14 @@ struct ContentView: View {
     }
 
     private var leftToolbar: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            TrafficLights()
+                .padding(.leading, 12)
+                .padding(.top, 10)
+                .padding(.bottom, 12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(WindowDragArea())
+
         ScrollView(.vertical, showsIndicators: false) {
         VStack(alignment: .leading, spacing: 18) {
             HStack(alignment: .center, spacing: 10) {
@@ -162,9 +171,82 @@ struct ContentView: View {
         }
         .padding(18)
         } // ScrollView
+        } // outer VStack
     }
 }
 
+
+// Makes the title bar invisible and extends content into that area, without
+// removing .titled from the styleMask (which breaks event routing to the workspace).
+// Native traffic light buttons are hidden — our custom ones in the sidebar replace them.
+private struct WindowTitleBarRemover: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView {
+        let v = NSView()
+        DispatchQueue.main.async {
+            guard let w = v.window else { return }
+            w.titlebarAppearsTransparent = true
+            w.titleVisibility = .hidden
+            w.styleMask.insert(.fullSizeContentView)
+            w.standardWindowButton(.closeButton)?.isHidden     = true
+            w.standardWindowButton(.miniaturizeButton)?.isHidden = true
+            w.standardWindowButton(.zoomButton)?.isHidden      = true
+        }
+        return v
+    }
+    func updateNSView(_ v: NSView, context: Context) {}
+}
+
+// macOS traffic light buttons — close / minimise / zoom — rendered inside the sidebar
+// since the title bar has been removed via .windowStyle(.hiddenTitleBar).
+private struct TrafficLights: View {
+    @State private var hovering = false
+
+    var body: some View {
+        HStack(spacing: 8) {
+            WinButton(hovering: hovering, fill: Color(red: 1.0,   green: 0.373, blue: 0.341), symbol: "xmark") {
+                NSApplication.shared.keyWindow?.performClose(nil)
+            }
+            WinButton(hovering: hovering, fill: Color(red: 1.0,   green: 0.741, blue: 0.180), symbol: "minus") {
+                NSApplication.shared.keyWindow?.miniaturize(nil)
+            }
+            WinButton(hovering: hovering, fill: Color(red: 0.157, green: 0.788, blue: 0.255), symbol: "plus") {
+                NSApplication.shared.keyWindow?.zoom(nil)
+            }
+        }
+        .onHover { hovering = $0 }
+    }
+}
+
+private struct WinButton: View {
+    let hovering: Bool
+    let fill: Color
+    let symbol: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            ZStack {
+                Circle().fill(fill).frame(width: 12, height: 12)
+                if hovering {
+                    Image(systemName: symbol)
+                        .font(.system(size: 6, weight: .black))
+                        .foregroundStyle(.black.opacity(0.55))
+                }
+            }
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// Makes the strip next to the traffic lights draggable so the window can still be moved.
+private struct WindowDragArea: NSViewRepresentable {
+    func makeNSView(context: Context) -> DragNSView { DragNSView() }
+    func updateNSView(_ nsView: DragNSView, context: Context) {}
+
+    class DragNSView: NSView {
+        override var mouseDownCanMoveWindow: Bool { true }
+    }
+}
 
 private struct SidebarResizeHandle: View {
     @Binding var sidebarWidth: CGFloat

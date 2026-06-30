@@ -5,6 +5,31 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.5.7 — 2026-06-30
+
+### New Icon & UI Overhaul
+
+**New app icon — M lettermark**
+- Replaced the previous icon with a new M lettermark design: white geometric M on the workspace canvas background (#0E0E0F) with a green status dot and concentric ping rings, matching the app's visual language
+- All 10 AppIcon sizes regenerated (16×16 through 1024×1024); MpingLogo sidebar asset updated at @1x/@2x/@3x; README header updated
+
+**Title bar removed**
+- Stripped the macOS title bar entirely via `window.styleMask.remove(.titled)` — reclaims the title bar height as usable screen space
+- Custom close / minimise / zoom traffic light buttons embedded at the top of the sidebar, matching native macOS colours and showing action icons on hover
+- Window drag strip spans the full width of the traffic light row so the window remains draggable
+
+**Device Tile Editor enhancements**
+- Per-type editing: Netgear Switch and Ping Only tiles each have their own settings tab with a live preview panel showing a real `MpingMapDeviceTileView` instance with mock data
+- Field reordering: ↑↓ buttons in the Netgear settings reorder the top-section fields (Device Name, IP Address, Device Type); order bakes back to source via the existing regex mechanism
+- Ping-only tile: height, latency badge size, IP size, padding, corner radius, and spacing all independently configurable
+- Fixed slider snap-to-max bug — `DebugSliderControl` was using `UUID()` as its `id`, regenerating on every render and causing `ForEach` to destroy mid-gesture; changed to use `title` as stable ID
+
+**Temperature plane settings propagation fix**
+- Changes in the Device Tile Editor were not reflected in the Temperatures plane because `.equatable()` on `MpingMapDeviceTileView` blocked re-renders when only internal `@ObservedObject` state changed
+- Fixed by adding `tileSettingsRevision: Int` as an explicit prop, driven by `.onReceive(DeviceTileEditorSettings.shared.objectWillChange)` in WorkspaceView
+
+---
+
 ## v0.5.6 — 2026-06-29
 
 ### Bug Fixes & Redundant Network Enhancements

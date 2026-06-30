@@ -4,6 +4,9 @@ import Network
 enum SNMPEngine {
     struct SwitchTemperatureResult: Sendable {
         let temperatureCelsius: Double?
+        let temperatureCelsius2: Double?
+        let fanSpeed1: Int?
+        let fanSpeed2: Int?
         let discoveredName: String?
         let statusText: String
         let rawOutput: String
@@ -33,6 +36,9 @@ enum SNMPEngine {
             )
             return SwitchTemperatureResult(
                 temperatureCelsius: nil,
+                temperatureCelsius2: nil,
+                fanSpeed1: nil,
+                fanSpeed2: nil,
                 discoveredName: nil,
                 statusText: "No switch IP",
                 rawOutput: "Empty IP"
@@ -90,11 +96,13 @@ enum SNMPEngine {
                 }
 
                 if let candidate = firstTemperatureCandidate(in: values) {
+                    let temp2 = secondTemperatureCandidate(in: values)?.temperatureCelsius
 
                     let fibreSummary = await readFibreOpticsSummary(client: client, raw: &raw, deviceID: deviceID, deviceLabel: deviceLabel, ipAddress: ip)
                     let lldpSummary = await readLLDPNeighbourSummary(client: client, raw: &raw, deviceID: deviceID, deviceLabel: deviceLabel, ipAddress: ip)
                     let portSummary = await readInterfacePortSummary(client: client, raw: &raw, deviceID: deviceID, deviceLabel: deviceLabel, ipAddress: ip)
                     await readSTPSummary(client: client, raw: &raw, deviceID: deviceID, deviceLabel: deviceLabel, ipAddress: ip)
+                    let (fan1, fan2) = await readFanSpeeds(client: client, raw: &raw, deviceID: deviceID, deviceLabel: deviceLabel, ipAddress: ip)
                     let suffixParts = [fibreSummary, lldpSummary, portSummary].filter { !$0.isEmpty }
                     let suffixJoined = suffixParts.joined(separator: " • ")
                     let suffix = suffixJoined.isEmpty ? "" : " • \(suffixJoined)"
@@ -110,6 +118,9 @@ enum SNMPEngine {
 
                     return SwitchTemperatureResult(
                         temperatureCelsius: candidate.temperatureCelsius,
+                        temperatureCelsius2: temp2,
+                        fanSpeed1: fan1,
+                        fanSpeed2: fan2,
                         discoveredName: discoveredName,
                         statusText: "SNMP OK • \(candidate.oid)\(suffix)",
                         rawOutput: raw
@@ -154,6 +165,9 @@ enum SNMPEngine {
 
             return SwitchTemperatureResult(
                 temperatureCelsius: nil,
+                temperatureCelsius2: nil,
+                fanSpeed1: nil,
+                fanSpeed2: nil,
                 discoveredName: discoveredName,
                 statusText: "SNMP OK • temp table empty/not exposed\(suffix)",
                 rawOutput: raw
@@ -172,6 +186,9 @@ enum SNMPEngine {
 
             return SwitchTemperatureResult(
                 temperatureCelsius: nil,
+                temperatureCelsius2: nil,
+                fanSpeed1: nil,
+                fanSpeed2: nil,
                 discoveredName: discoveredName,
                 statusText: "SNMP failed",
                 rawOutput: raw
@@ -284,6 +301,61 @@ private func firstTemperatureCandidate(in values: [SNMPClient.Value]) -> SNMPTem
     return nil
 }
 
+private func secondTemperatureCandidate(in values: [SNMPClient.Value]) -> SNMPTemperatureCandidate? {
+    var found = false
+    for value in values {
+        if let temperature = value.value.temperatureCelsiusCandidate {
+            if found { return SNMPTemperatureCandidate(oid: value.oid, temperatureCelsius: temperature) }
+            found = true
+        }
+    }
+    return nil
+}
+
+// Walks the Netgear fan speed table (agentThermalFanTable column 3 = RPM).
+// Returns RPM for fan slots 1 and 2; nil for any slot not reported by the switch.
+private func readFanSpeeds(
+    client: SNMPClient,
+    raw: inout String,
+    deviceID: UUID?,
+    deviceLabel: String,
+    ipAddress: String
+) async -> (fan1: Int?, fan2: Int?) {
+    let fanSpeedOID = "1.3.6.1.4.1.4526.10.43.1.9.1.3"
+    do {
+        ConsoleOutputStore.log(
+            subsystem: "SNMP",
+            direction: .command,
+            deviceID: deviceID,
+            deviceLabel: deviceLabel,
+            ipAddress: ipAddress,
+            message: "WALK \(fanSpeedOID) • Fan speeds (RPM)"
+        )
+        let values = try await client.walk(baseOID: fanSpeedOID, maxResults: 8)
+        raw += "--- Fan speeds \(fanSpeedOID) ---\n"
+        var fan1: Int? = nil
+        var fan2: Int? = nil
+        for value in values {
+            raw += "\(value.oid) = \(value.value.debugDescription)\n"
+            // OID suffix is the fan index (1, 2, …)
+            guard let indexStr = value.oid.split(separator: ".").last,
+                  let index = Int(indexStr) else { continue }
+            let rpm: Int?
+            switch value.value {
+            case .integer(let v):   rpm = v > 0 ? v : nil
+            case .unsigned(let v):  rpm = v > 0 ? Int(v) : nil
+            default:                rpm = nil
+            }
+            if index == 1 { fan1 = rpm }
+            else if index == 2 { fan2 = rpm }
+        }
+        return (fan1, fan2)
+    } catch {
+        raw += "Fan speed walk failed: \(snmpErrorText(error))\n"
+        return (nil, nil)
+    }
+}
+
 private func readFibreOpticsSummary(
     client: SNMPClient,
     raw: inout String,
@@ -305,11 +377,12 @@ private func readFibreOpticsSummary(
     // .8 = LOS enum
     // .9 = fault status text
     let fibreColumns: [(label: String, oid: String, apply: (inout FibreOpticsReading, SNMPValue) -> Void)] = [
-        // Live topology/alerting only needs temperature, TX/RX optical power and LOS.
-        // Voltage, bias current, TX fault and text fault status are intentionally not walked
-        // during regular telemetry because they multiply the SNMP request count without
-        // changing the current Mping UI.
+        // Bias current (column 4) is walked specifically to distinguish copper SFPs from
+        // fibre SFPs. Copper 1000BASE-T SFPs have no laser and report ~0 mA bias; fibre SFPs
+        // run 5–50 mA. Without this, copper SFPs show garbage TX/RX power that looks like
+        // real fibre loss and are incorrectly classified as optical links in the topology.
         ("Fibre optics temperature", "1.3.6.1.4.1.4526.10.43.1.18.1.2", { $0.temperature = formatTenthsCelsius($1) }),
+        ("Fibre optics bias current", "1.3.6.1.4.1.4526.10.43.1.18.1.4", { $0.biasCurrent = formatBiasCurrent($1) }),
         ("Fibre optics TX power", "1.3.6.1.4.1.4526.10.43.1.18.1.5", { $0.txPower = formatMilliDbm($1) }),
         ("Fibre optics RX power", "1.3.6.1.4.1.4526.10.43.1.18.1.6", { $0.rxPower = formatMilliDbm($1) }),
         ("Fibre optics LOS", "1.3.6.1.4.1.4526.10.43.1.18.1.8", { $0.los = formatLOSEnum($1) })

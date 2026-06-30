@@ -104,6 +104,9 @@ struct DevicePortTelemetry: Identifiable, Codable, Equatable, Hashable, Sendable
 
 struct SwitchTelemetry: Codable, Equatable, Sendable {
     var temperatureCelsius: Double?
+    var temperatureCelsius2: Double?
+    var fanSpeed1: Int?
+    var fanSpeed2: Int?
     var lastSNMPChecked: Date?
     var snmpStatusText: String?
     var fibrePorts: [FibrePortTelemetry]
@@ -116,6 +119,9 @@ struct SwitchTelemetry: Codable, Equatable, Sendable {
 
     init(
         temperatureCelsius: Double? = nil,
+        temperatureCelsius2: Double? = nil,
+        fanSpeed1: Int? = nil,
+        fanSpeed2: Int? = nil,
         lastSNMPChecked: Date? = nil,
         snmpStatusText: String? = nil,
         fibrePorts: [FibrePortTelemetry] = [],
@@ -127,6 +133,9 @@ struct SwitchTelemetry: Codable, Equatable, Sendable {
         stpDesignatedBridgePerPort: [Int: String] = [:]
     ) {
         self.temperatureCelsius = temperatureCelsius
+        self.temperatureCelsius2 = temperatureCelsius2
+        self.fanSpeed1 = fanSpeed1
+        self.fanSpeed2 = fanSpeed2
         self.lastSNMPChecked = lastSNMPChecked
         self.snmpStatusText = snmpStatusText
         self.fibrePorts = fibrePorts
@@ -140,6 +149,9 @@ struct SwitchTelemetry: Codable, Equatable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         case temperatureCelsius
+        case temperatureCelsius2
+        case fanSpeed1
+        case fanSpeed2
         case lastSNMPChecked
         case snmpStatusText
         case fibrePorts
@@ -154,6 +166,9 @@ struct SwitchTelemetry: Codable, Equatable, Sendable {
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         temperatureCelsius = try c.decodeIfPresent(Double.self, forKey: .temperatureCelsius)
+        temperatureCelsius2 = try c.decodeIfPresent(Double.self, forKey: .temperatureCelsius2)
+        fanSpeed1 = try c.decodeIfPresent(Int.self, forKey: .fanSpeed1)
+        fanSpeed2 = try c.decodeIfPresent(Int.self, forKey: .fanSpeed2)
         lastSNMPChecked = try c.decodeIfPresent(Date.self, forKey: .lastSNMPChecked)
         snmpStatusText = try c.decodeIfPresent(String.self, forKey: .snmpStatusText)
         fibrePorts = try c.decodeIfPresent([FibrePortTelemetry].self, forKey: .fibrePorts) ?? []
@@ -170,6 +185,9 @@ struct SwitchTelemetry: Codable, Equatable, Sendable {
     func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encodeIfPresent(temperatureCelsius, forKey: .temperatureCelsius)
+        try c.encodeIfPresent(temperatureCelsius2, forKey: .temperatureCelsius2)
+        try c.encodeIfPresent(fanSpeed1, forKey: .fanSpeed1)
+        try c.encodeIfPresent(fanSpeed2, forKey: .fanSpeed2)
         try c.encodeIfPresent(lastSNMPChecked, forKey: .lastSNMPChecked)
         try c.encodeIfPresent(snmpStatusText, forKey: .snmpStatusText)
         try c.encode(fibrePorts, forKey: .fibrePorts)

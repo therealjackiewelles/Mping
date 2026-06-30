@@ -52,7 +52,7 @@ struct FibrePortTelemetry: Identifiable, Codable, Equatable, Hashable, Sendable 
         return text.contains("loss of signal") || text.contains("no optical signal") || text.contains("signal lost") || text.contains("los detected") || text.contains("los asserted")
     }
 
-    var rxStatus: FibreSignalStatus {
+    nonisolated var rxStatus: FibreSignalStatus {
         // Only the switch's explicit LOS flag should create a no-signal state.
         // Very low/missing RX power can happen during partial polls, unsupported OIDs,
         // wrong LLDP-to-DDM mapping, or momentary SNMP gaps, and should not raise
@@ -83,7 +83,7 @@ struct LLDPNeighbour: Identifiable, Codable, Equatable, Hashable, Sendable {
         return Self.normalisedMACAddress(from: remoteChassisID)
     }
 
-    var bestRemotePortText: String {
+    nonisolated var bestRemotePortText: String {
         if let remotePortID, !remotePortID.isEmpty { return remotePortID }
         if let remotePortDescription, !remotePortDescription.isEmpty { return remotePortDescription }
         return ""
@@ -128,7 +128,7 @@ struct FibreConnection: Identifiable, Hashable, Codable, Equatable, Sendable {
     var bPort: Int
     var name: String = ""
 
-    init(
+    nonisolated init(
         id: UUID = UUID(),
         aDeviceID: UUID,
         aPort: Int,
@@ -182,7 +182,7 @@ struct FibreLossResult: Identifiable, Hashable, Sendable {
 
     enum FlowDirection { case none, aToB, bToA }
 
-    var displayName: String {
+    nonisolated var displayName: String {
         let trimmed = connection.name.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? "\(aDeviceName) P\(connection.aPort) ↔ \(bDeviceName) P\(connection.bPort)" : trimmed
     }
@@ -208,20 +208,22 @@ struct FibreLossResult: Identifiable, Hashable, Sendable {
     }
 
     var aEndpointLabel: String {
-        // Label near device A: show A's port, the loss on A's transmit path, A's SFP temperature.
+        // Label near device A: show A's port, the loss on the incoming (B→A) path, A's SFP temperature.
+        // lossBToA is what A receives from B — the value the operator standing at A cares about.
         compactEndpointLabel(
             port: connection.aPort,
-            loss: lossAToB,
+            loss: lossBToA,
             temperature: aTemperatureCelsius,
             hasOpticalTelemetry: aHasOpticalTelemetry
         )
     }
 
     var bEndpointLabel: String {
-        // Label near device B: show B's port, the loss on B's transmit path, B's SFP temperature.
+        // Label near device B: show B's port, the loss on the incoming (A→B) path, B's SFP temperature.
+        // lossAToB is what B receives from A — the value the operator standing at B cares about.
         compactEndpointLabel(
             port: connection.bPort,
-            loss: lossBToA,
+            loss: lossAToB,
             temperature: bTemperatureCelsius,
             hasOpticalTelemetry: bHasOpticalTelemetry
         )
@@ -245,7 +247,7 @@ struct FibreLossResult: Identifiable, Hashable, Sendable {
         guard hasOpticalTelemetry else {
             return "P\(port)"
         }
-        return "P\(port)\n\(formatLossForDisplay(loss))\n\(formatTemperatureForDisplay(temperature))"
+        return "P\(port)\nRX \(formatLossForDisplay(loss))\n\(formatTemperatureForDisplay(temperature))"
     }
 
     private func formatTemperatureForDisplay(_ temperature: Double?) -> String {
@@ -287,7 +289,7 @@ enum FibreSignalStatus: Int, Sendable {
 }
 
 enum FibreLossCalculator {
-    static func calculate(
+    nonisolated static func calculate(
         connection: FibreConnection,
         aDeviceName: String,
         bDeviceName: String,
@@ -334,7 +336,7 @@ enum FibreLossCalculator {
         )
     }
 
-    static func calculateLoss(txDbm: Double?, rxDbm: Double?) -> Double? {
+    nonisolated static func calculateLoss(txDbm: Double?, rxDbm: Double?) -> Double? {
         guard let txDbm, let rxDbm else { return nil }
 
         // Correct directional fibre attenuation uses the sender SFP's TX power and
@@ -359,7 +361,7 @@ enum FibreLossCalculator {
         return max(0, attenuation)
     }
 
-    private static func matchingTelemetry(
+    private nonisolated static func matchingTelemetry(
         deviceID: UUID,
         requestedPort: Int,
         telemetry: [FibrePortTelemetry]
@@ -404,7 +406,7 @@ enum FibreLossCalculator {
         return nil
     }
 
-    private static func worstStatus(aRx: FibreSignalStatus, bRx: FibreSignalStatus, lossAToB: Double?, lossBToA: Double?) -> FibreSignalStatus {
+    private nonisolated static func worstStatus(aRx: FibreSignalStatus, bRx: FibreSignalStatus, lossAToB: Double?, lossBToA: Double?) -> FibreSignalStatus {
         var statuses = [aRx, bRx]
         for loss in [lossAToB, lossBToA].compactMap({ $0 }) {
             if loss >= 8 { statuses.append(.bad) }
@@ -472,7 +474,7 @@ enum FibreTelemetryExtractor {
         }
 
         // Fallback for formatted summary lines generated by newer SNMPEngine builds,
-        // for example: Port 41 • Temp 52.0°C • TX -6.14dBm • RX -9.06dBm
+        // for example: Port 41 • Temp 52.0°C • Bias 15.3mA • TX -6.14dBm • RX -9.06dBm
         for rawLine in rawOutput.components(separatedBy: .newlines) {
             let line = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
             guard line.localizedCaseInsensitiveContains("Port ") else { continue }
@@ -490,10 +492,27 @@ enum FibreTelemetryExtractor {
                 if let temp = numberBefore("°C", after: "Temp", in: line) {
                     telemetry.temperatureCelsius = temp
                 }
+
+                if let bias = numberBefore("mA", after: "Bias", in: line) {
+                    telemetry.biasCurrentMilliAmps = bias
+                }
             }
         }
 
-        return ports.values.filter { $0.hasOpticalPower || $0.temperatureCelsius != nil }.sorted { $0.port < $1.port }
+        // Copper SFPs (1000BASE-T) appear in the Netgear DDM table — they have a
+        // real temperature sensor but no laser. Two complementary filters:
+        //
+        // 1. Require actual optical power signals (TX or RX dBm). Temperature alone
+        //    is not sufficient: copper SFPs report temp but no optical data. This is
+        //    the primary guard for modules where bias current is not reported.
+        //
+        // 2. If laser bias IS reported and is below 1 mA, the module has no active
+        //    laser regardless of any garbage TX/RX register values the switch returns.
+        return ports.values.filter { port in
+            guard port.hasOpticalPower else { return false }
+            if let bias = port.biasCurrentMilliAmps, bias < 1.0 { return false }
+            return true
+        }.sorted { $0.port < $1.port }
     }
 
     private static func firstNumber(after marker: String, in text: String) -> Double? {
@@ -700,6 +719,24 @@ enum FibreAutoLinkBuilder {
             canonicalKey($0.connection.aDeviceID, $0.connection.aPort,
                          $0.connection.bDeviceID, $0.connection.bPort)
         })
+
+        // Evict any remembered fibre link that is now confirmed live copper.
+        // This happens when a port was misclassified as fibre in a previous session
+        // (e.g. a copper SFP that reported temperature but no optical data) and is
+        // now correctly identified as copper. Without this cleanup the stale fibre
+        // entry persists in UserDefaults and reappears whenever LLDP briefly gaps.
+        let liveCopperKeys = Set(liveResults.filter { $0.linkMedium == .copper }.map {
+            canonicalKey($0.connection.aDeviceID, $0.connection.aPort,
+                         $0.connection.bDeviceID, $0.connection.bPort)
+        })
+        for stale in rememberedLinks(devices: switches) where stale.linkMedium == .fibre {
+            let key = canonicalKey(stale.connection.aDeviceID, stale.connection.aPort,
+                                   stale.connection.bDeviceID, stale.connection.bPort)
+            if liveCopperKeys.contains(key) {
+                deleteRememberedLink(id: stale.id)
+            }
+        }
+
         let missingResults = rememberedLinks(devices: switches)
             .filter { result in
                 let key = canonicalKey(result.connection.aDeviceID, result.connection.aPort,
@@ -734,7 +771,7 @@ enum FibreAutoLinkBuilder {
     private static let rememberedLinksKey = "Mping.rememberedTopologyLinks.v1"
     private static let deletedLinksKey = "Mping.deletedTopologyLinks.v1"
 
-    static func deleteRememberedLink(id: UUID) {
+    nonisolated static func deleteRememberedLink(id: UUID) {
         var deleted = deletedLinkIDs()
         deleted.insert(id)
         saveDeletedLinkIDs(deleted)
@@ -743,12 +780,12 @@ enum FibreAutoLinkBuilder {
         saveRememberedLinks(remaining)
     }
 
-    static func clearAllRememberedLinks() {
+    nonisolated static func clearAllRememberedLinks() {
         UserDefaults.standard.removeObject(forKey: rememberedLinksKey)
         UserDefaults.standard.removeObject(forKey: deletedLinksKey)
     }
 
-    private static func remember(_ results: [FibreLossResult]) {
+    private nonisolated static func remember(_ results: [FibreLossResult]) {
         guard !results.isEmpty else { return }
         let deleted = deletedLinkIDs()
 
@@ -829,7 +866,7 @@ enum FibreAutoLinkBuilder {
         return (try? JSONDecoder().decode([RememberedTopologyLink].self, from: data)) ?? []
     }
 
-    private static func saveRememberedLinks(_ links: [RememberedTopologyLink]) {
+    private nonisolated static func saveRememberedLinks(_ links: [RememberedTopologyLink]) {
         guard let data = try? JSONEncoder().encode(links) else { return }
         UserDefaults.standard.set(data, forKey: rememberedLinksKey)
     }
@@ -839,7 +876,7 @@ enum FibreAutoLinkBuilder {
         return Set(strings.compactMap(UUID.init(uuidString:)))
     }
 
-    private static func saveDeletedLinkIDs(_ ids: Set<UUID>) {
+    private nonisolated static func saveDeletedLinkIDs(_ ids: Set<UUID>) {
         UserDefaults.standard.set(ids.map { $0.uuidString }, forKey: deletedLinksKey)
     }
 
@@ -981,11 +1018,19 @@ enum FibreAutoLinkBuilder {
         )
     }
 
-    private static func isOpticalPort(on device: MonitoredDevice, port: Int) -> Bool {
-        // Prefer the Device Ports SNMP table because the map label is about the
-        // physical interface type, not whether we happened to find any DDM row
-        // with the same numeric index. Some copper/CAT ports can otherwise borrow
-        // unrelated SFP telemetry and incorrectly show loss/temperature.
+    private nonisolated static func isOpticalPort(on device: MonitoredDevice, port: Int) -> Bool {
+        // fibrePorts is authoritative: the bias-current filter already excluded copper SFPs,
+        // and the column-1 slot→ifIndex walk means port numbers are correct. When fibrePorts
+        // has been populated (at least one optical SFP found on this switch), its absence for
+        // a given port is definitive — the SFP slot may physically exist but hold a copper module.
+        let fibrePorts = device.switchTelemetry.fibrePorts
+        if !fibrePorts.isEmpty {
+            return fibrePorts.contains(where: { $0.port == port })
+        }
+
+        // DDM data hasn't arrived yet for this switch — fall back to the SNMP port-table
+        // medium string so links still render correctly on the first render before DDM data
+        // is available.
         if let portRow = device.switchTelemetry.devicePorts.first(where: { $0.port == port }) {
             let medium = (portRow.transmissionMedium ?? "").lowercased()
             let name = (portRow.interfaceName ?? "").lowercased()
@@ -1001,12 +1046,10 @@ enum FibreAutoLinkBuilder {
             }
         }
 
-        // If the port table has not populated yet, only treat the endpoint as
-        // optical when the SFP/DDM telemetry table explicitly contains that port.
-        return device.switchTelemetry.fibrePorts.contains(where: { $0.port == port && ($0.hasOpticalPower || $0.temperatureCelsius != nil) })
+        return false
     }
 
-    private static func bestRemotePort(
+    private nonisolated static func bestRemotePort(
         for neighbour: LLDPNeighbour,
         remoteDevice: MonitoredDevice,
         localDevice: MonitoredDevice,
@@ -1023,7 +1066,7 @@ enum FibreAutoLinkBuilder {
         return reciprocalLocalLLDPPort(on: remoteDevice, pointingTo: localDevice, allSwitches: allSwitches)
     }
 
-    private static func observationQuality(localPort: Int, remotePort: Int, neighbour: LLDPNeighbour) -> Int {
+    private nonisolated static func observationQuality(localPort: Int, remotePort: Int, neighbour: LLDPNeighbour) -> Int {
         var score = 0
         if remotePort != localPort { score += 10 }
         if let remotePortID = neighbour.remotePortID, !remotePortID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { score += 20 }
@@ -1032,7 +1075,7 @@ enum FibreAutoLinkBuilder {
         return score
     }
 
-    private static func reciprocalLocalLLDPPort(
+    private nonisolated static func reciprocalLocalLLDPPort(
         on remoteDevice: MonitoredDevice,
         pointingTo localDevice: MonitoredDevice,
         allSwitches: [MonitoredDevice]
@@ -1045,13 +1088,13 @@ enum FibreAutoLinkBuilder {
         return nil
     }
 
-    static func unmatchedNeighbours(from devices: [MonitoredDevice]) -> [(device: MonitoredDevice, neighbour: LLDPNeighbour)] {
+    nonisolated static func unmatchedNeighbours(from devices: [MonitoredDevice]) -> [(device: MonitoredDevice, neighbour: LLDPNeighbour)] {
         let switches = devices.filter { $0.deviceType == .netgearSwitch }
         var rows: [(MonitoredDevice, LLDPNeighbour)] = []
 
         for device in switches {
             for neighbour in device.switchTelemetry.lldpNeighbours {
-                if matchingDevice(for: neighbour, localDevice: device, devices: switches) == nil {
+                if case .none = matchingDevice(for: neighbour, localDevice: device, devices: switches) {
                     rows.append((device, neighbour))
                 }
             }
@@ -1060,7 +1103,7 @@ enum FibreAutoLinkBuilder {
         return rows
     }
 
-    private static func matchingDevice(for neighbour: LLDPNeighbour, localDevice: MonitoredDevice, devices: [MonitoredDevice]) -> MonitoredDevice? {
+    private nonisolated static func matchingDevice(for neighbour: LLDPNeighbour, localDevice: MonitoredDevice, devices: [MonitoredDevice]) -> MonitoredDevice? {
         let remoteSystemName = neighbour.remoteSystemName?.normalisedForMatching ?? ""
         let remoteChassisMac = neighbour.remoteChassisID?.normalisedForMatching ?? ""
         let remotePortText = neighbour.bestRemotePortText.normalisedForMatching
@@ -1114,7 +1157,7 @@ enum FibreAutoLinkBuilder {
         }
     }
 
-    private static func remotePortNumber(from neighbour: LLDPNeighbour) -> Int? {
+    private nonisolated static func remotePortNumber(from neighbour: LLDPNeighbour) -> Int? {
         let preferredTexts = [neighbour.remotePortID, neighbour.remotePortDescription]
             .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
@@ -1133,7 +1176,7 @@ enum FibreAutoLinkBuilder {
         return nil
     }
 
-    private static func interfaceStylePortNumber(from text: String) -> Int? {
+    private nonisolated static func interfaceStylePortNumber(from text: String) -> Int? {
         // Prefer the final component of names such as 0/42, g1/0/42, Gi1/0/42,
         // Te1/0/4, or 1/0/48. This avoids treating LLDP chassis/port subtype text
         // as the neighbour MAC address or as a single collapsed port number.
@@ -1154,7 +1197,7 @@ enum FibreAutoLinkBuilder {
         return nil
     }
 
-    private static func devicePairKey(_ aID: UUID, _ bID: UUID) -> String {
+    private nonisolated static func devicePairKey(_ aID: UUID, _ bID: UUID) -> String {
         let left = aID.uuidString
         let right = bID.uuidString
         return left < right ? "\(left)|\(right)" : "\(right)|\(left)"
@@ -1166,7 +1209,7 @@ enum FibreAutoLinkBuilder {
         return left < right ? "\(left)|\(right)" : "\(right)|\(left)"
     }
 
-    private static func stableConnectionID(key: String) -> UUID {
+    private nonisolated static func stableConnectionID(key: String) -> UUID {
         let hash = UInt64(bitPattern: Int64(key.hashValue))
         let hex = String(format: "%012llx", hash)
         return UUID(uuidString: "00000000-0000-4000-8000-\(String(hex.suffix(12)))") ?? UUID()
@@ -1576,6 +1619,7 @@ struct FibreLinksLayer: View {
     let setFibreLabelOffset: (CGSize, FibreLossResult, String) -> Void
     var showLines: Bool = true
     var showLabels: Bool = true
+    var animated: Bool = true
 
     @ObservedObject private var fibreBoxSettings = FibreBoxEditorSettings.shared
     @ObservedObject private var deviceTileSettings = DeviceTileEditorSettings.shared
@@ -1585,7 +1629,7 @@ struct FibreLinksLayer: View {
         let items = renderItems(positions: devicePositions)
             .filter { !deletedMissingLinkIDs.contains($0.result.id) }
         let labelOffsets = automaticLabelOffsets(for: items)
-        let animatedItems = showLines ? items.filter { $0.result.flowDirection != .none } : []
+        let animatedItems = (showLines && animated) ? items.filter { $0.result.flowDirection != .none } : []
 
         ZStack(alignment: .topLeading) {
             ForEach(items) { item in
@@ -1880,7 +1924,7 @@ extension FibreLinksLayer: Equatable {
 private extension String {
     var trimmedLeadingDot: String { hasPrefix(".") ? String(dropFirst()) : self }
 
-    var normalisedForMatching: String {
+    nonisolated var normalisedForMatching: String {
         lowercased()
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .replacingOccurrences(of: " ", with: "")
@@ -1890,7 +1934,7 @@ private extension String {
             .replacingOccurrences(of: "\"", with: "")
     }
 
-    func matches(for pattern: String) -> [String] {
+    nonisolated func matches(for pattern: String) -> [String] {
         guard let regex = try? NSRegularExpression(pattern: pattern) else { return [] }
         let range = NSRange(startIndex..<endIndex, in: self)
         return regex.matches(in: self, range: range).compactMap { match in

@@ -47,6 +47,18 @@ final class AppPreferences: ObservableObject {
         didSet { save() }
     }
 
+    // Full-opacity versions of the tint colors for use in P/S badge chips on device tiles.
+    // Strips the user's box opacity so the badge is always fully visible.
+    var redundantPrimaryBadgeColor: Color {
+        let rgba = AppPreferences.colorToRGBA(redundantPrimaryTintColor)
+        return Color(red: rgba[0], green: rgba[1], blue: rgba[2], opacity: 1.0)
+    }
+
+    var redundantSecondaryBadgeColor: Color {
+        let rgba = AppPreferences.colorToRGBA(redundantSecondaryTintColor)
+        return Color(red: rgba[0], green: rgba[1], blue: rgba[2], opacity: 1.0)
+    }
+
     private let fileURL: URL
 
     private struct Payload: Codable {

@@ -1,13 +1,582 @@
 import SwiftUI
 import AppKit
+import Combine
+#if os(macOS)
+import UniformTypeIdentifiers
+#endif
+
+// MARK: - Device Tile Editor Settings
+
+enum NetgearTopField: String, CaseIterable, Identifiable {
+    case deviceName = "Device Name"
+    case ipAddress = "IP Address"
+    case deviceType = "Device Type"
+    var id: String { rawValue }
+}
+
+final class DeviceTileEditorSettings: ObservableObject {
+    static let shared = DeviceTileEditorSettings()
+
+    @Published var tileWidth: CGFloat = 153.114
+    @Published var tileHeight: CGFloat = 83.16
+    @Published var tileCornerRadius: CGFloat = 10.034
+
+    @Published var tileHorizontalPadding: CGFloat = 8.169
+    @Published var tileTopPadding: CGFloat = 7.158
+    @Published var tileBottomPadding: CGFloat = 4.791
+
+    @Published var titleSize: CGFloat = 13.3
+    @Published var titleBold: Bool = false
+    @Published var titleItalic: Bool = false
+    @Published var titleOpacity: CGFloat = 0.98
+    @Published var titleTopSpacing: CGFloat = 0.0
+    @Published var titleTrailingPadding: CGFloat = 0.0
+    @Published var titleMinimumScale: CGFloat = 1.0
+
+    @Published var ipSize: CGFloat = 10.394
+    @Published var ipBold: Bool = false
+    @Published var ipItalic: Bool = false
+    @Published var ipOpacity: CGFloat = 0.482
+    @Published var ipTopSpacing: CGFloat = 2.39
+    @Published var ipTrailingPadding: CGFloat = 32.193
+    @Published var ipMinimumScale: CGFloat = 0.833
+
+    @Published var typeSize: CGFloat = 10.051
+    @Published var typeBold: Bool = false
+    @Published var typeItalic: Bool = false
+    @Published var typeOpacity: CGFloat = 0.446
+    @Published var typeTopSpacing: CGFloat = 1.395
+    @Published var typeTrailingPadding: CGFloat = 38.0
+    @Published var typeIconSize: CGFloat = 11.235
+    @Published var typeIconWidth: CGFloat = 12.063
+    @Published var typeIconSpacing: CGFloat = 3.008
+
+    @Published var temperatureSize: CGFloat = 11.075
+    @Published var temperatureBold: Bool = false
+    @Published var temperatureItalic: Bool = false
+    @Published var temperatureBoxHorizontalPadding: CGFloat = 7.0
+    @Published var temperatureBoxVerticalPadding: CGFloat = 4.0
+    @Published var temperatureBoxCornerRadius: CGFloat = 7.0
+    @Published var temperatureBoxOpacity: CGFloat = 0.21
+    @Published var temperatureBorderOpacity: CGFloat = 0.14
+
+    @Published var pingHeaderSize: CGFloat = 8.253
+    @Published var pingHeaderBold: Bool = false
+    @Published var pingHeaderItalic: Bool = false
+    @Published var pingHeaderOpacity: CGFloat = 0.5
+
+    @Published var pingLabelSize: CGFloat = 5.5
+    @Published var pingLabelBold: Bool = false
+    @Published var pingLabelItalic: Bool = false
+    @Published var pingLabelOpacity: CGFloat = 0.52
+
+    @Published var pingValueSize: CGFloat = 11.075
+    @Published var pingValueBold: Bool = false
+    @Published var pingValueItalic: Bool = false
+    @Published var pingValueOpacity: CGFloat = 0.96
+
+    @Published var pingBoxHorizontalPadding: CGFloat = 7.0
+    @Published var pingBoxVerticalPadding: CGFloat = 5.0
+    @Published var pingBoxCornerRadius: CGFloat = 7.0
+    @Published var pingBoxOpacity: CGFloat = 0.24
+    @Published var pingBorderOpacity: CGFloat = 0.16
+    @Published var pingBoxVerticalSpacing: CGFloat = 3.0
+    @Published var pingColumnWidth: CGFloat = 22.0
+    @Published var pingColumnSpacing: CGFloat = 6.0
+    @Published var pingColumnVerticalSpacing: CGFloat = 1.0
+
+    @Published var bottomRowSpacing: CGFloat = 7.0
+    @Published var bottomRowSpacerMinLength: CGFloat = 4.0
+
+    @Published var statusTrailingPadding: CGFloat = 10.0
+    @Published var statusOuterFrameSize: CGFloat = 42.0
+    @Published var statusRippleSize: CGFloat = 32.032
+    @Published var statusRippleLineWidth: CGFloat = 3.128
+    @Published var statusBackgroundSize: CGFloat = 18.641
+    @Published var statusBackgroundOpacity: CGFloat = 0.26
+    @Published var statusIconSize: CGFloat = 8.431
+    @Published var statusIconBorderOpacity: CGFloat = 0.7
+    @Published var statusIconBorderWidth: CGFloat = 1.05
+    @Published var statusShadowRadius: CGFloat = 6.0
+
+    @Published var selectedShadowRadius: CGFloat = 12.0
+    @Published var normalShadowRadius: CGFloat = 7.0
+    @Published var selectedShadowYOffset: CGFloat = 7.0
+    @Published var normalShadowYOffset: CGFloat = 4.0
+    @Published var selectedShadowOpacity: CGFloat = 0.48
+    @Published var normalShadowOpacity: CGFloat = 0.3
+
+    @Published var selectedBorderWidth: CGFloat = 1.8
+    @Published var normalBorderWidth: CGFloat = 1.05
+    @Published var selectedBorderOpacity: CGFloat = 0.98
+    @Published var normalBorderOpacity: CGFloat = 0.13
+    @Published var selectedGlowWidth: CGFloat = 5.0
+    @Published var selectedGlowBlur: CGFloat = 3.0
+    @Published var selectedGlowOpacity: CGFloat = 0.3
+
+    // Field ordering for netgear tile top section
+    @Published var netgearTopFieldOrder: [NetgearTopField] = [.deviceName, .ipAddress, .deviceType]
+
+    // Ping-only tile settings
+    @Published var pingOnlyTileHeight: CGFloat = 44.063
+    @Published var pingOnlyLatencySize: CGFloat = 10.0
+    @Published var pingOnlyIPSize: CGFloat = 10.037
+    @Published var pingOnlyBadgeHPadding: CGFloat = 5.0
+    @Published var pingOnlyBadgeVPadding: CGFloat = 3.0
+    @Published var pingOnlyBadgeCornerRadius: CGFloat = 5.0
+    @Published var pingOnlyBadgeSpacing: CGFloat = 6.0
+    @Published var pingOnlyHPadding: CGFloat = 8.019
+    @Published var pingOnlyVPadding: CGFloat = 7.0
+
+    private init() { }
+
+    private struct DeviceTileSourceSetting {
+        let name: String
+        let type: String
+    }
+
+    private static let sourceSettings: [DeviceTileSourceSetting] = [
+        DeviceTileSourceSetting(name: "tileWidth", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "tileHeight", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "tileCornerRadius", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "tileHorizontalPadding", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "tileTopPadding", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "tileBottomPadding", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "titleSize", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "titleBold", type: "Bool"),
+        DeviceTileSourceSetting(name: "titleItalic", type: "Bool"),
+        DeviceTileSourceSetting(name: "titleOpacity", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "titleTopSpacing", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "titleTrailingPadding", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "titleMinimumScale", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "ipSize", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "ipBold", type: "Bool"),
+        DeviceTileSourceSetting(name: "ipItalic", type: "Bool"),
+        DeviceTileSourceSetting(name: "ipOpacity", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "ipTopSpacing", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "ipTrailingPadding", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "ipMinimumScale", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "typeSize", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "typeBold", type: "Bool"),
+        DeviceTileSourceSetting(name: "typeItalic", type: "Bool"),
+        DeviceTileSourceSetting(name: "typeOpacity", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "typeTopSpacing", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "typeTrailingPadding", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "typeIconSize", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "typeIconWidth", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "typeIconSpacing", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "temperatureSize", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "temperatureBold", type: "Bool"),
+        DeviceTileSourceSetting(name: "temperatureItalic", type: "Bool"),
+        DeviceTileSourceSetting(name: "temperatureBoxHorizontalPadding", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "temperatureBoxVerticalPadding", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "temperatureBoxCornerRadius", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "temperatureBoxOpacity", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "temperatureBorderOpacity", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "pingHeaderSize", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "pingHeaderBold", type: "Bool"),
+        DeviceTileSourceSetting(name: "pingHeaderItalic", type: "Bool"),
+        DeviceTileSourceSetting(name: "pingHeaderOpacity", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "pingLabelSize", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "pingLabelBold", type: "Bool"),
+        DeviceTileSourceSetting(name: "pingLabelItalic", type: "Bool"),
+        DeviceTileSourceSetting(name: "pingLabelOpacity", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "pingValueSize", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "pingValueBold", type: "Bool"),
+        DeviceTileSourceSetting(name: "pingValueItalic", type: "Bool"),
+        DeviceTileSourceSetting(name: "pingValueOpacity", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "pingBoxHorizontalPadding", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "pingBoxVerticalPadding", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "pingBoxCornerRadius", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "pingBoxOpacity", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "pingBorderOpacity", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "pingBoxVerticalSpacing", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "pingColumnWidth", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "pingColumnSpacing", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "pingColumnVerticalSpacing", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "bottomRowSpacing", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "bottomRowSpacerMinLength", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "statusTrailingPadding", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "statusOuterFrameSize", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "statusRippleSize", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "statusRippleLineWidth", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "statusBackgroundSize", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "statusBackgroundOpacity", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "statusIconSize", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "statusIconBorderOpacity", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "statusIconBorderWidth", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "statusShadowRadius", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "selectedShadowRadius", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "normalShadowRadius", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "selectedShadowYOffset", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "normalShadowYOffset", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "selectedShadowOpacity", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "normalShadowOpacity", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "selectedBorderWidth", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "normalBorderWidth", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "selectedBorderOpacity", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "normalBorderOpacity", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "selectedGlowWidth", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "selectedGlowBlur", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "selectedGlowOpacity", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "netgearTopFieldOrder", type: "[NetgearTopField]"),
+        DeviceTileSourceSetting(name: "pingOnlyTileHeight", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "pingOnlyLatencySize", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "pingOnlyIPSize", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "pingOnlyBadgeHPadding", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "pingOnlyBadgeVPadding", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "pingOnlyBadgeCornerRadius", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "pingOnlyBadgeSpacing", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "pingOnlyHPadding", type: "CGFloat"),
+        DeviceTileSourceSetting(name: "pingOnlyVPadding", type: "CGFloat")
+    ]
+
+    func copyCurrentSettingsAsSwiftDefaults() {
+        #if os(macOS)
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(currentSwiftDefaultsText(), forType: .string)
+        #endif
+    }
+
+    #if os(macOS)
+    func overwriteWorkspaceViewSourceFile() {
+        let panel = NSOpenPanel()
+        panel.title = "Select WorkspaceView.swift to Update"
+        panel.message = "Choose your project copy of WorkspaceView.swift. Mping will rewrite only DeviceTileEditorSettings default values and resetDefaults() assignments."
+        panel.prompt = "Update Source"
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        if let swiftType = UTType(filenameExtension: "swift") {
+            panel.allowedContentTypes = [swiftType]
+        }
+
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        guard url.lastPathComponent == "WorkspaceView.swift" else {
+            showSourceWriteAlert(
+                title: "Wrong File Selected",
+                message: "Please select the project file named WorkspaceView.swift. No source file was changed."
+            )
+            return
+        }
+
+        do {
+            let originalSource = try String(contentsOf: url, encoding: .utf8)
+            let updatedSource = try sourceByBakingCurrentSettings(into: originalSource)
+            try updatedSource.write(to: url, atomically: true, encoding: .utf8)
+            showSourceWriteAlert(
+                title: "WorkspaceView.swift Updated",
+                message: "The current tile editor values have been written into WorkspaceView.swift. Rebuild Mping to make these the baked program defaults."
+            )
+        } catch {
+            showSourceWriteAlert(
+                title: "Could Not Update WorkspaceView.swift",
+                message: error.localizedDescription
+            )
+        }
+    }
+    #endif
+
+    func currentSwiftDefaultsText() -> String {
+        var lines: [String] = []
+        lines.append("// DeviceTileEditorSettings baked defaults")
+        lines.append("// Paste these values into WorkspaceView.swift, or use Update WorkspaceView.swift from the editor.")
+        lines.append("")
+        for setting in Self.sourceSettings {
+            lines.append("@Published var \(setting.name): \(setting.type) = \(sourceLiteral(for: setting.name))")
+        }
+        lines.append("")
+        lines.append("func resetDefaults() {")
+        for setting in Self.sourceSettings {
+            lines.append("    \(setting.name) = \(sourceLiteral(for: setting.name))")
+        }
+        lines.append("}")
+        return lines.joined(separator: "\n")
+    }
+
+    private func sourceByBakingCurrentSettings(into source: String) throws -> String {
+        var updated = source
+        for setting in Self.sourceSettings {
+            let literal = sourceLiteral(for: setting.name)
+            updated = Self.replacingPublishedDefault(settingName: setting.name, settingType: setting.type, literal: literal, in: updated)
+            updated = Self.replacingResetAssignment(settingName: setting.name, literal: literal, in: updated)
+        }
+        return updated
+    }
+
+    private static func replacingPublishedDefault(settingName: String, settingType: String, literal: String, in source: String) -> String {
+        let pattern = "@Published var \(settingName): \(settingType) = [^\n]+"
+        let replacement = "@Published var \(settingName): \(settingType) = \(literal)"
+        return source.replacingOccurrences(of: pattern, with: replacement, options: .regularExpression)
+    }
+
+    private static func replacingResetAssignment(settingName: String, literal: String, in source: String) -> String {
+        let pattern = "(?m)^(\\s*)\(settingName) = [^\n]+"
+        let replacement = "$1\(settingName) = \(literal)"
+        return source.replacingOccurrences(of: pattern, with: replacement, options: .regularExpression)
+    }
+
+    private func sourceLiteral(for settingName: String) -> String {
+        switch settingName {
+        case "tileWidth": return Self.swiftNumberLiteral(tileWidth)
+        case "tileHeight": return Self.swiftNumberLiteral(tileHeight)
+        case "tileCornerRadius": return Self.swiftNumberLiteral(tileCornerRadius)
+        case "tileHorizontalPadding": return Self.swiftNumberLiteral(tileHorizontalPadding)
+        case "tileTopPadding": return Self.swiftNumberLiteral(tileTopPadding)
+        case "tileBottomPadding": return Self.swiftNumberLiteral(tileBottomPadding)
+        case "titleSize": return Self.swiftNumberLiteral(titleSize)
+        case "titleBold": return titleBold ? "true" : "false"
+        case "titleItalic": return titleItalic ? "true" : "false"
+        case "titleOpacity": return Self.swiftNumberLiteral(titleOpacity)
+        case "titleTopSpacing": return Self.swiftNumberLiteral(titleTopSpacing)
+        case "titleTrailingPadding": return Self.swiftNumberLiteral(titleTrailingPadding)
+        case "titleMinimumScale": return Self.swiftNumberLiteral(titleMinimumScale)
+        case "ipSize": return Self.swiftNumberLiteral(ipSize)
+        case "ipBold": return ipBold ? "true" : "false"
+        case "ipItalic": return ipItalic ? "true" : "false"
+        case "ipOpacity": return Self.swiftNumberLiteral(ipOpacity)
+        case "ipTopSpacing": return Self.swiftNumberLiteral(ipTopSpacing)
+        case "ipTrailingPadding": return Self.swiftNumberLiteral(ipTrailingPadding)
+        case "ipMinimumScale": return Self.swiftNumberLiteral(ipMinimumScale)
+        case "typeSize": return Self.swiftNumberLiteral(typeSize)
+        case "typeBold": return typeBold ? "true" : "false"
+        case "typeItalic": return typeItalic ? "true" : "false"
+        case "typeOpacity": return Self.swiftNumberLiteral(typeOpacity)
+        case "typeTopSpacing": return Self.swiftNumberLiteral(typeTopSpacing)
+        case "typeTrailingPadding": return Self.swiftNumberLiteral(typeTrailingPadding)
+        case "typeIconSize": return Self.swiftNumberLiteral(typeIconSize)
+        case "typeIconWidth": return Self.swiftNumberLiteral(typeIconWidth)
+        case "typeIconSpacing": return Self.swiftNumberLiteral(typeIconSpacing)
+        case "temperatureSize": return Self.swiftNumberLiteral(temperatureSize)
+        case "temperatureBold": return temperatureBold ? "true" : "false"
+        case "temperatureItalic": return temperatureItalic ? "true" : "false"
+        case "temperatureBoxHorizontalPadding": return Self.swiftNumberLiteral(temperatureBoxHorizontalPadding)
+        case "temperatureBoxVerticalPadding": return Self.swiftNumberLiteral(temperatureBoxVerticalPadding)
+        case "temperatureBoxCornerRadius": return Self.swiftNumberLiteral(temperatureBoxCornerRadius)
+        case "temperatureBoxOpacity": return Self.swiftNumberLiteral(temperatureBoxOpacity)
+        case "temperatureBorderOpacity": return Self.swiftNumberLiteral(temperatureBorderOpacity)
+        case "pingHeaderSize": return Self.swiftNumberLiteral(pingHeaderSize)
+        case "pingHeaderBold": return pingHeaderBold ? "true" : "false"
+        case "pingHeaderItalic": return pingHeaderItalic ? "true" : "false"
+        case "pingHeaderOpacity": return Self.swiftNumberLiteral(pingHeaderOpacity)
+        case "pingLabelSize": return Self.swiftNumberLiteral(pingLabelSize)
+        case "pingLabelBold": return pingLabelBold ? "true" : "false"
+        case "pingLabelItalic": return pingLabelItalic ? "true" : "false"
+        case "pingLabelOpacity": return Self.swiftNumberLiteral(pingLabelOpacity)
+        case "pingValueSize": return Self.swiftNumberLiteral(pingValueSize)
+        case "pingValueBold": return pingValueBold ? "true" : "false"
+        case "pingValueItalic": return pingValueItalic ? "true" : "false"
+        case "pingValueOpacity": return Self.swiftNumberLiteral(pingValueOpacity)
+        case "pingBoxHorizontalPadding": return Self.swiftNumberLiteral(pingBoxHorizontalPadding)
+        case "pingBoxVerticalPadding": return Self.swiftNumberLiteral(pingBoxVerticalPadding)
+        case "pingBoxCornerRadius": return Self.swiftNumberLiteral(pingBoxCornerRadius)
+        case "pingBoxOpacity": return Self.swiftNumberLiteral(pingBoxOpacity)
+        case "pingBorderOpacity": return Self.swiftNumberLiteral(pingBorderOpacity)
+        case "pingBoxVerticalSpacing": return Self.swiftNumberLiteral(pingBoxVerticalSpacing)
+        case "pingColumnWidth": return Self.swiftNumberLiteral(pingColumnWidth)
+        case "pingColumnSpacing": return Self.swiftNumberLiteral(pingColumnSpacing)
+        case "pingColumnVerticalSpacing": return Self.swiftNumberLiteral(pingColumnVerticalSpacing)
+        case "bottomRowSpacing": return Self.swiftNumberLiteral(bottomRowSpacing)
+        case "bottomRowSpacerMinLength": return Self.swiftNumberLiteral(bottomRowSpacerMinLength)
+        case "statusTrailingPadding": return Self.swiftNumberLiteral(statusTrailingPadding)
+        case "statusOuterFrameSize": return Self.swiftNumberLiteral(statusOuterFrameSize)
+        case "statusRippleSize": return Self.swiftNumberLiteral(statusRippleSize)
+        case "statusRippleLineWidth": return Self.swiftNumberLiteral(statusRippleLineWidth)
+        case "statusBackgroundSize": return Self.swiftNumberLiteral(statusBackgroundSize)
+        case "statusBackgroundOpacity": return Self.swiftNumberLiteral(statusBackgroundOpacity)
+        case "statusIconSize": return Self.swiftNumberLiteral(statusIconSize)
+        case "statusIconBorderOpacity": return Self.swiftNumberLiteral(statusIconBorderOpacity)
+        case "statusIconBorderWidth": return Self.swiftNumberLiteral(statusIconBorderWidth)
+        case "statusShadowRadius": return Self.swiftNumberLiteral(statusShadowRadius)
+        case "selectedShadowRadius": return Self.swiftNumberLiteral(selectedShadowRadius)
+        case "normalShadowRadius": return Self.swiftNumberLiteral(normalShadowRadius)
+        case "selectedShadowYOffset": return Self.swiftNumberLiteral(selectedShadowYOffset)
+        case "normalShadowYOffset": return Self.swiftNumberLiteral(normalShadowYOffset)
+        case "selectedShadowOpacity": return Self.swiftNumberLiteral(selectedShadowOpacity)
+        case "normalShadowOpacity": return Self.swiftNumberLiteral(normalShadowOpacity)
+        case "selectedBorderWidth": return Self.swiftNumberLiteral(selectedBorderWidth)
+        case "normalBorderWidth": return Self.swiftNumberLiteral(normalBorderWidth)
+        case "selectedBorderOpacity": return Self.swiftNumberLiteral(selectedBorderOpacity)
+        case "normalBorderOpacity": return Self.swiftNumberLiteral(normalBorderOpacity)
+        case "selectedGlowWidth": return Self.swiftNumberLiteral(selectedGlowWidth)
+        case "selectedGlowBlur": return Self.swiftNumberLiteral(selectedGlowBlur)
+        case "selectedGlowOpacity": return Self.swiftNumberLiteral(selectedGlowOpacity)
+        case "netgearTopFieldOrder":
+            let fieldLiterals = netgearTopFieldOrder.map { f -> String in
+                switch f {
+                case .deviceName: return ".deviceName"
+                case .ipAddress: return ".ipAddress"
+                case .deviceType: return ".deviceType"
+                }
+            }
+            return "[\(fieldLiterals.joined(separator: ", "))]"
+        case "pingOnlyTileHeight": return Self.swiftNumberLiteral(pingOnlyTileHeight)
+        case "pingOnlyLatencySize": return Self.swiftNumberLiteral(pingOnlyLatencySize)
+        case "pingOnlyIPSize": return Self.swiftNumberLiteral(pingOnlyIPSize)
+        case "pingOnlyBadgeHPadding": return Self.swiftNumberLiteral(pingOnlyBadgeHPadding)
+        case "pingOnlyBadgeVPadding": return Self.swiftNumberLiteral(pingOnlyBadgeVPadding)
+        case "pingOnlyBadgeCornerRadius": return Self.swiftNumberLiteral(pingOnlyBadgeCornerRadius)
+        case "pingOnlyBadgeSpacing": return Self.swiftNumberLiteral(pingOnlyBadgeSpacing)
+        case "pingOnlyHPadding": return Self.swiftNumberLiteral(pingOnlyHPadding)
+        case "pingOnlyVPadding": return Self.swiftNumberLiteral(pingOnlyVPadding)
+        default: return "0.0"
+        }
+    }
+
+    private static func swiftNumberLiteral(_ value: CGFloat) -> String {
+        let number = Double(value)
+        if abs(number.rounded() - number) < 0.000_001 {
+            return String(format: "%.1f", number)
+        }
+        return String(format: "%.3f", number)
+            .replacingOccurrences(of: "0+$", with: "", options: .regularExpression)
+            .replacingOccurrences(of: "\\.$", with: ".0", options: .regularExpression)
+    }
+
+    #if os(macOS)
+    private func showSourceWriteAlert(title: String, message: String) {
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = message
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "OK")
+        alert.runModal()
+    }
+    #endif
+
+    func resetDefaults() {
+        tileWidth = 153.114
+        tileHeight = 83.16
+        tileCornerRadius = 10.034
+
+        tileHorizontalPadding = 8.169
+        tileTopPadding = 7.158
+        tileBottomPadding = 4.791
+
+        titleSize = 13.3
+        titleBold = false
+        titleItalic = false
+        titleOpacity = 0.98
+        titleTopSpacing = 0.0
+        titleTrailingPadding = 0.0
+        titleMinimumScale = 1.0
+
+        ipSize = 10.394
+        ipBold = false
+        ipItalic = false
+        ipOpacity = 0.482
+        ipTopSpacing = 2.39
+        ipTrailingPadding = 32.193
+        ipMinimumScale = 0.833
+
+        typeSize = 10.051
+        typeBold = false
+        typeItalic = false
+        typeOpacity = 0.446
+        typeTopSpacing = 1.395
+        typeTrailingPadding = 38.0
+        typeIconSize = 11.235
+        typeIconWidth = 12.063
+        typeIconSpacing = 3.008
+
+        temperatureSize = 11.075
+        temperatureBold = false
+        temperatureItalic = false
+        temperatureBoxHorizontalPadding = 7.0
+        temperatureBoxVerticalPadding = 4.0
+        temperatureBoxCornerRadius = 7.0
+        temperatureBoxOpacity = 0.21
+        temperatureBorderOpacity = 0.14
+
+        pingHeaderSize = 8.253
+        pingHeaderBold = false
+        pingHeaderItalic = false
+        pingHeaderOpacity = 0.5
+
+        pingLabelSize = 5.5
+        pingLabelBold = false
+        pingLabelItalic = false
+        pingLabelOpacity = 0.52
+
+        pingValueSize = 11.075
+        pingValueBold = false
+        pingValueItalic = false
+        pingValueOpacity = 0.96
+
+        pingBoxHorizontalPadding = 7.0
+        pingBoxVerticalPadding = 5.0
+        pingBoxCornerRadius = 7.0
+        pingBoxOpacity = 0.24
+        pingBorderOpacity = 0.16
+        pingBoxVerticalSpacing = 3.0
+        pingColumnWidth = 22.0
+        pingColumnSpacing = 6.0
+        pingColumnVerticalSpacing = 1.0
+
+        bottomRowSpacing = 7.0
+        bottomRowSpacerMinLength = 4.0
+
+        statusTrailingPadding = 10.0
+        statusOuterFrameSize = 42.0
+        statusRippleSize = 32.032
+        statusRippleLineWidth = 3.128
+        statusBackgroundSize = 18.641
+        statusBackgroundOpacity = 0.26
+        statusIconSize = 8.431
+        statusIconBorderOpacity = 0.7
+        statusIconBorderWidth = 1.05
+        statusShadowRadius = 6.0
+
+        selectedShadowRadius = 12.0
+        normalShadowRadius = 7.0
+        selectedShadowYOffset = 7.0
+        normalShadowYOffset = 4.0
+        selectedShadowOpacity = 0.48
+        normalShadowOpacity = 0.3
+
+        selectedBorderWidth = 1.8
+        normalBorderWidth = 1.05
+        selectedBorderOpacity = 0.98
+        normalBorderOpacity = 0.13
+        selectedGlowWidth = 5.0
+        selectedGlowBlur = 3.0
+        selectedGlowOpacity = 0.3
+
+        netgearTopFieldOrder = [.deviceName, .deviceType, .ipAddress]
+        pingOnlyTileHeight = 44.063
+        pingOnlyLatencySize = 10.0
+        pingOnlyIPSize = 10.037
+        pingOnlyBadgeHPadding = 5.0
+        pingOnlyBadgeVPadding = 3.0
+        pingOnlyBadgeCornerRadius = 5.0
+        pingOnlyBadgeSpacing = 6.0
+        pingOnlyHPadding = 8.019
+        pingOnlyVPadding = 7.0
+    }
+}
+
+extension View {
+    @ViewBuilder
+    func italicIf(_ shouldApply: Bool) -> some View {
+        if shouldApply {
+            self.italic()
+        } else {
+            self
+        }
+    }
+}
+
+// MARK: - WorkspaceView
 
 struct WorkspaceView: View {
     @ObservedObject var store: DeviceStore
+    @ObservedObject private var preferences = AppPreferences.shared
     var searchText: String = ""
     // Pre-filtered by the active redundant network tab (passed from WorkspacePlaneCoordinator).
     // When there are no redundant pairs this is always store.devices.
     var visibleDevices: [MonitoredDevice]
     var boxTint: Color? = nil
+    var isTemperatureMode: Bool = false
 
 
     @State private var deviceDragStart: [UUID: CGPoint] = [:]
@@ -20,6 +589,7 @@ struct WorkspaceView: View {
     @State private var liveOffset: CGSize = .zero
     @State private var liveScale: Double = 1.0
     @State private var syncTask: Task<Void, Never>? = nil
+    @State private var tileSettingsRevision: Int = 0
 
     private let canvasSize = CGSize(width: 5000, height: 3000)
 
@@ -42,7 +612,8 @@ struct WorkspaceView: View {
                         fibreLabelOffset: store.fibreLabelOffset,
                         setFibreLabelOffset: store.setFibreLabelOffset,
                         showLines: true,
-                        showLabels: false
+                        showLabels: false,
+                        animated: !isTemperatureMode
                     )
                     .equatable()
                     .frame(width: canvasSize.width, height: canvasSize.height)
@@ -108,7 +679,11 @@ struct WorkspaceView: View {
                             shouldShowSecondaryDetail: liveScale >= 0.52,
                             hasAlert: store.deviceIDsWithCurrentAlerts.contains(device.id),
                             isFlashing: store.flashingDeviceIDs.contains(device.id),
-                            redundantModeActive: store.redundantModeActive
+                            redundantModeActive: store.redundantModeActive,
+                            primaryBadgeColor: preferences.redundantPrimaryBadgeColor,
+                            secondaryBadgeColor: preferences.redundantSecondaryBadgeColor,
+                            isTemperatureMode: isTemperatureMode,
+                            tileSettingsRevision: tileSettingsRevision
                         )
                         .equatable()
                         .opacity(deviceMatchesSearch(device) ? 1.0 : 0.22)
@@ -131,7 +706,8 @@ struct WorkspaceView: View {
                         fibreLabelOffset: store.fibreLabelOffset,
                         setFibreLabelOffset: store.setFibreLabelOffset,
                         showLines: false,
-                        showLabels: true
+                        showLabels: true,
+                        animated: !isTemperatureMode
                     )
                     .equatable()
                     .frame(width: canvasSize.width, height: canvasSize.height)
@@ -159,11 +735,6 @@ struct WorkspaceView: View {
                         .position(x: rect.midX, y: rect.midY)
                         .allowsHitTesting(false)
                 }
-
-                FibreTopologyHUD(store: store)
-                    .padding(12)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                    .allowsHitTesting(false)
 
                 WorkspaceEventCatcher(
                     isSnapToGridEnabled: store.snapToGridEnabled,
@@ -252,6 +823,9 @@ struct WorkspaceView: View {
                 liveOffset = store.workspaceOffset
                 liveScale = store.workspaceScale
             }
+            .onReceive(DeviceTileEditorSettings.shared.objectWillChange) { _ in
+                tileSettingsRevision += 1
+            }
             .clipped()
             .background(Color(red: 0.055, green: 0.055, blue: 0.06))
         }
@@ -259,7 +833,7 @@ struct WorkspaceView: View {
 
     private func applyLiveZoom(delta: Double, around point: CGPoint) {
         guard delta != 0 else { return }
-        let step = 0.01
+        let step = 0.03
         let direction = delta > 0 ? 1.0 : -1.0
         let oldScale = liveScale
         let newScale = min(3.5, max(0.25, oldScale + (step * direction)))
@@ -485,13 +1059,17 @@ struct WorkspaceView: View {
 }
 
 
-private struct MpingMapDeviceTileView: View, Equatable {
+struct MpingMapDeviceTileView: View, Equatable {
     let device: MonitoredDevice
     let isSelected: Bool
     let shouldShowSecondaryDetail: Bool
     let hasAlert: Bool
     let isFlashing: Bool
     let redundantModeActive: Bool
+    let primaryBadgeColor: Color
+    let secondaryBadgeColor: Color
+    var isTemperatureMode: Bool = false
+    var tileSettingsRevision: Int = 0
 
     @ObservedObject private var tileStyle = DeviceTileEditorSettings.shared
 
@@ -534,11 +1112,19 @@ private struct MpingMapDeviceTileView: View, Equatable {
             && lhs.isFlashing == rhs.isFlashing
             && lhs.device.redundancyRole == rhs.device.redundancyRole
             && lhs.redundantModeActive == rhs.redundantModeActive
+            && lhs.primaryBadgeColor == rhs.primaryBadgeColor
+            && lhs.secondaryBadgeColor == rhs.secondaryBadgeColor
+            && lhs.isTemperatureMode == rhs.isTemperatureMode
+            && lhs.tileSettingsRevision == rhs.tileSettingsRevision
+            && lhs.device.switchTelemetry.temperatureCelsius == rhs.device.switchTelemetry.temperatureCelsius
+            && lhs.device.switchTelemetry.temperatureCelsius2 == rhs.device.switchTelemetry.temperatureCelsius2
+            && lhs.device.switchTelemetry.fanSpeed1 == rhs.device.switchTelemetry.fanSpeed1
+            && lhs.device.switchTelemetry.fanSpeed2 == rhs.device.switchTelemetry.fanSpeed2
     }
 
     private var isPingOnly: Bool { device.deviceType == .pingOnly }
     private var tileWidth: CGFloat { tileStyle.tileWidth }
-    private var tileHeight: CGFloat { isPingOnly ? tileStyle.tileHeight * 0.5 : tileStyle.tileHeight }
+    private var tileHeight: CGFloat { isPingOnly ? tileStyle.pingOnlyTileHeight : tileStyle.tileHeight }
     private var cornerRadius: CGFloat { tileStyle.tileCornerRadius }
 
     private var statusColor: Color {
@@ -657,8 +1243,8 @@ private struct MpingMapDeviceTileView: View, Equatable {
             Group {
                 if isPingOnly {
                     pingOnlyContent
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 7)
+                        .padding(.horizontal, tileStyle.pingOnlyHPadding)
+                        .padding(.vertical, tileStyle.pingOnlyVPadding)
                 } else {
                     tileContent
                         .padding(.horizontal, tileStyle.tileHorizontalPadding)
@@ -667,10 +1253,17 @@ private struct MpingMapDeviceTileView: View, Equatable {
                 }
             }
 
-            heartbeatIndicator
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
-                .padding(.trailing, tileStyle.statusTrailingPadding)
-                .allowsHitTesting(false)
+            if isTemperatureMode {
+                thermalIndicator
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
+                    .padding(.trailing, tileStyle.statusTrailingPadding)
+                    .allowsHitTesting(false)
+            } else {
+                heartbeatIndicator
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
+                    .padding(.trailing, tileStyle.statusTrailingPadding)
+                    .allowsHitTesting(false)
+            }
         }
         .frame(width: tileWidth, height: tileHeight)
         .overlay(
@@ -700,6 +1293,15 @@ private struct MpingMapDeviceTileView: View, Equatable {
                 .fill(Color.white.opacity(flashOpacity))
                 .allowsHitTesting(false)
         )
+        .onAppear {
+            // When the tab switches to show this device the tile is born with isFlashing
+            // already true, so onChange never fires. Kick the animation manually here.
+            if isFlashing {
+                withAnimation(.easeInOut(duration: 0.3).repeatCount(10, autoreverses: true)) {
+                    flashOpacity = 0.55
+                }
+            }
+        }
         .onChange(of: isFlashing) { _, flashing in
             if flashing {
                 withAnimation(.easeInOut(duration: 0.3).repeatCount(10, autoreverses: true)) {
@@ -715,12 +1317,12 @@ private struct MpingMapDeviceTileView: View, Equatable {
             HStack(spacing: 3) {
                 if device.redundancyRole != .none {
                     Text(device.redundancyRole == .primary ? "P" : "S")
-                        .font(.system(size: 7, weight: .black, design: .rounded))
-                        .foregroundStyle(.black)
+                        .font(.system(size: 8, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.white)
                         .padding(.horizontal, 4)
                         .padding(.vertical, 2)
                         .background(
-                            device.redundancyRole == .primary ? Color.cyan : Color.mint,
+                            device.redundancyRole == .primary ? primaryBadgeColor : secondaryBadgeColor,
                             in: RoundedRectangle(cornerRadius: 3, style: .continuous)
                         )
                 }
@@ -752,54 +1354,62 @@ private struct MpingMapDeviceTileView: View, Equatable {
 
     private var tileContent: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(device.displayName)
-                .font(.system(size: tileStyle.titleSize, weight: tileStyle.titleBold ? .semibold : .regular, design: .rounded))
-                .italicIf(tileStyle.titleItalic)
-                .foregroundStyle(.white.opacity(tileStyle.titleOpacity))
-                .lineLimit(1)
-                .minimumScaleFactor(tileStyle.titleMinimumScale)
-                .truncationMode(.tail)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.trailing, tileStyle.titleTrailingPadding)
-                .padding(.top, tileStyle.titleTopSpacing)
-
-            Text(device.ipAddress)
-                .font(.system(size: tileStyle.ipSize, weight: tileStyle.ipBold ? .semibold : .regular, design: .rounded))
-                .italicIf(tileStyle.ipItalic)
-                .foregroundStyle(.white.opacity(tileStyle.ipOpacity))
-                .lineLimit(1)
-                .minimumScaleFactor(tileStyle.ipMinimumScale)
-                .truncationMode(.middle)
-                .padding(.top, tileStyle.ipTopSpacing)
-                .padding(.trailing, tileStyle.ipTrailingPadding)
-
-            if shouldShowSecondaryDetail && !isPingOnly {
-                HStack(spacing: tileStyle.typeIconSpacing) {
-                    Image(systemName: iconName)
-                        .font(.system(size: tileStyle.typeIconSize, weight: .regular))
-                        .foregroundStyle(.white.opacity(tileStyle.typeOpacity))
-                        .frame(width: tileStyle.typeIconWidth)
-
-                    Text(device.deviceType.label)
-                        .font(.system(size: tileStyle.typeSize, weight: tileStyle.typeBold ? .semibold : .regular, design: .rounded))
-                        .italicIf(tileStyle.typeItalic)
-                        .foregroundStyle(.white.opacity(tileStyle.typeOpacity))
+            ForEach(tileStyle.netgearTopFieldOrder) { field in
+                switch field {
+                case .deviceName:
+                    Text(device.displayName)
+                        .font(.system(size: tileStyle.titleSize, weight: tileStyle.titleBold ? .semibold : .regular, design: .rounded))
+                        .italicIf(tileStyle.titleItalic)
+                        .foregroundStyle(.white.opacity(tileStyle.titleOpacity))
                         .lineLimit(1)
-                        .minimumScaleFactor(0.78)
+                        .minimumScaleFactor(tileStyle.titleMinimumScale)
                         .truncationMode(.tail)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.trailing, tileStyle.titleTrailingPadding)
+                        .padding(.top, tileStyle.titleTopSpacing)
+                case .ipAddress:
+                    Text(device.ipAddress)
+                        .font(.system(size: tileStyle.ipSize, weight: tileStyle.ipBold ? .semibold : .regular, design: .rounded))
+                        .italicIf(tileStyle.ipItalic)
+                        .foregroundStyle(.white.opacity(tileStyle.ipOpacity))
+                        .lineLimit(1)
+                        .minimumScaleFactor(tileStyle.ipMinimumScale)
+                        .truncationMode(.middle)
+                        .padding(.top, tileStyle.ipTopSpacing)
+                        .padding(.trailing, tileStyle.ipTrailingPadding)
+                case .deviceType:
+                    if shouldShowSecondaryDetail {
+                        HStack(spacing: tileStyle.typeIconSpacing) {
+                            Image(systemName: iconName)
+                                .font(.system(size: tileStyle.typeIconSize, weight: .regular))
+                                .foregroundStyle(.white.opacity(tileStyle.typeOpacity))
+                                .frame(width: tileStyle.typeIconWidth)
+                            Text(device.deviceType.label)
+                                .font(.system(size: tileStyle.typeSize, weight: tileStyle.typeBold ? .semibold : .regular, design: .rounded))
+                                .italicIf(tileStyle.typeItalic)
+                                .foregroundStyle(.white.opacity(tileStyle.typeOpacity))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.78)
+                                .truncationMode(.tail)
+                        }
+                        .padding(.top, tileStyle.typeTopSpacing)
+                        .padding(.trailing, tileStyle.typeTrailingPadding)
+                    }
                 }
-                .padding(.top, tileStyle.typeTopSpacing)
-                .padding(.trailing, tileStyle.typeTrailingPadding)
             }
 
             Spacer(minLength: 0)
 
-            HStack(alignment: .bottom, spacing: tileStyle.bottomRowSpacing) {
-                pingBadge
+            if isTemperatureMode {
+                thermalContent
+            } else {
+                HStack(alignment: .bottom, spacing: tileStyle.bottomRowSpacing) {
+                    pingBadge
 
-                if shouldShowTemperatureBadge {
-                    Spacer(minLength: tileStyle.bottomRowSpacerMinLength)
-                    tempBadge
+                    if shouldShowTemperatureBadge {
+                        Spacer(minLength: tileStyle.bottomRowSpacerMinLength)
+                        tempBadge
+                    }
                 }
             }
         }
@@ -818,17 +1428,17 @@ private struct MpingMapDeviceTileView: View, Equatable {
 
             Spacer(minLength: 0)
 
-            HStack(spacing: 6) {
+            HStack(spacing: tileStyle.pingOnlyBadgeSpacing) {
                 Text(latencyText)
-                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .font(.system(size: tileStyle.pingOnlyLatencySize, weight: .semibold, design: .monospaced))
                     .foregroundStyle(.white.opacity(0.88))
                     .lineLimit(1)
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 3)
-                    .background(.white.opacity(0.12), in: RoundedRectangle(cornerRadius: 5, style: .continuous))
+                    .padding(.horizontal, tileStyle.pingOnlyBadgeHPadding)
+                    .padding(.vertical, tileStyle.pingOnlyBadgeVPadding)
+                    .background(.white.opacity(0.12), in: RoundedRectangle(cornerRadius: tileStyle.pingOnlyBadgeCornerRadius, style: .continuous))
 
                 Text(device.ipAddress)
-                    .font(.system(size: 9.5, weight: .regular, design: .monospaced))
+                    .font(.system(size: tileStyle.pingOnlyIPSize, weight: .regular, design: .monospaced))
                     .foregroundStyle(.white.opacity(0.50))
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
@@ -900,6 +1510,104 @@ private struct MpingMapDeviceTileView: View, Equatable {
         }
         .frame(width: tileStyle.statusOuterFrameSize, height: tileStyle.statusOuterFrameSize)
         .accessibilityLabel("Ping status \(device.status.label)")
+    }
+
+    // MARK: - Temperature mode
+
+    private var hottestTemp: Double? {
+        [device.switchTelemetry.temperatureCelsius,
+         device.switchTelemetry.temperatureCelsius2].compactMap { $0 }.max()
+    }
+
+    private var thermalStatusColor: Color {
+        guard let t = hottestTemp else { return Color(red: 0.40, green: 0.42, blue: 0.46) }
+        if t >= 60 { return Color(red: 0.76, green: 0.22, blue: 0.20) }
+        if t >= 45 { return Color(red: 0.86, green: 0.60, blue: 0.14) }
+        return Color(red: 0.20, green: 0.72, blue: 0.34)
+    }
+
+    private func tempLabel(_ value: Double?) -> String {
+        guard let v = value else { return "--" }
+        return String(format: "%.0f°", v)
+    }
+
+    private func fanLabel(_ rpm: Int?) -> String {
+        guard let r = rpm else { return "---" }
+        return "\(r)"
+    }
+
+    // Replaces the ping ripple in temperature mode — static thermometer dot coloured by heat.
+    private var thermalIndicator: some View {
+        ZStack {
+            Circle()
+                .fill(Color.black.opacity(tileStyle.statusBackgroundOpacity))
+                .frame(width: tileStyle.statusBackgroundSize, height: tileStyle.statusBackgroundSize)
+
+            Circle()
+                .fill(thermalStatusColor)
+                .frame(width: tileStyle.statusIconSize, height: tileStyle.statusIconSize)
+                .overlay(
+                    Circle()
+                        .stroke(Color.white.opacity(tileStyle.statusIconBorderOpacity), lineWidth: tileStyle.statusIconBorderWidth)
+                )
+                .shadow(color: thermalStatusColor.opacity(0.78), radius: tileStyle.statusShadowRadius, x: 0, y: 0)
+
+            Image(systemName: "thermometer.medium")
+                .font(.system(size: tileStyle.statusIconSize * 0.55, weight: .medium))
+                .foregroundStyle(.white.opacity(0.90))
+        }
+        .frame(width: tileStyle.statusOuterFrameSize, height: tileStyle.statusOuterFrameSize)
+    }
+
+    // Replaces the ping badge row in temperature mode.
+    private var thermalContent: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            // Temperature sensors
+            HStack(spacing: 6) {
+                Label(tempLabel(device.switchTelemetry.temperatureCelsius), systemImage: "thermometer.medium")
+                    .font(.system(size: tileStyle.temperatureSize, weight: .semibold, design: .rounded))
+                    .foregroundStyle(sensorColor(device.switchTelemetry.temperatureCelsius))
+                    .monospacedDigit()
+
+                if device.switchTelemetry.temperatureCelsius2 != nil || device.deviceType == .netgearSwitch {
+                    Text("·")
+                        .foregroundStyle(.white.opacity(0.30))
+                    Label(tempLabel(device.switchTelemetry.temperatureCelsius2), systemImage: "thermometer.medium")
+                        .font(.system(size: tileStyle.temperatureSize, weight: .semibold, design: .rounded))
+                        .foregroundStyle(sensorColor(device.switchTelemetry.temperatureCelsius2))
+                        .monospacedDigit()
+                }
+            }
+
+            // Fan speeds
+            if device.deviceType == .netgearSwitch {
+                HStack(spacing: 6) {
+                    Label(fanLabel(device.switchTelemetry.fanSpeed1), systemImage: "fan")
+                        .font(.system(size: tileStyle.temperatureSize - 1, weight: .medium, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.72))
+                        .monospacedDigit()
+
+                    Text("·")
+                        .foregroundStyle(.white.opacity(0.30))
+
+                    Label(fanLabel(device.switchTelemetry.fanSpeed2), systemImage: "fan")
+                        .font(.system(size: tileStyle.temperatureSize - 1, weight: .medium, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.72))
+                        .monospacedDigit()
+                }
+            }
+        }
+        .padding(.horizontal, tileStyle.temperatureBoxHorizontalPadding)
+        .padding(.vertical, tileStyle.temperatureBoxVerticalPadding)
+        .background(.black.opacity(tileStyle.temperatureBoxOpacity),
+                    in: RoundedRectangle(cornerRadius: tileStyle.temperatureBoxCornerRadius, style: .continuous))
+    }
+
+    private func sensorColor(_ temp: Double?) -> Color {
+        guard let t = temp else { return .white.opacity(0.45) }
+        if t >= 60 { return Color(red: 0.95, green: 0.35, blue: 0.30) }
+        if t >= 45 { return Color(red: 0.95, green: 0.78, blue: 0.28) }
+        return .white.opacity(0.88)
     }
 
     private var shouldShowTemperatureBadge: Bool {
@@ -982,11 +1690,19 @@ private struct MpingMapDeviceTileView: View, Equatable {
     }
 }
 
-private struct FibreTopologyHUD: View {
+struct FibreTopologyHUD: View {
     @ObservedObject var store: DeviceStore
 
     private var links: [FibreLossResult] {
         store.cachedFibreResults
+    }
+
+    private var liveCount: Int {
+        links.filter { !$0.isMissing }.count
+    }
+
+    private var totalCount: Int {
+        links.count
     }
 
     private var lldpCount: Int {
@@ -997,13 +1713,17 @@ private struct FibreTopologyHUD: View {
         store.devices.reduce(0) { $0 + $1.switchTelemetry.fibrePorts.count }
     }
 
+    private var linkLabel: String {
+        totalCount == 0 ? "Links: 0" : "Links: \(liveCount)/\(totalCount)"
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Fibre Topology")
                 .font(.system(size: 11, weight: .bold, design: .rounded))
                 .foregroundStyle(.white)
 
-            Text("Links: \(links.count)   LLDP: \(lldpCount)   SFP: \(sfpCount)")
+            Text("\(linkLabel)   LLDP: \(lldpCount)   SFP: \(sfpCount)")
                 .font(.system(size: 10, weight: .semibold, design: .rounded))
                 .foregroundStyle(.white.opacity(0.72))
 
@@ -1344,3 +2064,4 @@ private final class MenuActionTarget: NSObject {
         action()
     }
 }
+

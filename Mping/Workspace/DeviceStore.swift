@@ -864,6 +864,21 @@ final class DeviceStore: ObservableObject {
                 deviceChanged = true
             }
 
+            if device.switchTelemetry.temperatureCelsius2 != result.temperatureCelsius2 {
+                device.switchTelemetry.temperatureCelsius2 = result.temperatureCelsius2
+                deviceChanged = true
+            }
+
+            if device.switchTelemetry.fanSpeed1 != result.fanSpeed1 {
+                device.switchTelemetry.fanSpeed1 = result.fanSpeed1
+                deviceChanged = true
+            }
+
+            if device.switchTelemetry.fanSpeed2 != result.fanSpeed2 {
+                device.switchTelemetry.fanSpeed2 = result.fanSpeed2
+                deviceChanged = true
+            }
+
             if device.switchTelemetry.lastSNMPChecked != pollCompletedAt {
                 device.switchTelemetry.lastSNMPChecked = pollCompletedAt
                 deviceChanged = true

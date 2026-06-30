@@ -1,15 +1,17 @@
 import SwiftUI
 
 enum WorkspacePlane: String, CaseIterable, Identifiable {
-    case overview = "Overview"
-    case stp      = "STP"
+    case overview     = "Overview"
+    case stp          = "STP"
+    case temperatures = "Temperatures"
 
     var id: String { rawValue }
 
     var icon: String {
         switch self {
-        case .overview: return "map"
-        case .stp:      return "point.3.connected.trianglepath.dotted"
+        case .overview:     return "map"
+        case .stp:          return "point.3.connected.trianglepath.dotted"
+        case .temperatures: return "thermometer.medium"
         }
     }
 }
@@ -54,6 +56,8 @@ struct WorkspacePlaneCoordinator: View {
                 WorkspaceView(store: store, searchText: searchText, visibleDevices: visibleDevices, boxTint: boxTint)
             case .stp:
                 STPPlaneView(store: store)
+            case .temperatures:
+                WorkspaceView(store: store, searchText: searchText, visibleDevices: visibleDevices, boxTint: boxTint, isTemperatureMode: true)
             }
 
             // Bottom plane switcher (Overview / STP) — always visible.
@@ -61,21 +65,51 @@ struct WorkspacePlaneCoordinator: View {
                 .padding(.bottom, 18)
                 .zIndex(1000)
         }
-        .overlay(alignment: .topLeading) {
-            // Primary / Secondary network tab — only shown when redundant pairs exist.
-            if store.hasRedundantPairs && activePlane == .overview {
-                networkTabPicker
-                    .padding(.top, 14)
-                    .padding(.leading, 14)
-                    .zIndex(1001)
-                    .allowsHitTesting(true)
+        .onChange(of: store.pendingFocusDeviceID) { _, id in
+            guard let id,
+                  let device = store.devices.first(where: { $0.id == id }),
+                  store.hasRedundantPairs else { return }
+            let targetTab: RedundantNetworkTab = device.redundancyRole == .secondary ? .secondary : .primary
+            guard targetTab != activeNetworkTab else { return }
+            let originalTab = activeNetworkTab
+            withAnimation(.easeInOut(duration: 0.15)) { activeNetworkTab = targetTab }
+            // Mirror the workspace scroll-back: restore the original tab after the same delay.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                withAnimation(.easeInOut(duration: 0.55)) { activeNetworkTab = originalTab }
             }
         }
+        .overlay(alignment: .topLeading) {
+            VStack(alignment: .leading, spacing: 8) {
+                // Primary / Secondary network tab — shown on all planes when redundant pairs exist.
+                if store.hasRedundantPairs {
+                    networkTabPicker
+                        .allowsHitTesting(true)
+                }
+
+                // Fibre topology HUD — only on overview.
+                if activePlane == .overview {
+                    FibreTopologyHUD(store: store)
+                        .allowsHitTesting(false)
+                }
+            }
+            .padding(.top, 14)
+            .padding(.leading, 14)
+            .zIndex(1001)
+        }
+    }
+
+    private var activeTabColor: Color {
+        activeNetworkTab == .primary
+            ? preferences.redundantPrimaryBadgeColor.opacity(0.50)
+            : preferences.redundantSecondaryBadgeColor.opacity(0.50)
     }
 
     private var networkTabPicker: some View {
         HStack(spacing: 2) {
             ForEach(RedundantNetworkTab.allCases) { tab in
+                let tabColor = tab == .primary
+                    ? preferences.redundantPrimaryBadgeColor.opacity(0.50)
+                    : preferences.redundantSecondaryBadgeColor.opacity(0.50)
                 Button {
                     withAnimation(.easeInOut(duration: 0.15)) {
                         activeNetworkTab = tab
@@ -90,9 +124,7 @@ struct WorkspacePlaneCoordinator: View {
                     .padding(.horizontal, 11)
                     .padding(.vertical, 6)
                     .background(
-                        activeNetworkTab == tab
-                            ? Color.blue.opacity(0.35)
-                            : Color.clear,
+                        activeNetworkTab == tab ? tabColor : Color.clear,
                         in: RoundedRectangle(cornerRadius: 8)
                     )
                     .foregroundStyle(activeNetworkTab == tab ? .white : .white.opacity(0.50))
@@ -103,7 +135,7 @@ struct WorkspacePlaneCoordinator: View {
         }
         .padding(4)
         .background(.black.opacity(0.65), in: RoundedRectangle(cornerRadius: 12))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.blue.opacity(0.45), lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(activeTabColor, lineWidth: 1))
     }
 
     private var planeSwitcher: some View {
