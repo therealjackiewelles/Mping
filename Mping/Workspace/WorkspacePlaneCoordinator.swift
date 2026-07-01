@@ -29,6 +29,16 @@ struct WorkspacePlaneCoordinator: View {
     let searchText: String
     @State private var activePlane: WorkspacePlane = .overview
     @State private var activeNetworkTab: RedundantNetworkTab = .primary
+    // Shared viewport — owned here so switching planes never resets zoom/pan.
+    @State private var sharedScale: Double
+    @State private var sharedOffset: CGSize
+
+    init(store: DeviceStore, searchText: String) {
+        _store = ObservedObject(wrappedValue: store)
+        self.searchText = searchText
+        _sharedScale = State(initialValue: store.workspaceScale)
+        _sharedOffset = State(initialValue: store.workspaceOffset)
+    }
 
     // Devices visible on the current network tab.
     private var visibleDevices: [MonitoredDevice] {
@@ -53,14 +63,17 @@ struct WorkspacePlaneCoordinator: View {
         ZStack(alignment: .bottom) {
             switch activePlane {
             case .overview:
-                WorkspaceView(store: store, searchText: searchText, visibleDevices: visibleDevices, boxTint: boxTint)
+                WorkspaceView(store: store, searchText: searchText, visibleDevices: visibleDevices,
+                              boxTint: boxTint, liveScale: $sharedScale, liveOffset: $sharedOffset)
             case .stp:
                 STPPlaneView(store: store)
             case .temperatures:
-                WorkspaceView(store: store, searchText: searchText, visibleDevices: visibleDevices, boxTint: boxTint, isTemperatureMode: true)
+                WorkspaceView(store: store, searchText: searchText, visibleDevices: visibleDevices,
+                              boxTint: boxTint, isTemperatureMode: true,
+                              liveScale: $sharedScale, liveOffset: $sharedOffset)
             }
 
-            // Bottom plane switcher (Overview / STP) — always visible.
+            // Bottom plane switcher — always visible.
             planeSwitcher
                 .padding(.bottom, 18)
                 .zIndex(1000)

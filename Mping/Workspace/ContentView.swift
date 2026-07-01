@@ -16,45 +16,56 @@ struct ContentView: View {
     @State private var isResizingSidebar: Bool = false
 
     var body: some View {
-        HStack(spacing: 0) {
-            leftToolbar
-                .frame(width: sidebarWidth)
-                .background(
-                    ZStack {
-                        Color(red: 0.07, green: 0.07, blue: 0.08)
-                        PanelInteractionBlocker(id: "left-sidebar")
+        GeometryReader { geo in
+            let maxSidebar = max(210, geo.size.width * 0.20)
+            let resizeRange: ClosedRange<CGFloat> = 210...maxSidebar
+
+            HStack(spacing: 0) {
+                leftToolbar
+                    .frame(width: sidebarWidth)
+                    .background(
+                        ZStack {
+                            Color(red: 0.07, green: 0.07, blue: 0.08)
+                            PanelInteractionBlocker(id: "left-sidebar")
+                        }
+                    )
+
+                SidebarResizeHandle(
+                    sidebarWidth: $sidebarWidth,
+                    isResizing: $isResizingSidebar,
+                    range: resizeRange,
+                    onResizeEnded: { width in
+                        preferences.setSidebarWidth(width)
                     }
                 )
-                .contentShape(Rectangle())
-                .onTapGesture { }
 
-            SidebarResizeHandle(
-                sidebarWidth: $sidebarWidth,
-                isResizing: $isResizingSidebar,
-                range: 210...420,
-                onResizeEnded: { width in
-                    preferences.setSidebarWidth(width)
+                ZStack(alignment: .topTrailing) {
+                    WorkspacePlaneCoordinator(store: store, searchText: workspaceSearch)
+                        .contentShape(Rectangle())
+
+                    if showMinimap && !store.hasSelection {
+                        MiniMapView(store: store)
+                            .frame(width: 320, height: 210)
+                            .padding(18)
+                            .zIndex(9999)
+                            .allowsHitTesting(false)
+                    }
+
+                    HStack(spacing: 0) {
+                        Spacer(minLength: 0)
+                        InspectorView(store: store)
+                            .frame(width: store.inspectorWidth)
+                            .opacity(store.hasSelection ? 1 : 0)
+                            .allowsHitTesting(store.hasSelection)
+                    }
                 }
-            )
-
-            ZStack(alignment: .topTrailing) {
-                WorkspacePlaneCoordinator(store: store, searchText: workspaceSearch)
-                    .contentShape(Rectangle())
-
-                if showMinimap && !store.hasSelection {
-                    MiniMapView(store: store)
-                        .frame(width: 320, height: 210)
-                        .padding(18)
-                        .zIndex(9999)
-                        .allowsHitTesting(false)
-                }
-
-                HStack(spacing: 0) {
-                    Spacer(minLength: 0)
-                    InspectorView(store: store)
-                        .frame(width: store.inspectorWidth)
-                        .opacity(store.hasSelection ? 1 : 0)
-                        .allowsHitTesting(store.hasSelection)
+            }
+            .onChange(of: geo.size.width) { _, newWidth in
+                let cap = max(210, newWidth * 0.20)
+                if sidebarWidth > cap {
+                    var t = Transaction()
+                    t.disablesAnimations = true
+                    withTransaction(t) { sidebarWidth = cap }
                 }
             }
         }
@@ -73,7 +84,6 @@ struct ContentView: View {
             sidebarWidth = clamped
             preferences.setSidebarWidth(clamped)
             hasLoadedSavedSidebarWidth = true
-
         }
     }
 
@@ -111,11 +121,6 @@ struct ContentView: View {
                 .font(.system(size: 12, weight: .bold, design: .rounded))
                 .foregroundStyle(.white.opacity(0.75))
                 .lineLimit(1)
-
-            Text("NIC MODE ACTIVE")
-                .font(.system(size: 11, weight: .black, design: .rounded))
-                .foregroundStyle(.green)
-
 
             AlertingSidebarBox(
                 store: store,
@@ -179,16 +184,44 @@ struct ContentView: View {
 // Completely removes the title bar chrome by stripping .titled from the window's
 // styleMask. This reclaims the full title bar height for app content.
 // Custom TrafficLights + WindowDragArea in the sidebar replace the native controls.
+//
+// Removing .titled makes NSWindow.canBecomeKeyWindow return false by default,
+// which causes SwiftUI to silently drop all gesture events after an NSMenu closes.
+// MpingWindowFixer restores canBecomeKey/canBecomeMain via isa-swizzling.
 private struct WindowTitleBarRemover: NSViewRepresentable {
     func makeNSView(context: Context) -> NSView {
         let v = NSView()
         DispatchQueue.main.async {
             guard let w = v.window else { return }
             w.styleMask.remove(.titled)
+            MpingWindowFixer.apply(to: w)
         }
         return v
     }
     func updateNSView(_ v: NSView, context: Context) {}
+}
+
+private enum MpingWindowFixer {
+    static func apply(to window: NSWindow) {
+        let currentClass: AnyClass = type(of: window)
+        let subclassName = "MpingFixed_\(NSStringFromClass(currentClass))"
+
+        let subclass: AnyClass
+        if let existing = NSClassFromString(subclassName) {
+            subclass = existing
+        } else {
+            guard let cls = objc_allocateClassPair(currentClass, subclassName, 0) else { return }
+            let trueIMP = imp_implementationWithBlock(
+                { (_: AnyObject) -> Bool in true } as @convention(block) (AnyObject) -> Bool
+            )
+            class_addMethod(cls, NSSelectorFromString("canBecomeKeyWindow"), trueIMP, "c@:")
+            class_addMethod(cls, NSSelectorFromString("canBecomeMainWindow"), trueIMP, "c@:")
+            objc_registerClassPair(cls)
+            subclass = cls
+        }
+
+        object_setClass(window, subclass)
+    }
 }
 
 // macOS traffic light buttons — close / minimise / zoom — rendered inside the sidebar
@@ -205,7 +238,7 @@ private struct TrafficLights: View {
                 NSApplication.shared.keyWindow?.miniaturize(nil)
             }
             WinButton(hovering: hovering, fill: Color(red: 0.157, green: 0.788, blue: 0.255), symbol: "plus") {
-                NSApplication.shared.keyWindow?.zoom(nil)
+                NSApplication.shared.keyWindow?.toggleFullScreen(nil)
             }
         }
         .onHover { hovering = $0 }
@@ -253,23 +286,26 @@ private struct SidebarResizeHandle: View {
     var body: some View {
         Rectangle()
             .fill(isResizing ? Color.white.opacity(0.28) : Color.white.opacity(0.10))
-            .frame(width: isResizing ? 5 : 3)
+            .frame(width: 3)
             .overlay(
                 Rectangle()
                     .fill(Color.white.opacity(isResizing ? 0.18 : 0.06))
                     .frame(width: 1)
             )
-            .contentShape(Rectangle())
+            .contentShape(Rectangle().inset(by: -5))
             .gesture(
-                DragGesture(minimumDistance: 0)
+                DragGesture(minimumDistance: 0, coordinateSpace: .global)
                     .onChanged { value in
                         if !isResizing {
                             dragStartWidth = sidebarWidth
                             isResizing = true
                         }
-
                         let proposed = dragStartWidth + value.translation.width
-                        sidebarWidth = min(range.upperBound, max(range.lowerBound, proposed))
+                        var t = Transaction()
+                        t.disablesAnimations = true
+                        withTransaction(t) {
+                            sidebarWidth = min(range.upperBound, max(range.lowerBound, proposed))
+                        }
                     }
                     .onEnded { _ in
                         let clamped = min(range.upperBound, max(range.lowerBound, sidebarWidth))
@@ -288,7 +324,6 @@ private struct SidebarResizeHandle: View {
                 }
                 #endif
             }
-            .animation(.easeOut(duration: 0.12), value: isResizing)
     }
 }
 

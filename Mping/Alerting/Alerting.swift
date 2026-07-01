@@ -111,80 +111,83 @@ struct AlertingSidebarBox: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10 * sidebarScale) {
-            HStack(spacing: 8) {
-                Text("Alerting")
-                    .font(.system(size: titleSize, weight: .black, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.88))
-                    .lineLimit(1)
-                    .fixedSize(horizontal: true, vertical: false)
-                    .layoutPriority(1)
+        GeometryReader { geo in
+            VStack(alignment: .leading, spacing: 10 * sidebarScale) {
+                HStack(spacing: 8) {
+                    Text("Alerting")
+                        .font(.system(size: titleSize, weight: .black, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.88))
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
+                        .layoutPriority(1)
 
-                Spacer(minLength: 4)
+                    Spacer(minLength: 4)
 
-                Button {
-                    showingThresholds = true
-                } label: {
-                    Image(systemName: "slider.horizontal.3")
-                        .font(.system(size: 11 * min(1.35, sidebarScale), weight: .black))
-                        .frame(width: 18 * min(1.35, sidebarScale), height: 18 * min(1.35, sidebarScale))
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.white.opacity(0.62))
-                .background(
-                    RoundedRectangle(cornerRadius: 5)
-                        .fill(Color.white.opacity(0.07))
-                )
-                .popover(isPresented: $showingThresholds, arrowEdge: .leading) {
-                    AlertThresholdsPopover(store: store)
-                }
+                    Button {
+                        showingThresholds = true
+                    } label: {
+                        Image(systemName: "slider.horizontal.3")
+                            .font(.system(size: 11 * min(1.35, sidebarScale), weight: .black))
+                            .frame(width: 18 * min(1.35, sidebarScale), height: 18 * min(1.35, sidebarScale))
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.white.opacity(0.62))
+                    .background(
+                        RoundedRectangle(cornerRadius: 5)
+                            .fill(Color.white.opacity(0.07))
+                    )
+                    .popover(isPresented: $showingThresholds, arrowEdge: .leading) {
+                        AlertThresholdsPopover(store: store)
+                    }
 
-                Button("Ack All") {
-                    store.acknowledgeAlerts()
-                }
-                .buttonStyle(.plain)
-                .font(.system(size: buttonSize, weight: .bold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.62))
-                .padding(.horizontal, 7 * min(1.35, sidebarScale))
-                .padding(.vertical, 4 * min(1.35, sidebarScale))
-                .background(
-                    RoundedRectangle(cornerRadius: 7)
-                        .fill(Color.white.opacity(0.07))
-                )
-            }
-
-            LazyVGrid(columns: columns, alignment: .leading, spacing: iconGridSpacing) {
-                ForEach(MpingAlertCategory.allCases) { category in
-                    AlertIconButton(
-                        store: store,
-                        category: category,
-                        openCategory: $openCategory,
-                        sidebarScale: sidebarScale
+                    Button("Ack All") {
+                        store.acknowledgeAlerts()
+                    }
+                    .buttonStyle(.plain)
+                    .font(.system(size: buttonSize, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.62))
+                    .padding(.horizontal, 7 * min(1.35, sidebarScale))
+                    .padding(.vertical, 4 * min(1.35, sidebarScale))
+                    .background(
+                        RoundedRectangle(cornerRadius: 7)
+                            .fill(Color.white.opacity(0.07))
                     )
                 }
+
+                LazyVGrid(columns: columns, alignment: .leading, spacing: iconGridSpacing) {
+                    ForEach(MpingAlertCategory.allCases) { category in
+                        AlertIconButton(
+                            store: store,
+                            category: category,
+                            openCategory: $openCategory,
+                            sidebarScale: sidebarScale
+                        )
+                    }
+                }
             }
+            .padding(panelPadding)
+            .frame(width: geo.size.width, height: geo.size.width)
+            .background(alertingPanelBackground)
+            .overlay(
+                Group {
+                    if hasActiveAlerts {
+                        PulsingBorderView(
+                            color: NSColor.systemRed,
+                            lineWidth: 1,
+                            cornerRadius: 14,
+                            minOpacity: 0.20,
+                            maxOpacity: 0.55,
+                            duration: 1.4
+                        )
+                    } else {
+                        RoundedRectangle(cornerRadius: 14)
+                            .stroke(Color.white.opacity(0.09), lineWidth: 1)
+                    }
+                }
+            )
         }
-        .padding(panelPadding)
         .frame(maxWidth: .infinity)
-        .frame(minHeight: 112 * sidebarScale, alignment: .top)
-        .background(alertingPanelBackground)
-        .overlay(
-            Group {
-                if hasActiveAlerts {
-                    PulsingBorderView(
-                        color: NSColor.systemRed,
-                        lineWidth: 1,
-                        cornerRadius: 14,
-                        minOpacity: 0.20,
-                        maxOpacity: 0.55,
-                        duration: 1.4
-                    )
-                } else {
-                    RoundedRectangle(cornerRadius: 14)
-                        .stroke(Color.white.opacity(0.09), lineWidth: 1)
-                }
-            }
-        )
+        .aspectRatio(1, contentMode: .fit)
     }
 
 

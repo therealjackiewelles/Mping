@@ -27,25 +27,31 @@ struct PulsingBorderView: NSViewRepresentable {
     }
 
     final class PulsingBorderNSView: NSView {
-        private let shapeLayer = CAShapeLayer()
-        private var storedCornerRadius: CGFloat = 8
+        // Uses a CALayer border with cornerCurve = .continuous so the rounded shape
+        // matches SwiftUI's RoundedRectangle(style: .continuous) exactly. A CAShapeLayer
+        // with CGPath(roundedRect:) uses circular-arc corners which visually mis-align
+        // on the shorter ping-only tile where corners are a larger proportion of the height.
+        private let borderLayer = CALayer()
 
         override init(frame: CGRect) {
             super.init(frame: frame)
             wantsLayer = true
-            shapeLayer.fillColor = nil
-            layer?.addSublayer(shapeLayer)
+            borderLayer.cornerCurve = .continuous
+            layer?.addSublayer(borderLayer)
         }
         required init?(coder: NSCoder) { fatalError() }
 
         func configure(color: NSColor, lineWidth: CGFloat, cornerRadius: CGFloat,
                        minOpacity: Float, maxOpacity: Float, duration: Double) {
-            storedCornerRadius = cornerRadius
-            shapeLayer.strokeColor = color.cgColor
-            shapeLayer.lineWidth = lineWidth
-            refreshPath()
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            borderLayer.borderColor = color.cgColor
+            borderLayer.borderWidth = lineWidth
+            borderLayer.cornerRadius = cornerRadius
+            refreshFrame()
+            CATransaction.commit()
 
-            shapeLayer.removeAllAnimations()
+            borderLayer.removeAllAnimations()
             let anim = CABasicAnimation(keyPath: "opacity")
             anim.fromValue = minOpacity
             anim.toValue = maxOpacity
@@ -53,27 +59,22 @@ struct PulsingBorderView: NSViewRepresentable {
             anim.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
             anim.repeatCount = .infinity
             anim.autoreverses = true
-            shapeLayer.add(anim, forKey: "pulse")
+            borderLayer.add(anim, forKey: "pulse")
         }
 
         override func layout() {
             super.layout()
-            refreshPath()
+            refreshFrame()
         }
 
         override func hitTest(_ point: NSPoint) -> NSView? { nil }
 
-        private func refreshPath() {
-            guard let layer = self.layer else { return }
-            shapeLayer.frame = layer.bounds
-            let inset = shapeLayer.lineWidth / 2
-            let rect = layer.bounds.insetBy(dx: inset, dy: inset)
-            shapeLayer.path = CGPath(
-                roundedRect: rect,
-                cornerWidth: storedCornerRadius,
-                cornerHeight: storedCornerRadius,
-                transform: nil
-            )
+        private func refreshFrame() {
+            guard let hostLayer = self.layer else { return }
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            borderLayer.frame = hostLayer.bounds
+            CATransaction.commit()
         }
     }
 }

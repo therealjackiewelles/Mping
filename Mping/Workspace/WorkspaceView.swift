@@ -577,7 +577,10 @@ struct WorkspaceView: View {
     var visibleDevices: [MonitoredDevice]
     var boxTint: Color? = nil
     var isTemperatureMode: Bool = false
-
+    // Viewport state is owned by WorkspacePlaneCoordinator and shared across planes
+    // via @Binding so switching planes never resets zoom or pan position.
+    @Binding var liveScale: Double
+    @Binding var liveOffset: CGSize
 
     @State private var deviceDragStart: [UUID: CGPoint] = [:]
     @State private var shapeDragStart: [UUID: CGPoint] = [:]
@@ -586,8 +589,6 @@ struct WorkspaceView: View {
     @State private var hoverPoint: CGPoint? = nil
     @State private var resizingShapeID: UUID? = nil
     @State private var shapeResizeStartFrames: [UUID: CGRect] = [:]
-    @State private var liveOffset: CGSize = .zero
-    @State private var liveScale: Double = 1.0
     @State private var syncTask: Task<Void, Never>? = nil
     @State private var tileSettingsRevision: Int = 0
 
@@ -601,7 +602,6 @@ struct WorkspaceView: View {
                     .onTapGesture {
                         store.clearSelection()
                     }
-                    .gesture(selectionBoxGesture)
 
                 ZStack(alignment: .topLeading) {
                     grid
@@ -669,7 +669,7 @@ struct WorkspaceView: View {
                                 store.selectOnlyShape(shape.id)
                             }
                         }
-                        .gesture(shapeDragGesture(shape))
+                        .simultaneousGesture(shapeDragGesture(shape))
                     }
 
                     ForEach(visibleDevices) { device in
@@ -697,7 +697,7 @@ struct WorkspaceView: View {
                                 store.selectOnlyDevice(device.id)
                             }
                         }
-                        .gesture(deviceDragGesture(device))
+                        .simultaneousGesture(deviceDragGesture(device))
                     }
 
                     FibreLinksLayer(
@@ -777,6 +777,59 @@ struct WorkspaceView: View {
                             abs(CGFloat($0.x) - canvasX) <= halfW &&
                             abs(CGFloat($0.y) - canvasY) <= halfH
                         }
+                    },
+                    shapeAt: { swiftUIPoint in
+                        let scale = liveScale
+                        let offset = liveOffset
+                        let canvasX = (swiftUIPoint.x - offset.width) / scale
+                        let canvasY = (swiftUIPoint.y - offset.height) / scale
+                        let pt = CGPoint(x: canvasX, y: canvasY)
+                        return store.shapes.first {
+                            CGRect(x: $0.x, y: $0.y, width: $0.width, height: $0.height).contains(pt)
+                        }
+                    },
+                    onSelectionBoxChange: { start, current in
+                        selectionStart = start
+                        selectionCurrent = current
+                    },
+                    onSelectionBoxClear: {
+                        selectionStart = nil
+                        selectionCurrent = nil
+                    },
+                    onBoxSelectEnd: { start, end in
+                        let viewRect = CGRect(
+                            x: min(start.x, end.x),
+                            y: min(start.y, end.y),
+                            width: abs(end.x - start.x),
+                            height: abs(end.y - start.y)
+                        )
+                        let scale = liveScale
+                        let offset = liveOffset
+                        let worldTopLeft = CGPoint(
+                            x: (viewRect.minX - offset.width) / scale,
+                            y: (viewRect.minY - offset.height) / scale
+                        )
+                        let worldBottomRight = CGPoint(
+                            x: (viewRect.maxX - offset.width) / scale,
+                            y: (viewRect.maxY - offset.height) / scale
+                        )
+                        let worldRect = CGRect(
+                            x: min(worldTopLeft.x, worldBottomRight.x),
+                            y: min(worldTopLeft.y, worldBottomRight.y),
+                            width: abs(worldBottomRight.x - worldTopLeft.x),
+                            height: abs(worldBottomRight.y - worldTopLeft.y)
+                        )
+                        let selectedDevices = Set(
+                            visibleDevices.filter { device in
+                                worldRect.intersects(CGRect(x: device.x - 85, y: device.y - 52, width: 170, height: 104))
+                            }.map(\.id)
+                        )
+                        let selectedShapes = Set(
+                            store.shapes.filter { shape in
+                                worldRect.intersects(CGRect(x: shape.x, y: shape.y, width: shape.width, height: shape.height))
+                            }.map(\.id)
+                        )
+                        store.setSelection(deviceIDs: selectedDevices, shapeIDs: selectedShapes)
                     },
                     onOpenWebInterface: { id in store.openWebInterface(for: id) },
                     onSelectDevice: { id in store.selectOnlyDevice(id) },
@@ -876,68 +929,6 @@ struct WorkspaceView: View {
         )
     }
 
-    private var selectionBoxGesture: some Gesture {
-        DragGesture(minimumDistance: 4)
-            .onChanged { value in
-                selectionStart = selectionStart ?? value.startLocation
-                selectionCurrent = value.location
-            }
-            .onEnded { value in
-                defer {
-                    selectionStart = nil
-                    selectionCurrent = nil
-                }
-
-                let viewRect = CGRect(
-                    x: min(value.startLocation.x, value.location.x),
-                    y: min(value.startLocation.y, value.location.y),
-                    width: abs(value.location.x - value.startLocation.x),
-                    height: abs(value.location.y - value.startLocation.y)
-                )
-
-                if viewRect.width < 5 && viewRect.height < 5 {
-                    store.clearSelection()
-                    return
-                }
-
-                let worldTopLeft = CGPoint(
-                    x: (viewRect.minX - liveOffset.width) / liveScale,
-                    y: (viewRect.minY - liveOffset.height) / liveScale
-                )
-                let worldBottomRight = CGPoint(
-                    x: (viewRect.maxX - liveOffset.width) / liveScale,
-                    y: (viewRect.maxY - liveOffset.height) / liveScale
-                )
-
-                let worldRect = CGRect(
-                    x: min(worldTopLeft.x, worldBottomRight.x),
-                    y: min(worldTopLeft.y, worldBottomRight.y),
-                    width: abs(worldBottomRight.x - worldTopLeft.x),
-                    height: abs(worldBottomRight.y - worldTopLeft.y)
-                )
-
-                let selectedDevices = Set(
-                    visibleDevices
-                        .filter { device in
-                            let rect = CGRect(x: device.x - 85, y: device.y - 52, width: 170, height: 104)
-                            return worldRect.intersects(rect)
-                        }
-                        .map(\.id)
-                )
-
-                let selectedShapes = Set(
-                    store.shapes
-                        .filter { shape in
-                            let rect = CGRect(x: shape.x, y: shape.y, width: shape.width, height: shape.height)
-                            return worldRect.intersects(rect)
-                        }
-                        .map(\.id)
-                )
-
-                store.setSelection(deviceIDs: selectedDevices, shapeIDs: selectedShapes)
-            }
-    }
-
     private var grid: some View {
         Canvas { context, size in
             let spacing: CGFloat = 40
@@ -964,7 +955,7 @@ struct WorkspaceView: View {
     }
 
     private func deviceDragGesture(_ device: MonitoredDevice) -> some Gesture {
-        DragGesture(minimumDistance: 1)
+        DragGesture(minimumDistance: 5)
             .onChanged { value in
                 if !store.selectedDeviceIDs.contains(device.id) {
                     store.selectOnlyDevice(device.id)
@@ -1007,7 +998,7 @@ struct WorkspaceView: View {
     }
 
     private func shapeDragGesture(_ shape: WorkspaceShape) -> some Gesture {
-        DragGesture(minimumDistance: 1)
+        DragGesture(minimumDistance: 5)
             .onChanged { value in
                 if !store.selectedShapeIDs.contains(shape.id) {
                     store.selectOnlyShape(shape.id)
@@ -1264,22 +1255,21 @@ struct MpingMapDeviceTileView: View, Equatable {
                     .padding(.trailing, tileStyle.statusTrailingPadding)
                     .allowsHitTesting(false)
             }
+
+            if hasAlert {
+                PulsingBorderView(
+                    color: NSColor.systemYellow,
+                    lineWidth: 2.5,
+                    cornerRadius: cornerRadius,
+                    minOpacity: 0.10,
+                    maxOpacity: 0.85,
+                    duration: 1.4
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .allowsHitTesting(false)
+            }
         }
         .frame(width: tileWidth, height: tileHeight)
-        .overlay(
-            Group {
-                if hasAlert {
-                    PulsingBorderView(
-                        color: NSColor.systemYellow,
-                        lineWidth: 2.5,
-                        cornerRadius: cornerRadius,
-                        minOpacity: 0.10,
-                        maxOpacity: 0.85,
-                        duration: 1.4
-                    )
-                }
-            }
-        )
         .overlay(alignment: .leading) {
             if let zone = device.zoneName, !zone.isEmpty {
                 RoundedRectangle(cornerRadius: 2, style: .continuous)
@@ -1755,6 +1745,10 @@ private struct WorkspaceEventCatcher: NSViewRepresentable {
     let onPaste: () -> Void
     var onClearTopologyLinks: (() -> Void)?
     var deviceAt: ((CGPoint) -> MonitoredDevice?)?
+    var shapeAt: ((CGPoint) -> WorkspaceShape?)?
+    var onSelectionBoxChange: ((CGPoint, CGPoint) -> Void)?
+    var onSelectionBoxClear: (() -> Void)?
+    var onBoxSelectEnd: ((CGPoint, CGPoint) -> Void)?
     var onOpenWebInterface: ((UUID) -> Void)?
     var onSelectDevice: ((UUID) -> Void)?
     var onCopyDevice: ((UUID) -> Void)?
@@ -1785,6 +1779,10 @@ private struct WorkspaceEventCatcher: NSViewRepresentable {
         view.onCopySelection = onCopySelection
         view.onPaste = onPaste
         view.deviceAt = deviceAt
+        view.shapeAt = shapeAt
+        view.onSelectionBoxChange = onSelectionBoxChange
+        view.onSelectionBoxClear = onSelectionBoxClear
+        view.onBoxSelectEnd = onBoxSelectEnd
         view.onOpenWebInterface = onOpenWebInterface
         view.onSelectDevice = onSelectDevice
         view.onCopyDevice = onCopyDevice
@@ -1806,6 +1804,10 @@ private struct WorkspaceEventCatcher: NSViewRepresentable {
         var onPaste: (() -> Void)?
         var onClearTopologyLinks: (() -> Void)?
         var deviceAt: ((CGPoint) -> MonitoredDevice?)?
+        var shapeAt: ((CGPoint) -> WorkspaceShape?)?
+        var onSelectionBoxChange: ((CGPoint, CGPoint) -> Void)?
+        var onSelectionBoxClear: (() -> Void)?
+        var onBoxSelectEnd: ((CGPoint, CGPoint) -> Void)?
         var onOpenWebInterface: ((UUID) -> Void)?
         var onSelectDevice: ((UUID) -> Void)?
         var onCopyDevice: ((UUID) -> Void)?
@@ -1818,6 +1820,10 @@ private struct WorkspaceEventCatcher: NSViewRepresentable {
         private var rightMouseDownEvent: NSEvent?
         private var didRightDrag = false
         private var menuTargets: [MenuActionTarget] = []
+
+        // Left-drag selection box state (tracked in monitor to avoid SwiftUI DragGesture stuck issues)
+        private var leftDragStartWindow: NSPoint? = nil
+        private var leftDragThresholdMet = false
 
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
@@ -1837,74 +1843,153 @@ private struct WorkspaceEventCatcher: NSViewRepresentable {
             removeMonitor()
 
             monitor = NSEvent.addLocalMonitorForEvents(
-                matching: [.rightMouseDown, .rightMouseDragged, .rightMouseUp, .scrollWheel]
+                matching: [.leftMouseDown, .leftMouseDragged, .leftMouseUp,
+                            .rightMouseDown, .rightMouseDragged, .rightMouseUp, .scrollWheel]
             ) { [weak self] event in
                 guard let self, let window = self.window else { return event }
                 guard event.window === window else { return event }
 
-                if PanelInteractionRegistry.isPointInsideBlockedPanel(event.locationInWindow) {
-                    self.lastRightPoint = nil
-                    self.rightMouseDownEvent = nil
-                    self.didRightDrag = false
-                    return event
-                }
+                let inBlockedPanel = PanelInteractionRegistry.isPointInsideBlockedPanel(event.locationInWindow)
 
-                let localPoint = self.convert(event.locationInWindow, from: nil)
-                guard self.bounds.contains(localPoint) else {
-                    self.lastRightPoint = nil
-                    self.rightMouseDownEvent = nil
-                    self.didRightDrag = false
-                    return event
-                }
-
-                switch event.type {
-                case .scrollWheel:
+                // Right-mouse and scroll handling
+                if event.type == .scrollWheel {
+                    guard !inBlockedPanel else { return event }
+                    let localPoint = self.convert(event.locationInWindow, from: nil)
+                    guard self.bounds.contains(localPoint) else { return event }
                     self.onScroll?(event.scrollingDeltaY)
                     return nil
-
-                case .rightMouseDown:
-                    self.lastRightPoint = event.locationInWindow
-                    self.rightMouseDownEvent = event
-                    self.didRightDrag = false
-                    return nil
-
-                case .rightMouseDragged:
-                    let current = event.locationInWindow
-
-                    if let down = self.rightMouseDownEvent {
-                        let dx = current.x - down.locationInWindow.x
-                        let dy = current.y - down.locationInWindow.y
-                        if abs(dx) > 3 || abs(dy) > 3 {
-                            self.didRightDrag = true
-                        }
-                    }
-
-                    if let last = self.lastRightPoint {
-                        self.onRightPan?(
-                            CGSize(
-                                width: current.x - last.x,
-                                height: last.y - current.y
-                            )
-                        )
-                    }
-
-                    self.lastRightPoint = current
-                    return nil
-
-                case .rightMouseUp:
-                    if !self.didRightDrag,
-                       let downEvent = self.rightMouseDownEvent {
-                        self.showWorkspaceMenu(for: downEvent)
-                    }
-
-                    self.lastRightPoint = nil
-                    self.rightMouseDownEvent = nil
-                    self.didRightDrag = false
-                    return nil
-
-                default:
-                    return event
                 }
+
+                if event.type == .rightMouseDown || event.type == .rightMouseDragged || event.type == .rightMouseUp {
+                    if inBlockedPanel {
+                        self.lastRightPoint = nil
+                        self.rightMouseDownEvent = nil
+                        self.didRightDrag = false
+                        return event
+                    }
+                    let localPoint = self.convert(event.locationInWindow, from: nil)
+                    guard self.bounds.contains(localPoint) else {
+                        self.lastRightPoint = nil
+                        self.rightMouseDownEvent = nil
+                        self.didRightDrag = false
+                        return event
+                    }
+
+                    switch event.type {
+                    case .rightMouseDown:
+                        // Make window key before consuming the event. If we don't, the
+                        // window was non-key when the NSMenu ran, so AppKit has nowhere to
+                        // restore key status after menu close — leaving the window
+                        // permanently non-key and silently dropping all SwiftUI gestures.
+                        self.window?.makeKey()
+                        self.lastRightPoint = event.locationInWindow
+                        self.rightMouseDownEvent = event
+                        self.didRightDrag = false
+                        return nil
+
+                    case .rightMouseDragged:
+                        let current = event.locationInWindow
+                        if let down = self.rightMouseDownEvent {
+                            let dx = current.x - down.locationInWindow.x
+                            let dy = current.y - down.locationInWindow.y
+                            if abs(dx) > 3 || abs(dy) > 3 { self.didRightDrag = true }
+                        }
+                        if let last = self.lastRightPoint {
+                            self.onRightPan?(CGSize(width: current.x - last.x, height: last.y - current.y))
+                        }
+                        self.lastRightPoint = current
+                        return nil
+
+                    case .rightMouseUp:
+                        // Defer menu show so NSMenu's modal event loop never nests inside
+                        // this monitor callback, which would leave SwiftUI gesture recognisers
+                        // waiting for a leftMouseUp that the menu already consumed.
+                        let shouldShowMenu = !self.didRightDrag && self.rightMouseDownEvent != nil
+                        let pendingEvent = self.rightMouseDownEvent
+                        self.lastRightPoint = nil
+                        self.rightMouseDownEvent = nil
+                        self.didRightDrag = false
+                        if shouldShowMenu, let pendingEvent {
+                            DispatchQueue.main.async { [weak self] in
+                                self?.showWorkspaceMenu(for: pendingEvent)
+                            }
+                        }
+                        return nil
+
+                    default: return event
+                    }
+                }
+
+                // Left-mouse handling — tracked here to drive the selection box without
+                // a SwiftUI DragGesture on the background. A SwiftUI DragGesture on the
+                // background is the component that gets stuck after NSMenu's modal loop:
+                // it receives a leftMouseDown from AppKit's state restoration on menu
+                // close but never gets the matching leftMouseUp, blocking all subsequent
+                // clicks. By owning this in the monitor we sidestep that entirely.
+                if event.type == .leftMouseDown || event.type == .leftMouseDragged || event.type == .leftMouseUp {
+                    guard !inBlockedPanel else { return event }
+                    let localPoint = self.convert(event.locationInWindow, from: nil)
+                    guard self.bounds.contains(localPoint) else {
+                        if event.type == .leftMouseDown {
+                            self.leftDragStartWindow = nil
+                            self.leftDragThresholdMet = false
+                        }
+                        return event
+                    }
+                    let swiftUIPoint = CGPoint(x: localPoint.x, y: self.bounds.height - localPoint.y)
+
+                    switch event.type {
+                    case .leftMouseDown:
+                        // Ensure window is key on every left click. A titleless NSWindow
+                        // may not regain key status automatically after an NSMenu is shown
+                        // while the window was non-key — SwiftUI silently drops all
+                        // gesture events (tap, drag) on non-key windows.
+                        if self.window?.isKeyWindow == false { self.window?.makeKey() }
+                        // Only track for selection box if click is on empty canvas
+                        let onDevice = self.deviceAt?(swiftUIPoint) != nil
+                        let onShape = self.shapeAt?(swiftUIPoint) != nil
+                        if onDevice || onShape {
+                            self.leftDragStartWindow = nil
+                            self.leftDragThresholdMet = false
+                        } else {
+                            self.leftDragStartWindow = event.locationInWindow
+                            self.leftDragThresholdMet = false
+                        }
+                        return event
+
+                    case .leftMouseDragged:
+                        guard let start = self.leftDragStartWindow else { return event }
+                        let current = event.locationInWindow
+                        let dx = current.x - start.x
+                        let dy = current.y - start.y
+                        if !self.leftDragThresholdMet && (abs(dx) > 4 || abs(dy) > 4) {
+                            self.leftDragThresholdMet = true
+                        }
+                        if self.leftDragThresholdMet {
+                            let startLocal = self.convert(start, from: nil)
+                            let swiftUIStart = CGPoint(x: startLocal.x, y: self.bounds.height - startLocal.y)
+                            self.onSelectionBoxChange?(swiftUIStart, swiftUIPoint)
+                        }
+                        return event
+
+                    case .leftMouseUp:
+                        guard let start = self.leftDragStartWindow else { return event }
+                        let thresholdMet = self.leftDragThresholdMet
+                        self.leftDragStartWindow = nil
+                        self.leftDragThresholdMet = false
+                        self.onSelectionBoxClear?()
+                        if thresholdMet {
+                            let startLocal = self.convert(start, from: nil)
+                            let swiftUIStart = CGPoint(x: startLocal.x, y: self.bounds.height - startLocal.y)
+                            self.onBoxSelectEnd?(swiftUIStart, swiftUIPoint)
+                        }
+                        return event
+
+                    default: return event
+                    }
+                }
+
+                return event
             }
         }
 
@@ -1919,6 +2004,11 @@ private struct WorkspaceEventCatcher: NSViewRepresentable {
             } else {
                 showCanvasMenu(for: event)
             }
+
+            // After NSMenu's synchronous modal event loop, AppKit may have demoted our
+            // window's key/main status. Restore it so the next click lands on the
+            // workspace rather than whatever is behind it.
+            window?.makeKeyAndOrderFront(nil)
         }
 
         private func showDeviceMenu(for device: MonitoredDevice, with event: NSEvent) {

@@ -133,6 +133,9 @@ Mping is built in Xcode. There is no package manager or CLI build step.
 
 ## Changelog
 
+### v0.5.9 — 2026-07-01
+- Fixed left-click device selection breaking after right-click context menu — `window.styleMask.remove(.titled)` causes `canBecomeKeyWindow` to return `false`, preventing the window from regaining key status after NSMenu closes and causing SwiftUI to silently drop all gesture events; fixed via `MpingWindowFixer` which isa-swizzles the window to a dynamic subclass overriding `canBecomeKeyWindow` and `canBecomeMainWindow` to return `true`
+
 ### v0.5.8 — 2026-06-30
 - Fixed title bar reappearing — `WindowTitleBarRemover` restored to `window.styleMask.remove(.titled)` to strip the full NSThemeFrame (previous version had reverted to the cosmetic transparent-titlebar approach)
 

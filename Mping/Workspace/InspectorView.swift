@@ -457,6 +457,9 @@ private struct DeviceInspector: View {
         }
         .onAppear {
             syncFromDevice()
+            if device.requiresSetup {
+                DispatchQueue.main.async { focusedField = .name }
+            }
         }
         .onDisappear {
             commitDeviceTextFields()
@@ -464,6 +467,9 @@ private struct DeviceInspector: View {
         }
         .onChange(of: device.id) { _, _ in
             syncFromDevice()
+            if device.requiresSetup {
+                DispatchQueue.main.async { focusedField = .name }
+            }
         }
         .onChange(of: device.sourceIPAddress) { _, _ in
             syncInterfaceSelection()

@@ -5,6 +5,18 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.5.9 — 2026-07-01
+
+### Bug Fix
+
+**Left-click device selection broken after right-click context menu**
+- After opening the workspace right-click menu and selecting any item, left-clicking device tiles would fail to register — clicks appeared to fall through to the desktop, sometimes minimising the window
+- Root cause: `window.styleMask.remove(.titled)` causes `NSWindow.canBecomeKeyWindow` to return `false`, so every call to `makeKey()` / `makeKeyAndOrderFront()` silently no-ops. After an NSMenu closes, AppKit never restores the window's key status, and SwiftUI silently drops all gesture events (tap, drag) on non-key windows
+- Fixed by isa-swizzling the window via `MpingWindowFixer` (added to `ContentView.swift`): immediately after removing `.titled`, a dynamic Objective-C subclass of the window's actual runtime class is created with `objc_allocateClassPair`, overriding `canBecomeKeyWindow` and `canBecomeMainWindow` to return `true`, then applied via `object_setClass`
+- Window now correctly regains key status on the next click after any NSMenu interaction — tile selection, canvas taps, and drag selection all work immediately
+
+---
+
 ## v0.5.8 — 2026-06-30
 
 ### Bug Fix
