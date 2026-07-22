@@ -5,6 +5,23 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.7.5 — 2026-07-22
+
+### Licensing
+
+**Floating keys, Licence Studio & revocation**
+- **Licence Studio** (Debugging menu, password-gated, ⌘⌥L): a full GUI for issuing keys — load the private signing key once (remembered), fill in licensee/type/expiry, and mint; every key is copied to the clipboard and recorded in a ledger with per-row copy, revoke, and delete
+- **Floating keys**: leave the machine ID blank and the key works on whichever single machine activates it — mint batches ahead of time (quantity stepper auto-numbers licensees) without asking anyone for their machine ID; machine-bound keys remain available when the ID is known
+- **Per-key revocation**: every key carries a unique key ID; revoking a ledger row rewrites `revoked.json` for publishing to the public repo, and any online copy using that key disables itself at next launch ("disabled by the publisher" shown in About) — offline copies remain bounded by their expiry date
+- **Enforcement is now ON**: the real public key is embedded and the Debug bypass is removed, so unlicensed copies soft-gate monitoring (ping and SNMP/LLDP both stop; the example workspace stays live) exactly as shipped builds do
+
+### Updater
+
+- **Patch releases now notify**: automatic checks previously only alerted on major/minor version changes, which under a patch-first release policy silenced every update — any newer version now alerts ("Skip This Version" still respected)
+- **Download dialog no longer hangs**: the progress alert never dismissed itself because its completion ran on a queue the modal loop never serviced — it now closes the moment the download completes and the installer opens; also hardened the download against a temp-file race
+
+---
+
 ## v0.7.4 — 2026-07-22
 
 ### Licensing
