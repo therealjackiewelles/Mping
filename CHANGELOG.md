@@ -5,6 +5,49 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.7.3 — 2026-07-21
+
+### Temperatures Plane
+
+**Graph sub-view (#53)**
+- A Details / Graph bar above the plane switcher (temperatures plane only, remembered across visits and launches) switches every tile to a 1-hour rolling plot of both temperature sensors and all four fans
+- Six colour-coded series — temperatures warm and solid, fans cool, dotted, and at half opacity so temperature always reads on top; a shared key sits on the canvas
+- Fixed default scales (15–70 °C, 0–18,500 RPM) that expand only when a reading falls outside, so a small wobble reads as small
+- Hover shows a crosshair, per-series dots, and a timestamped readout of every value — rendered below the tile and raised above other layers, so the graph itself is never obscured
+- Fan speed history is now recorded alongside temperature on each SNMP poll (it previously wasn't stored at all)
+
+### Inspector
+
+**Fibre Optics panel shows raw SFP values (#54)**
+- The panel now reports the actual DDM figures each switch provides — for each direction, the transmitting SFP's TX and the receiving SFP's RX, each line naming its port and switch outright — instead of duplicating the calculated loss shown on the workspace links
+- New per-module SFP block: temperature, supply voltage, and laser bias, plus module identity — vendor, transceiver type, speed, and serial — read from the Netgear SFP inventory table (ENTITY-MIB only exposes the chassis on M4250s)
+
+**"?" help buttons**
+- The Ping and Fibre Optics boxes gained a help affordance (click, or hover for a second): plain-language explanations of RTT, loss, and jitter — and of TX/RX dBm, the connector-loss budget, and the field-order causes of high loss — each reading the workspace's live alert thresholds
+
+### Alerting
+
+**All alerts latch; recovered-but-unacknowledged shown amber**
+- Every category now latches like fibre did: a condition that clears before being acknowledged turns amber instead of vanishing, so a mid-show dropout can't erase itself before anyone saw it — red means live, amber means recovered and awaiting acknowledgement
+- Applied consistently across the sidebar category boxes, history rows, category popovers (whose Acked column now reads "Ready"), and the inspector; a re-triggering condition returns to red
+- The green "Recovered" history row is logged the moment the condition clears, not when it's later acknowledged
+
+### Workspaces
+
+**Auto-reopen only from ~/Documents/Mping**
+- At launch the app only restores a workspace whose .mpw actually exists in Documents/Mping — hidden Library state can no longer resurrect an untitled or externally-stored workspace, and clearing Documents/Mping genuinely resets the app to its first-launch example
+- Unsaved edits still survive relaunches for Documents-stored workspaces
+
+### Licensing (preparatory)
+
+- Groundwork for per-machine licensing: an Ed25519 signed-licence verifier bound to the hardware UUID, an activation screen, developer tooling, and a licence status line in the sidebar (licensee and expiry, or this machine's copyable ID) — dormant and unenforced in this release
+
+### Project
+
+- Source moved to a private repository; this public repository now hosts the product page, downloads, full changelog, and the issue tracker
+
+---
+
 ## v0.7.2 — 2026-07-18
 
 ### Updates
