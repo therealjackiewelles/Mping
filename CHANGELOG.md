@@ -5,6 +5,21 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.7.4 — 2026-07-22
+
+### Licensing
+
+**Offline licence keys**
+- Licences are now issued as pasteable **keys** rather than files: a signed token carrying the licensee, type, expiry, and machine binding, verified entirely offline against the app's embedded public key — no server, no internet
+- **About window** (click the logo) is the licence home: shows the current licensee, type, and expiry when activated; when not, shows the machine ID and a paste-key field with **Activate** (a file install remains as a fallback)
+- The sidebar licence box is gone; unlicensed, a compact **"Mping not licensed — click here to add licence"** banner sits under the workspace name and opens the About window
+- Unlicensed machines still open the app and run the example workspace, but **real-network monitoring is disabled and greyed** until activated
+- Developer tooling: `make-key.swift` mints keys and records each in a local ledger; `list-keys.swift` lists everything issued with live active/expired status; licences carry a free-text type (perpetual, annual, beta, …) and a per-key expiry
+
+All licensing remains dormant until enforcement is enabled on a signed private-source build; Debug builds always bypass it.
+
+---
+
 ## v0.7.3 — 2026-07-21
 
 ### Temperatures Plane
