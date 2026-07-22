@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/icon.png" width="128" alt="Mping" />
+</p>
+
 <h1 align="center">Mping</h1>
 
 <p align="center">
