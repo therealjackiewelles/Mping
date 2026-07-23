@@ -18,6 +18,8 @@
 
 ---
 
+![Mping monitoring a live show network](docs/mping-demo.gif)
+
 ## What is Mping?
 
 Traditional network monitoring tools are built for IT infrastructure — powerful, but slow to configure and impossible to read at a glance during a show. Mping is built around the workflows of AV system engineers:
