@@ -134,6 +134,14 @@ The application source is maintained in a private repository (`Mping-source`); t
 
 <!-- CHANGELOG:START -->
 
+## v0.7.6 — 2026-07-22
+
+### Licensing
+
+- **Licensing removed** — the licence key system introduced in v0.7.4/v0.7.5 has been withdrawn while it is rethought: no more activation, licence checks, or unlicensed banner, and monitoring is never gated. The About window slims down to version, copyright, and support details
+
+---
+
 ## v0.7.5 — 2026-07-22
 
 ### Licensing
