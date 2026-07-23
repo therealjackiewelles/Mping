@@ -134,6 +134,33 @@ The application source is maintained in a private repository (`Mping-source`); t
 
 <!-- CHANGELOG:START -->
 
+## v0.7.9 — 2026-07-23
+
+### Port Status Boxes (LLDP)
+
+- **Per-switch port status box**: right-click a switch (or hover it and click the new tile-side button) for a draggable companion box showing every port — grid mode mimics a switch faceplate; **Rack Columns mode replicates a physical amp rack**: per-column heights, an unplaced-ports tray, drag-and-drop placement, and units butted flush with dotted separators like gear in a bay
+- **Cell labels**: LLDP neighbour name or the connected device's IP — resolved via the switch's own learned-MAC table and ARP table over SNMP, so un-pinged, LLDP-less endpoints (amplifiers) still label with their IP
+- Boxes snap to the grid, refuse to overlap their own tile (auto-relocating if a layout edit grows them into it), and are edited in a dedicated Port Status Box Editor
+
+### Appearance
+
+- **Light mode**: full dual-theme support via Preferences → Appearance — adaptive colour system across every surface, with status-tinted pastel tiles, solid readout chips, and per-surface tuning; dark remains the default and is pixel-identical to before
+
+### Inspector
+
+- **SFP-centric Fibre Optics section**: one card per transceiver on the selected device — port chip, module type, rx-status dot, TX/RX/temperature/voltage/bias readings, vendor and serial — including modules in ports with no drawn link
+
+### UI Polish (beta-readiness pass)
+
+- Audit-driven cleanup across the app: unified status colours (caution is yellow app-wide), consistent typography and spacing, tooltips and hover states, standardised labels, Escape closes sheets and dialogs
+- Zoomed-out canvas switches to big centred device names (legible status map instead of shrunken tiles); detail sheds progressively with zoom
+- Device names cap at 20 characters and shrink-to-fit before truncating
+- Rubber-band selection matches real tile footprints; port boxes can't hide behind tiles
+- **File → Open Recent** lists the last eight workspaces
+- About window gains a red close button; Mping-styled update download panel
+
+---
+
 ## v0.7.8 — 2026-07-22
 
 ### Updater
