@@ -39,3 +39,9 @@ For commercial licensing, evaluation copies, or any other permission:
 
 - Email: mping@mb-technical.com
 - Phone: +44 7548 773053
+
+---
+
+## Trademarks
+
+Mping is an independent product of MB Technical, with no affiliation to, endorsement by, or sponsorship from NETGEAR, Inc., L-Acoustics, or any other equipment manufacturer. Third-party product names and trademarks are the property of their respective owners and appear only to describe interoperability.

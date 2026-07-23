@@ -97,6 +97,12 @@ Alerts **latch until acknowledged** — a fault that recovers on its own turns a
 
 ---
 
+## Trademarks & Affiliation
+
+Mping is an independent product of MB Technical. It is **not affiliated with, endorsed by, or sponsored by NETGEAR, Inc., L-Acoustics, or any other equipment manufacturer**. NETGEAR is a trademark of NETGEAR, Inc. L-Acoustics and LS10 are trademarks of L-Acoustics. All product names, logos, and brands mentioned are the property of their respective owners and are used solely to describe compatibility and interoperability. We think their gear is great — that's why Mping talks to it.
+
+---
+
 ## Requirements
 
 - macOS 13 Ventura or later
