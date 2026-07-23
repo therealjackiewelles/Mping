@@ -5,6 +5,14 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.7.8 — 2026-07-22
+
+### Updater
+
+- The download progress panel now matches Mping's style — logo, dark rounded card, green progress bar — instead of a plain system window
+
+---
+
 ## v0.7.7 — 2026-07-22
 
 ### Updater
