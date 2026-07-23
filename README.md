@@ -134,6 +134,14 @@ The application source is maintained in a private repository (`Mping-source`); t
 
 <!-- CHANGELOG:START -->
 
+## v0.7.7 — 2026-07-22
+
+### Updater
+
+- **Download dialog fixed properly** — the 0.7.5 fix didn't hold: a modal progress alert's run loop never services the queued "download finished" work at all, so the dialog still hung until Cancel was clicked. The progress dialog is now a regular floating panel, so it closes itself the moment the download completes — and Mping stays usable while downloading
+
+---
+
 ## v0.7.6 — 2026-07-22
 
 ### Licensing
