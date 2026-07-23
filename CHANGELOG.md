@@ -5,6 +5,29 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.7.10 — 2026-07-23
+
+### Search
+
+- **Network-wide search**: the sidebar search now also matches switch ports — by LLDP neighbour name or the endpoint IP resolved from the switch's learned-MAC/ARP tables — so typing an amplifier's IP finds the port it's plugged into
+- **Results list** (capped at 10) under the search field: click to jump-and-highlight, Enter cycles forwards, Tab + Enter cycles backwards; port results auto-show the switch's port status box and flash the exact port cell
+- Rapid cycling is clean: only the current result highlights, and the canvas/tab return-to-view fires once at the end of a burst
+
+### Alerting
+
+- **Offline alerts only fire for devices that were online this session** — opening a show file at home or before the rig is powered no longer floods the history; never-seen devices simply show "Never Seen"
+
+### Port Status Boxes
+
+- Toggle button moved above the tile: springs out of its own tile on hover, hides half a second after the pointer leaves, and can never be obscured by fibre labels
+- The tether line runs tile-edge to box-edge in high-contrast adaptive ink instead of crossing the cards
+
+### Fixes
+
+- Device Ports window no longer shows a duplicated "Device" label
+
+---
+
 ## v0.7.9 — 2026-07-23
 
 ### Port Status Boxes (LLDP)
