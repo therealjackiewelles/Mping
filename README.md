@@ -138,7 +138,7 @@ The application source is maintained in a private repository (`Mping-source`); t
 
 ### Devices
 
-- **New device type: L-Acoustics LS10** — user-selectable in the TYPE picker; renders and behaves identically to a Netgear switch (tile, port status boxes, Device Ports, inspector, links). Polls the LS10's standard SNMP (ports + LLDP; enable SNMP on the switch first — the GigaCore fixed "Public" community and web interface defaults are set automatically). HTTP API support to follow.
+- **New device type: L-Acoustics LS10** — user-selectable in the TYPE picker; renders and behaves identically to a Netgear switch (tile, port status boxes, Device Ports, inspector, links).
 
 ### Performance
 
