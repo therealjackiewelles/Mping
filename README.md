@@ -134,6 +134,19 @@ The application source is maintained in a private repository (`Mping-source`); t
 
 <!-- CHANGELOG:START -->
 
+## v0.7.11 — 2026-07-23
+
+### Devices
+
+- **New device type: L-Acoustics LS10** — user-selectable in the TYPE picker; renders and behaves identically to a Netgear switch (tile, port status boxes, Device Ports, inspector, links). Polls the LS10's standard SNMP (ports + LLDP; enable SNMP on the switch first — the GigaCore fixed "Public" community and web interface defaults are set automatically). HTTP API support to follow.
+
+### Performance
+
+- **Canvas FPS restored**: the adaptive theme's colour tokens defeated SwiftUI's change detection, forcing the whole canvas to re-layout every frame while panning — tokens are now memoised and the workspace is smooth again
+- Port-box label resolution is cached off the render path instead of rebuilding lookup tables every frame
+
+---
+
 ## v0.7.10 — 2026-07-23
 
 ### Search
