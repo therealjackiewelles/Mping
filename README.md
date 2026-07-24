@@ -144,6 +144,19 @@ The application source is maintained in a private repository (`Mping-source`); t
 
 <!-- CHANGELOG:START -->
 
+## v0.7.15 — 2026-07-24
+
+### Port Status Box Editor
+
+- **Multi-select placement**: ⌘-click several ports in the tray, then click a rack slot to drop the whole run in order — no more placing them one at a time
+- **Auto-fill**: one button drops every unplaced port into the empty slots in port order, building a full rack instantly
+
+### Port Status Box
+
+- **Wider cells** so full IP addresses show on the face instead of truncating
+
+---
+
 ## v0.7.14 — 2026-07-24
 
 ### Port Status Boxes
