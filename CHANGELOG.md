@@ -5,6 +5,15 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.7.17 — 2026-07-24
+
+### Port Status Boxes
+
+- **Dropped-packet view** — cells can show each port's discard counters as ↓in ↑out, so a link that's dropping packets stands out at a glance
+- **Cycle button** beside the port-box reveal button steps each cell through LLDP Name → Device IP → Drops without opening the editor
+
+---
+
 ## v0.7.16 — 2026-07-24
 
 ### Port Status Boxes
