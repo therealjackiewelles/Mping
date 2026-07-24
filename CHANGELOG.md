@@ -5,6 +5,14 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.7.13 — 2026-07-24
+
+### Port Status Boxes
+
+- **Amp IP labels now resolve on site** — endpoints that advertise a management IP over LLDP (L-Acoustics amplifiers do) are read directly from the switch's LLDP table as a port → IP mapping, no ARP dependency. Also adds the modern RFC 4293 ARP table for switches that don't implement the legacy one. Fixes empty "Device IP" labels against real Netgear M4250 rigs
+
+---
+
 ## v0.7.12 — 2026-07-23
 
 ### Devices
