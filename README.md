@@ -144,6 +144,20 @@ The application source is maintained in a private repository (`Mping-source`); t
 
 <!-- CHANGELOG:START -->
 
+## v0.7.16 — 2026-07-24
+
+### Port Status Boxes
+
+- **Phantom ports gone** — switches list logical interfaces (link-aggregation groups, VLANs, CPU) in their IF-MIB alongside real ports, which were showing as extra ports; only physical Ethernet ports appear now
+- **Editor**: ⌘-click several tray ports and place them in one go, plus an **Auto-fill** button that drops every unplaced port into the rack in order
+- **Wider cells** so full IP addresses show on the face instead of truncating
+
+### Rendering
+
+- **Sharper on all displays** — the fibre-link, ping-pulse, and alert-border graphics now render at the screen's native resolution (they were drawing at half-resolution on Retina), and tile dimensions and font sizes are pixel-aligned so text and edges stay crisp, especially on standard (non-Retina) monitors
+
+---
+
 ## v0.7.15 — 2026-07-24
 
 ### Port Status Box Editor
