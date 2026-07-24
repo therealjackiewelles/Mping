@@ -5,6 +5,19 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.7.18 — 2026-07-24
+
+### Fixes
+
+- **Port status boxes now persist** — box visibility, layout, rack columns, placed slots, and label style were being stripped when a workspace was reopened; they now save and restore fully with the .mpw
+- **Rack layouts survive mode switches** — flipping a box to Grid and back no longer discards the amp-rack arrangement
+
+### Rendering
+
+- **Sharper zoomed-in canvas** — tiles drop their shadows past 1:1 zoom so text re-renders crisply instead of magnifying a bitmap, and the heartbeat, alert-pulse, and fibre-dash graphics now re-render at the zoomed resolution
+
+---
+
 ## v0.7.17 — 2026-07-24
 
 ### Port Status Boxes
