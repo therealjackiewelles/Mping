@@ -5,6 +5,18 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.7.12 — 2026-07-23
+
+### Devices
+
+- **LS10 polling now uses the switch's built-in HTTP interface** — read-only monitoring with no configuration needed on the switch; port link state, speed, and duplex feed the same port boxes, Device Ports view, and search as Netgear switches. Mping only ever reads — it cannot change any device setting
+
+### Inspector
+
+- **Protocols strip**: a compact status line under the monitoring toggles showing per-transport health at a glance — ICMP for every device, SNMP and LLDP for Netgear switches, HTTP for LS10s — green OK, red N/R, grey when monitoring is off
+
+---
+
 ## v0.7.11 — 2026-07-23
 
 ### Devices

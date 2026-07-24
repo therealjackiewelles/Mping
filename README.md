@@ -144,11 +144,23 @@ The application source is maintained in a private repository (`Mping-source`); t
 
 <!-- CHANGELOG:START -->
 
+## v0.7.12 — 2026-07-23
+
+### Devices
+
+- **LS10 polling now uses the switch's built-in HTTP interface** — read-only monitoring with no configuration needed on the switch; port link state, speed, and duplex feed the same port boxes, Device Ports view, and search as Netgear switches. Mping only ever reads — it cannot change any device setting
+
+### Inspector
+
+- **Protocols strip**: a compact status line under the monitoring toggles showing per-transport health at a glance — ICMP for every device, SNMP and LLDP for Netgear switches, HTTP for LS10s — green OK, red N/R, grey when monitoring is off
+
+---
+
 ## v0.7.11 — 2026-07-23
 
 ### Devices
 
-- **New device type: L-Acoustics LS10** — user-selectable in the TYPE picker; renders and behaves identically to a Netgear switch (tile, port status boxes, Device Ports, inspector, links).
+- **New device type: L-Acoustics LS10** — user-selectable in the TYPE picker; renders and behaves identically to a Netgear switch (tile, port status boxes, Device Ports, inspector, links). Polls the LS10's standard SNMP (ports + LLDP; enable SNMP on the switch first — the GigaCore fixed "Public" community and web interface defaults are set automatically). HTTP API support to follow.
 
 ### Performance
 
