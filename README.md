@@ -144,6 +144,14 @@ The application source is maintained in a private repository (`Mping-source`); t
 
 <!-- CHANGELOG:START -->
 
+## v0.7.14 — 2026-07-24
+
+### Port Status Boxes
+
+- **Phantom ports removed** — switches list link-aggregation groups, VLAN interfaces, and a CPU/management interface in their IF-MIB alongside real ports; these logical interfaces were showing as ports (indices up to 74 on a 30-port switch). Only physical Ethernet ports appear now
+
+---
+
 ## v0.7.13 — 2026-07-24
 
 ### Port Status Boxes

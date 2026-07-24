@@ -5,6 +5,14 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.7.14 — 2026-07-24
+
+### Port Status Boxes
+
+- **Phantom ports removed** — switches list link-aggregation groups, VLAN interfaces, and a CPU/management interface in their IF-MIB alongside real ports; these logical interfaces were showing as ports (indices up to 74 on a 30-port switch). Only physical Ethernet ports appear now
+
+---
+
 ## v0.7.13 — 2026-07-24
 
 ### Port Status Boxes
