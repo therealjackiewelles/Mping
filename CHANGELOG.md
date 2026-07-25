@@ -5,6 +5,32 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.7.19 — 2026-07-24
+
+### Port Status Boxes
+
+- **Layouts persist properly** — box visibility, rack columns, placed ports, and label style now save and restore with the workspace; switching a box to Grid and back no longer discards the rack
+- **Racks appear on open, red until verified** — a reopened workspace shows every configured rack immediately with its labels, each cell red ("remembered") until the first SNMP poll confirms the port, then green (up) or dark (down)
+- **Redundant pairs share box geometry** — configure a switch's box and its redundant peer mirrors position, size, and mode (each keeps its own port arrangement)
+- **Search dims non-matching cells** so the amp you're looking for stands out in the rack
+- **Cell text auto-sizes** to the largest that fits each box's longest label — bigger and readable when zoomed out, never truncated
+- **Global label toolbar** on the workspace's left edge sets every box to LLDP Name / Device IP / Drops at once
+- **Editor multi-drag** — ⌘-select several ports and drag them into the rack together
+
+### Devices
+
+- **Amp IPs resolve on site** via the switch's LLDP management-address table; phantom (logical) ports filtered out so switches show only real ports
+
+### Performance
+
+- **Tile dragging is smooth** — moving a tile no longer re-renders the inspector, port boxes, and every fibre link each frame
+
+### Alerting
+
+- Offline alerts only fire for devices that were online this session
+
+---
+
 ## v0.7.18 — 2026-07-24
 
 ### Fixes
