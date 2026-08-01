@@ -144,6 +144,27 @@ The application source is maintained in a private repository (`Mping-source`); t
 
 <!-- CHANGELOG:START -->
 
+## v0.7.20 — 2026-07-31
+
+### Performance & Heat
+
+This release is a CPU pass, driven by profiling an optimised build against a full live rig.
+
+- **SNMP polling costs a fraction of what it did** — parsing switch telemetry, not talking to the switches, turned out to be the app's biggest CPU cost. Reading each value ran a freshly-built regular expression, and every line was searched up to nine times over. Both are gone, along with the allocations behind them; the parsers were checked against real switch output to be certain nothing reads differently
+- **Device tiles no longer redraw on every ping** — a tile's name, IP, and type row were being re-laid-out (including their shrink-to-fit text sizing) each time any ping result landed, for every tile on the canvas. Only the latency badge and heartbeat update now
+- **The debug console no longer runs when it isn't open** — every ping and every telemetry poll was assembling and storing log entries, including full raw switch output, whether or not anyone was looking at them
+- **Animations pause only when the window genuinely can't be seen** — minimised, hidden, covered, or on another Space. Mping left visible on a second monitor keeps animating while you work in another app
+
+### Devices
+
+- **Open CLI** — right-click a switch to open its command-line interface (port 4444) in your browser, alongside Open Web Interface
+
+### Fixes
+
+- Dead (red) fibre links no longer show flowing traffic animation
+
+---
+
 ## v0.7.19 — 2026-07-24
 
 ### Port Status Boxes
