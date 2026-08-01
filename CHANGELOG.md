@@ -5,6 +5,22 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.7.21 — 2026-08-01
+
+### Link failures show up in seconds
+
+- **A dead link turns red on the map almost immediately** instead of waiting for the next full telemetry pass. Link state is now read on its own quick schedule, separate from the heavier data that only needs occasional refreshing
+- **A pulled cable and a fibre that has lost light look the same**, because operationally they are — the link is down either way
+- **Copper links finally report properly.** They carry no optical telemetry, so port state is the only liveness signal they have; they now use it
+- **Port boxes track ports coming up and going down** at the same quick cadence
+
+### Under the hood
+
+- Individual readings — switch temperature, SFP temperature, SFP signal, port state, dropped packets — can each be polled on their own schedule instead of all arriving together on one slow pass. Reading a single value now asks the switch only for that value
+- A missed or timed-out response is never mistaken for a failure: the previous reading stands until the switch answers again
+
+---
+
 ## v0.7.20 — 2026-07-31
 
 ### Performance & Heat
