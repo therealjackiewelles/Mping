@@ -198,6 +198,96 @@ flowchart TB
 
 ---
 
+## 4a. The tiered module system
+
+Every reading is a module: it owns the OIDs that produce it, declares how often it should run, and knows how to merge its own result. `DeviceStore` schedules; it no longer knows how any individual reading works.
+
+```mermaid
+flowchart TB
+    subgraph Proto["TelemetryModule protocol"]
+        A["subsystem<br/>console category"]
+        B["ownedOIDs<br/>nothing else may walk these"]
+        C["isDiscovery"]
+        D["affectsFibreResults<br/>recordsTemperatureHistory"]
+        E["poll(target) → Output?"]
+        F["merge(output, into: device) → changed?"]
+    end
+
+    subgraph Impl["Modules — one file each"]
+        M1["PortStateModule"]
+        M2["SFPOpticalModule<br/>.temperature / .signal"]
+        M3["SwitchTemperatureModule"]
+        M4["DiscardsModule"]
+        M5["Discovery module<br/>NOT YET EXTRACTED"]
+    end
+
+    subgraph Sched["DeviceStore — scheduler only"]
+        R["pollNextTierTarget<br/>round-robin, one switch per wake"]
+        G["isPollingTier gate<br/>one SNMP unit at a time"]
+        RUN["run(module, target)"]
+    end
+
+    Proto --- Impl
+    R --> G --> RUN
+    RUN -->|"poll off main actor"| Impl
+    Impl -->|"merge on main actor"| ST["MonitoredDevice.switchTelemetry"]
+    RUN -->|"if affectsFibreResults"| FIB["refreshCachedFibreResults"]
+    RUN -->|"if recordsTemperatureHistory"| HIS["temperature history"]
+    RUN --> FR["TelemetryFreshness<br/>last success per module per device"]
+```
+
+### The lifecycle of one reading
+
+```mermaid
+sequenceDiagram
+    participant S as Scheduler
+    participant M as Module
+    participant D as DeviceStore
+    participant F as TelemetryFreshness
+
+    S->>S: pick next switch in rotation
+    Note over S: skipped turn does NOT advance rotation
+    S->>M: poll(target)
+    alt got an answer
+        M-->>S: Output
+        S->>F: recordSuccess(subsystem, device)
+        S->>D: merge on main actor
+        D-->>S: changed?
+        opt changed && affectsFibreResults
+            S->>D: recompute fibre map
+        end
+    else no answer
+        M-->>S: nil
+        Note over S,D: previous state stands.<br/>Absence is never a reading.
+    end
+    S->>S: sleep interval ÷ switch count
+```
+
+### Adding a reading
+
+1. New file in `SNMP-LLDP/Modules/`, conform to `TelemetryModule`.
+2. Declare `ownedOIDs` — and remove them from whatever walks them today.
+3. One line in `DeviceStore.pollTier` mapping the tier to the module.
+4. An interval in `TelemetryPollingDebugSettings`, and a row in the Telemetry Polling window.
+
+Nothing else in the scheduler changes.
+
+### Status
+
+| Module | State |
+|---|---|
+| `PortStateModule` | ✅ extracted, verified on the live rig |
+| `SFPOpticalModule` (temperature + signal) | ✅ extracted |
+| `SwitchTemperatureModule` | ✅ extracted |
+| `DiscardsModule` | ✅ extracted |
+| Bandwidth | ⬜ still inline, own loop |
+| LLDP · STP · MAC/ARP · speed/duplex · fans | ⬜ still inside discovery |
+| **Discovery** | ⬜ still monolithic, still bursts, **still walks OIDs the modules own** |
+
+**The remaining prize is exclusion.** Until discovery stops walking port state, discards and DDM, those are polled twice. That cutover needs live hardware: if a module doesn't fully cover what it claims to own, the reading silently freezes at its last value and only real switches will show it going stale.
+
+---
+
 ## 5. Link liveness — how a dead link turns red
 
 ```mermaid
@@ -262,6 +352,9 @@ Debug windows are password-gated (SHA-256 digest in `DebugAccess`): Device Tile 
 | SNMP | `SNMP-LLDP/LS10Engine.swift` | L-Acoustics HTTP, **GET-only by design** |
 | Modules | `SNMP-LLDP/Modules/TelemetryModule.swift` | Protocol, poll target, freshness |
 | Modules | `SNMP-LLDP/Modules/PortStateModule.swift` | Port up/down |
+| Modules | `SNMP-LLDP/Modules/SFPOpticalModule.swift` | DDM temperature and TX/RX signal |
+| Modules | `SNMP-LLDP/Modules/SwitchTemperatureModule.swift` | Chassis temperature sensors |
+| Modules | `SNMP-LLDP/Modules/DiscardsModule.swift` | Dropped-packet counters |
 | Canvas | `Workspace/WorkspaceView.swift` | Tiles, right-click menu, drag, port boxes |
 | Canvas | `Workspace/WorkspacePlaneCoordinator.swift` | Plane switching, left-edge toolbars |
 | Canvas | `Workspace/Planes/TemperatureGraphView.swift` | Temperature plots |
