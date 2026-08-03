@@ -152,6 +152,23 @@ The application source is maintained in a private repository (`Mping-source`); t
 
 <!-- CHANGELOG:START -->
 
+## v0.7.23 — 2026-08-03
+
+### Adding devices
+
+- **A name is no longer required** to start monitoring. It is a label for you, not something the network cares about — only an IP address and a Ping NIC are needed now
+- **Setup completes when you click away**, not only when you press Enter. Moving from one field straight to another used to leave the change uncommitted
+- **New devices no longer land on top of each other.** Adding several in a row lays them out in a row instead of stacking them in one spot where the ones underneath couldn't be seen or clicked
+- Setup starts with the IP field focused, since that is what it actually needs
+- Choosing the Ping NIC now completes setup immediately — it is usually the last step
+
+### Under the hood
+
+- Whether a device is ready to monitor is now decided in one place. The rule was written out twice, which is why setup behaved differently depending on how you left the field
+- The pulsing highlight on unfilled fields is created and destroyed as you type; it now cleans up after itself properly
+
+---
+
 ## v0.7.22 — 2026-08-03
 
 ### Temperature graphs
