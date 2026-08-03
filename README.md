@@ -126,9 +126,11 @@ I think their gear is great — that's why Mping talks to it.
 
 ## Support, suggestions & licensing
 
+- **Ideas & feature requests:** [Discussions](https://github.com/therealjackiewelles/Mping/discussions) — tell me what Mping should do. What you'd use it for on a rig matters more than how it should work
+- **Questions:** [Q&A](https://github.com/therealjackiewelles/Mping/discussions/categories/q-a)
+- **Bugs & anything broken:** [GitHub Issues](https://github.com/therealjackiewelles/Mping/issues)
 - **Email:** mping@mb-technical.com
 - **Phone:** +44 7548 773053
-- **Issues & feature requests:** [GitHub Issues](https://github.com/therealjackiewelles/Mping/issues)
 
 ---
 
