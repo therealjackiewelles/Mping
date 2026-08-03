@@ -124,6 +124,12 @@ I think their gear is great — that's why Mping talks to it.
 ---
 
 
+## How it works
+
+[**ARCHITECTURE.md**](ARCHITECTURE.md) is the system board — what runs where, when, and why. Diagrams of the monitoring loops and their intervals, the ping and false-offline-prevention path, how telemetry discovery and per-reading polls fit together, and the rules the code is held to.
+
+---
+
 ## Support, suggestions & licensing
 
 - **Ideas & feature requests:** [Discussions](https://github.com/therealjackiewelles/Mping/discussions) — tell me what Mping should do. What you'd use it for on a rig matters more than how it should work
