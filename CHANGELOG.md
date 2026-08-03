@@ -5,6 +5,23 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.7.22 — 2026-08-03
+
+### Temperature graphs
+
+- **The scale now fits the readings.** The graph used a fixed 15–70°C axis, so a switch moving 43°C to 46°C barely registered. It now scales to the temperatures actually on screen, plus 5°C either side — a few degrees of movement is immediately obvious, and two sensors drifting apart is easy to see
+- **A steady sensor still looks steady.** The 5°C padding keeps the axis at least 10°C tall, so normal fluctuation reads as small rather than filling the plot
+- **Curved lines** instead of straight segments, so a trend reads as a trend. Every reading is still plotted exactly — nothing is smoothed away
+- **30 minute window** by default instead of an hour, switchable between 15m, 30m and 1h from buttons on the left of the workspace
+- Fan speeds keep their fixed scale — they sit behind the temperature lines as context, and rescaling them would make idle fan noise swing across the graph
+
+### Telemetry
+
+- **Fixed SFP signal readings on the faster optical poll.** Optical power is reported in thousandths of a dBm; it was being read as hundredths, which would have shown healthy links at around −61 dBm and marked them as failed. Found and corrected against live hardware
+- **Individual readings can no longer be switched off** — the polling controls now set how often each one refreshes, not whether it happens. Switch temperature and dropped packets refresh every 30s, SFP signal every 20s, SFP temperature every 30s, port state every 5s
+
+---
+
 ## v0.7.21 — 2026-08-01
 
 ### Link failures show up in seconds
