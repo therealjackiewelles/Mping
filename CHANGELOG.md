@@ -5,6 +5,25 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.7.25 — 2026-08-03
+
+### When a switch won't report
+
+- **The inspector now tells you why.** A switch that answers pings but gives back no SNMP used to show nothing but empty fields — no ports, no temperatures, no explanation. It now says what has happened and lists the three usual causes: SNMP turned off on the switch, a community string that doesn't match, or the switch only accepting SNMP from certain addresses
+- **The SNMP community can be set in the inspector**, where you actually look when a switch isn't reporting. It was only in Device Manager before. There's a "?" beside it explaining what a community string is and how to create one on a Netgear switch
+- Changing the community clears the previous failure message, so an old error doesn't sit there looking like the new setting is wrong
+
+### Smoother while monitoring
+
+- **The main telemetry sweep is spread across its interval** instead of hammering every switch at once and then going quiet. Each switch is checked exactly as often as before — the work is simply spread out, so the app no longer surges every cycle. On a rig where some switches are slow to answer, the difference is large
+- **Port boxes stop redrawing when nothing about them has changed**, which they were doing on every poll
+
+### Zoom
+
+- The status and temperature dots stay sharp when you zoom right in; they were being flattened into an image beforehand
+
+---
+
 ## v0.7.24 — 2026-08-03
 
 ### Mping runs on macOS 13 Ventura again

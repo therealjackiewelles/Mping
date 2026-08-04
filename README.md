@@ -138,6 +138,22 @@ The application source is maintained in a private repository; this repository ho
 
 <!-- CHANGELOG:START -->
 
+## v0.7.25 — 2026-08-03
+
+### When a switch won't report
+
+- **The inspector now tells you why.** A switch that answers pings but gives back no SNMP used to show nothing but empty fields — no ports, no temperatures, no explanation. It now says what has happened and lists the three usual causes: SNMP turned off on the switch, a community string that doesn't match, or the switch only accepting SNMP from certain addresses
+- **The SNMP community can be set in the inspector**, where you actually look when a switch isn't reporting. It was only in Device Manager before. There's a "?" beside it explaining what a community string is and how to create one on a Netgear switch
+- Changing the community clears the previous failure message, so an old error doesn't sit there looking like the new setting is wrong
+
+### Smoother while monitoring
+
+- **The main telemetry sweep is spread across its interval** instead of hammering every switch at once and then going quiet. Each switch is checked exactly as often as before — the work is simply spread out, so the app no longer surges every cycle. On a rig where some switches are slow to answer, the difference is large
+- **Port boxes stop redrawing when nothing about them has changed**, which they were doing on every poll
+
+### Zoom
+
+- The status and temperature dots stay sharp when you zoom right in; they were being flattened into an image beforehand
 ## v0.7.24 — 2026-08-03
 
 ### Mping runs on macOS 13 Ventura again
@@ -164,20 +180,6 @@ One small difference on Ventura: in the workspace search box, Tab no longer arms
 
 - Whether a device is ready to monitor is now decided in one place. The rule was written out twice, which is why setup behaved differently depending on how you left the field
 - The pulsing highlight on unfilled fields is created and destroyed as you type; it now cleans up after itself properly
-## v0.7.22 — 2026-08-03
-
-### Temperature graphs
-
-- **The scale now fits the readings.** The graph used a fixed 15–70°C axis, so a switch moving 43°C to 46°C barely registered. It now scales to the temperatures actually on screen, plus 5°C either side — a few degrees of movement is immediately obvious, and two sensors drifting apart is easy to see
-- **A steady sensor still looks steady.** The 5°C padding keeps the axis at least 10°C tall, so normal fluctuation reads as small rather than filling the plot
-- **Curved lines** instead of straight segments, so a trend reads as a trend. Every reading is still plotted exactly — nothing is smoothed away
-- **30 minute window** by default instead of an hour, switchable between 15m, 30m and 1h from buttons on the left of the workspace
-- Fan speeds keep their fixed scale — they sit behind the temperature lines as context, and rescaling them would make idle fan noise swing across the graph
-
-### Telemetry
-
-- **Fixed SFP signal readings on the faster optical poll.** Optical power is reported in thousandths of a dBm; it was being read as hundredths, which would have shown healthy links at around −61 dBm and marked them as failed. Found and corrected against live hardware
-- **Individual readings can no longer be switched off** — the polling controls now set how often each one refreshes, not whether it happens. Switch temperature and dropped packets refresh every 30s, SFP signal every 20s, SFP temperature every 30s, port state every 5s
 
 **[Full changelog →](CHANGELOG.md)** — every release since v0.3.0.
 
