@@ -152,6 +152,21 @@ The application source is maintained in a private repository (`Mping-source`); t
 
 <!-- CHANGELOG:START -->
 
+## v0.7.24 — 2026-08-03
+
+### Mping runs on macOS 13 Ventura again
+
+**If Mping refused to install on your Mac, this is the release to get.**
+
+Previous builds were accidentally marked as requiring the very newest macOS, so they would not install on anything older — even though Mping has always been documented as running on Ventura or later. That was a packaging mistake, not a real requirement.
+
+- **Minimum is now macOS 13 Ventura**, as documented
+- Nothing else changes — no features were removed to achieve it
+
+One small difference on Ventura: in the workspace search box, Tab no longer arms reverse-cycling through results. Enter still cycles forward as normal.
+
+---
+
 ## v0.7.23 — 2026-08-03
 
 ### Adding devices
