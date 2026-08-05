@@ -138,6 +138,27 @@ The application source is maintained in a private repository; this repository ho
 
 <!-- CHANGELOG:START -->
 
+## v0.7.26 — 2026-08-04
+
+Tested against a live show network, which turned up several things that only appear when real switches are answering.
+
+### Monitoring is now as fast as you set it
+
+- **Poll intervals were running two to three times slower than configured.** Readings rotate through your switches one at a time, but the gap between them didn't account for how long each reading actually takes — so a five second setting behaved more like fifteen on a large rig. The numbers in Telemetry Polling now mean what they say
+- **Reading a switch's temperature was quietly fetching everything else too** — port tables, neighbours, fibre levels, spanning tree and fan speeds — every thirty seconds per switch. Temperature now reads the temperature. SNMP traffic is down to about a quarter of what it was
+- **Nothing is fetched twice.** Each reading is now the only thing asking for its data
+
+### Fixes
+
+- **Port boxes no longer blank out** when the slower discovery pass runs
+- **Temperature graphs no longer zig-zag** between two sensors — the graph follows the hottest sensor consistently
+- **Fibre link matching is much faster**, which on a large rig was the single heaviest thing the app did
+- Console Output: device names no longer flip between your name for a device and the name it reports over LLDP, and the log no longer empties and refills as it updates
+
+### Quality of life
+
+- **The last workspace reopens on launch, wherever you keep it** — including the Desktop or a USB stick, not just the app's own folder
+- **A reading that stops updating now says so** in the inspector, with how long ago the last value arrived, rather than quietly showing a stale number as though it were current
 ## v0.7.25 — 2026-08-03
 
 ### When a switch won't report
@@ -166,20 +187,6 @@ Previous builds were accidentally marked as requiring the very newest macOS, so 
 - Nothing else changes — no features were removed to achieve it
 
 One small difference on Ventura: in the workspace search box, Tab no longer arms reverse-cycling through results. Enter still cycles forward as normal.
-## v0.7.23 — 2026-08-03
-
-### Adding devices
-
-- **A name is no longer required** to start monitoring. It is a label for you, not something the network cares about — only an IP address and a Ping NIC are needed now
-- **Setup completes when you click away**, not only when you press Enter. Moving from one field straight to another used to leave the change uncommitted
-- **New devices no longer land on top of each other.** Adding several in a row lays them out in a row instead of stacking them in one spot where the ones underneath couldn't be seen or clicked
-- Setup starts with the IP field focused, since that is what it actually needs
-- Choosing the Ping NIC now completes setup immediately — it is usually the last step
-
-### Under the hood
-
-- Whether a device is ready to monitor is now decided in one place. The rule was written out twice, which is why setup behaved differently depending on how you left the field
-- The pulsing highlight on unfilled fields is created and destroyed as you type; it now cleans up after itself properly
 
 **[Full changelog →](CHANGELOG.md)** — every release since v0.3.0.
 
