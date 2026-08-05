@@ -138,6 +138,22 @@ The application source is maintained in a private repository; this repository ho
 
 <!-- CHANGELOG:START -->
 
+## v0.7.27 — 2026-08-04
+
+Tested by taking a redundant link down on a live show network and watching what the app did, frame by frame. It turned up several ways a failed link could go unnoticed.
+
+### A failed link is now visible
+
+- **A copper link between two switches no longer disappears when it fails.** Previously it was simply forgotten and vanished from the map — the redundant leg you would never notice failing by any other means. It now stays put and turns red. Copper links to endpoints like laptops and access points still come and go as before
+- **A dead link shows red even when spanning tree had it blocked.** The blocked colour was winning, so a failure on a redundant leg looked exactly like normal operation
+- **Two links between the same pair of switches now sit side by side.** They were being drawn exactly on top of one another, so the second link was invisible underneath the first
+- **Link failures show up in seconds again.** A change in v0.7.26 let the slow background scan monopolise polling, so a dropped link could take the best part of a minute to appear. Each switch is now polled independently
+
+### Fixes
+
+- Fibre labels no longer swap in front of and behind each other every few seconds
+- A link that recovers is picked up sooner — the switch it belongs to is re-read straight away rather than waiting its turn
+- Temperature graphs, the console log and device naming fixes from v0.7.26 carried forward
 ## v0.7.26 — 2026-08-04
 
 Tested against a live show network, which turned up several things that only appear when real switches are answering.
@@ -175,18 +191,6 @@ Tested against a live show network, which turned up several things that only app
 ### Zoom
 
 - The status and temperature dots stay sharp when you zoom right in; they were being flattened into an image beforehand
-## v0.7.24 — 2026-08-03
-
-### Mping runs on macOS 13 Ventura again
-
-**If Mping refused to install on your Mac, this is the release to get.**
-
-Previous builds were accidentally marked as requiring the very newest macOS, so they would not install on anything older — even though Mping has always been documented as running on Ventura or later. That was a packaging mistake, not a real requirement.
-
-- **Minimum is now macOS 13 Ventura**, as documented
-- Nothing else changes — no features were removed to achieve it
-
-One small difference on Ventura: in the workspace search box, Tab no longer arms reverse-cycling through results. Enter still cycles forward as normal.
 
 **[Full changelog →](CHANGELOG.md)** — every release since v0.3.0.
 

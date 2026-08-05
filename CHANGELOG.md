@@ -5,6 +5,25 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.7.27 — 2026-08-04
+
+Tested by taking a redundant link down on a live show network and watching what the app did, frame by frame. It turned up several ways a failed link could go unnoticed.
+
+### A failed link is now visible
+
+- **A copper link between two switches no longer disappears when it fails.** Previously it was simply forgotten and vanished from the map — the redundant leg you would never notice failing by any other means. It now stays put and turns red. Copper links to endpoints like laptops and access points still come and go as before
+- **A dead link shows red even when spanning tree had it blocked.** The blocked colour was winning, so a failure on a redundant leg looked exactly like normal operation
+- **Two links between the same pair of switches now sit side by side.** They were being drawn exactly on top of one another, so the second link was invisible underneath the first
+- **Link failures show up in seconds again.** A change in v0.7.26 let the slow background scan monopolise polling, so a dropped link could take the best part of a minute to appear. Each switch is now polled independently
+
+### Fixes
+
+- Fibre labels no longer swap in front of and behind each other every few seconds
+- A link that recovers is picked up sooner — the switch it belongs to is re-read straight away rather than waiting its turn
+- Temperature graphs, the console log and device naming fixes from v0.7.26 carried forward
+
+---
+
 ## v0.7.26 — 2026-08-04
 
 Tested against a live show network, which turned up several things that only appear when real switches are answering.
