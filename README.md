@@ -138,6 +138,48 @@ The application source is maintained in a private repository; this repository ho
 
 <!-- CHANGELOG:START -->
 
+## v0.7.29 — 2026-08-07
+
+Tested on a live show rig. The headline is heat: the app now uses less than half the CPU it did this morning, and a fault that made it get steadily worse the longer it ran is fixed.
+
+### Much cooler
+
+Measured on the same rig, same workspace, 16 of 16 links live throughout:
+
+| | CPU |
+|---|---|
+| v0.7.28 | 79% |
+| **v0.7.29** | **35%** |
+
+Three separate causes, found by profiling rather than guesswork:
+
+- **It got worse the longer it ran.** Raising the console log to 50,000 entries in v0.7.28 meant that once the log filled, every single line copied the whole log. Fine on launch, bad after ten minutes. It now trims in blocks. This was a fault introduced in v0.7.28 and is the main reason to update.
+- **The map was describing itself to nobody.** Roughly 60% of the work in each canvas redraw was macOS accessibility machinery, rebuilding descriptions of every tile and link on every pass. See the note below.
+- **One reading arriving caused several redraws.** A single poll updates fibre results, bandwidth, temperature history and alerts, and each one separately told the screen to redraw. They now share one.
+
+### A link going down is now caught in about 4 seconds
+
+Confirmed on the rig by taking a redundant leg down:
+
+- **An alert is raised even when the link is redundant** and nothing else appears to break — the case where a rig quietly loses its backup path. This had never been seen work before.
+- **Detection takes about 4 seconds**, and recovery about 5. Previously both took around 45.
+
+### Fixes
+
+- **SFP temperature and optical readings no longer stop on some switches.** A single failed or timed-out discovery could empty a switch's SFP list, and once empty the readings had nothing to attach to, so that switch stayed blank until a later sweep happened to rediscover it. The list now keeps its contents when a discovery comes back empty. The same protection was added to the per-port list.
+- **Selecting several devices works properly.** Dragging a selection box towards the sidebar no longer stops it growing, releasing outside no longer leaves the box stranded on screen, and it selects what it covers.
+- **Fibre Box Editor** shows the real fibre label instead of a preview that had drifted a long way from it, and its bold, line spacing and border controls now do something.
+- **Undo no longer risks a burst of false Link Down alerts.**
+
+### New
+
+- **Paste device names and addresses straight from a spreadsheet** into Device Manager. Copy the columns, select a row, paste. Two columns are read as name then address; a single column is worked out from what it contains. More rows than devices creates the devices it needs.
+
+### Worth knowing
+
+**The map is no longer reachable by VoiceOver or Voice Control.** That was a deliberate trade for a third of the CPU saving. Everything else — sidebar, inspector, Device Manager, port tables, menus — is unaffected.
+
+**CPU is much better, not solved.** The system compositor still spends a significant amount drawing the canvas, so the machine will still warm up on a large workspace. That work continues.
 ## v0.7.28 — 2026-08-06
 
 A stability baseline before starting a larger change to how the canvas is zoomed. Mostly performance and interface fixes made away from the rig, so several items still need confirming on live hardware — they are listed at the end.
@@ -191,27 +233,6 @@ Tested by taking a redundant link down on a live show network and watching what 
 - Fibre labels no longer swap in front of and behind each other every few seconds
 - A link that recovers is picked up sooner — the switch it belongs to is re-read straight away rather than waiting its turn
 - Temperature graphs, the console log and device naming fixes from v0.7.26 carried forward
-## v0.7.26 — 2026-08-04
-
-Tested against a live show network, which turned up several things that only appear when real switches are answering.
-
-### Monitoring is now as fast as you set it
-
-- **Poll intervals were running two to three times slower than configured.** Readings rotate through your switches one at a time, but the gap between them didn't account for how long each reading actually takes — so a five second setting behaved more like fifteen on a large rig. The numbers in Telemetry Polling now mean what they say
-- **Reading a switch's temperature was quietly fetching everything else too** — port tables, neighbours, fibre levels, spanning tree and fan speeds — every thirty seconds per switch. Temperature now reads the temperature. SNMP traffic is down to about a quarter of what it was
-- **Nothing is fetched twice.** Each reading is now the only thing asking for its data
-
-### Fixes
-
-- **Port boxes no longer blank out** when the slower discovery pass runs
-- **Temperature graphs no longer zig-zag** between two sensors — the graph follows the hottest sensor consistently
-- **Fibre link matching is much faster**, which on a large rig was the single heaviest thing the app did
-- Console Output: device names no longer flip between your name for a device and the name it reports over LLDP, and the log no longer empties and refills as it updates
-
-### Quality of life
-
-- **The last workspace reopens on launch, wherever you keep it** — including the Desktop or a USB stick, not just the app's own folder
-- **A reading that stops updating now says so** in the inspector, with how long ago the last value arrived, rather than quietly showing a stale number as though it were current
 
 **[Full changelog →](CHANGELOG.md)** — every release since v0.3.0.
 
