@@ -5,6 +5,46 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.7.28 — 2026-08-06
+
+A stability baseline before starting a larger change to how the canvas is zoomed. Mostly performance and interface fixes made away from the rig, so several items still need confirming on live hardware — they are listed at the end.
+
+### The app should be much cooler and quieter
+
+A 30 second profile of a live rig running at 85% CPU found the cost was not the SNMP polling at all — the poller threads were idle over 99% of the time. It was the app redrawing the whole canvas every time any reading arrived, many times a second.
+
+- Redraws are now grouped and capped at four a second. Readings still arrive and are acted on the instant they land; only the picture is paced. Anything you do yourself redraws immediately, so the canvas still feels immediate under the hand.
+- Telemetry polls are limited to three at once rather than seven all competing for the same queue.
+
+### Console output
+
+- Every entry is now numbered, like Wireshark, so you can refer to a specific line. The number is kept with the entry, so it stays put when you filter.
+- The log keeps 50,000 entries instead of 3,000.
+- Scrolling up stops the log following, and a **Jump to latest** button appears. New entries keep arriving underneath rather than shoving what you are reading up the screen.
+- The jitter and the occasional blank console are fixed. Auto-scroll was animating towards a target that had already moved.
+- Rows are tighter, so about half as many again fit in the window.
+
+### Windows and tables
+
+- Device Manager and Device Ports no longer open wider than the app window and hang off the side of the screen. They size themselves to the window and follow it as you resize.
+- Their columns shrink to fit a narrow window before falling back to sideways scrolling. Column widths you have set are remembered and restored — they are never overwritten by the fitting.
+
+### Fibre Box Editor
+
+- The preview now shows the real fibre label rather than a lookalike that had drifted a long way from it, including the copper state it never had.
+- Bold text, line spacing and border width were connected to nothing. All three now work.
+
+### Under the hood
+
+- Fan speed and spanning tree are now polled separately on their own intervals, with their own sliders. If either misbehaves, the **Split fan speed and spanning tree** toggle in Telemetry Polling puts them back with no restart.
+- Undo could apply an out-of-date topology rebuild, which had the potential to raise a burst of false Link Down alerts and immediately clear them.
+
+### Still to be confirmed on hardware
+
+These are believed right but have not been proven against real switches: the CPU improvement, the poll limit, the link-down alert for redundant links, link detection timing, and the fan/spanning-tree split. Each is tracked on its issue with what to check.
+
+---
+
 ## v0.7.27 — 2026-08-04
 
 Tested by taking a redundant link down on a live show network and watching what the app did, frame by frame. It turned up several ways a failed link could go unnoticed.
