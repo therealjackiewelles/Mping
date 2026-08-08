@@ -5,6 +5,30 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.7.35 — 2026-08-08
+
+Three changes, all shaped by a day of two machines watching the same live rig.
+
+### The map starts honest, every launch
+
+Topology memory is now session-only, by design: **every boot starts from nothing and draws only what the switches prove over live LLDP.** Previously, remembered links and right-click deletions persisted per machine — so the map was partly yesterday's assumptions, two computers could show the same rig differently, and there was no way to tell observation from assumption. That ambiguity is exactly what made a field report of wrong-looking links undiagnosable after the fact.
+
+Within a session nothing changes: a link that dies stays visible and red and raises its alert, because this session saw it up.
+
+Expect on first launch: any link you had deleted that the switches still advertise will reappear — including real cross-plane interconnects. The map shows what is cabled and advertised, full stop.
+
+### Jitter alerts need a sustained breach
+
+A jitter alert now requires **three consecutive ping cycles over the limit** (about six seconds at default settings) instead of one. Eight devices alerting within the same seven seconds is the signature of the measuring Mac stalling for a moment — a compile, a spotlight index, anything — not of eight network paths degrading at once. Real jitter persists and still alerts quickly; a machine hiccup no longer pages you. The alert text says "sustained" so the rule is visible.
+
+### Spreadsheet paste lands on the rows you see
+
+In a redundant-mode workspace, pasting wrote to the store's internal device order rather than the filtered, reorderable table on screen — names and addresses could land on an interleaved mix of primary and secondary devices, and a workspace rebuilt that way drew wildly wrong topology because tiles were, by address, different switches than their labels claimed. Every paste path now maps through the exact row order of the table it happens in, drag-reordering included.
+
+If you rebuilt a workspace with paste on an earlier build and the map looks wrong: check Device Manager's SNMP/LLDP Name column against your row names, then re-paste names and addresses on this build.
+
+---
+
 ## v0.7.34 — 2026-08-08
 
 Two fixes, both found in the field the same day.
