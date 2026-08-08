@@ -5,9 +5,23 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
-## v0.7.32 — 2026-08-07
+## v0.7.32 — 2026-08-08
 
-A small improvement to panning, and a note about what is actually causing it.
+Fibre link direction fixes, a duplicate SNMP reading removed, and a small improvement to panning.
+
+### Link flow arrows stop reversing
+
+Reported from a live rig: the flow animation on a link would run the wrong way, come right, then go wrong again. Three separate faults were behind it, all of which looked identical on screen.
+
+- **A link had no fixed orientation.** Its identity was already consistent whichever switch reported it, but which end counted as the "start" was simply whichever switch happened to be polled. Seen from the other end, the same unchanged flow was recorded as its opposite — and because the identity matched, the app treated the reversal as a genuine change and committed it. Poll order rotates, so it flipped intermittently. Links now hold one orientation whoever reports them.
+- **Link identities did not survive a restart.** They were derived using a value that macOS deliberately randomises for each app launch, so a link got a different identity every time the app started, while saved links kept their old one. The same physical link then existed twice — once live, once remembered — and the two disagreed. Identities are now derived properly and are the same on every launch.
+- **Links saved by earlier versions lingered as ghosts.** Anything remembered under the old scheme could never match a live link again, so it stayed on the map until topology links were cleared by hand. Saved links are now matched up on load, so this corrects itself.
+
+### One less SNMP reading per switch
+
+Switch temperature was being fetched twice every cycle — once by the temperature reading and again by the discovery pass. The discovery pass no longer asks for it.
+
+This also fixed something quieter: switches that do not publish a temperature table were falling down a different path that skipped their port and fan readings entirely. Every switch now gets the same treatment.
 
 ### Panning
 
