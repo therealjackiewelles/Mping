@@ -138,6 +138,24 @@ The application source is maintained in a private repository; this repository ho
 
 <!-- CHANGELOG:START -->
 
+## v0.7.30 — 2026-08-07
+
+Building a workspace is much quicker: add devices in bulk, then paste their names and addresses in from a spreadsheet.
+
+### Building a workspace
+
+- **Add Devices…** in the Devices menu (⌥⌘D) — choose how many of each device type and add them all at once. They lay out across the canvas without overlapping, and the whole batch is a single undo.
+- **Paste from Spreadsheet** in Device Manager — copy a column of names, or two columns of names and addresses, and paste them straight in. More rows than devices creates the devices needed, so a workspace can be built from an empty canvas.
+- Pasting into a row fills from that row down, so you can top up part of a list.
+- Pasting into the address column fills addresses, even when the values do not look like typical addresses.
+
+### Fixed
+
+- **Pasting no longer ruins the device you paste into.** The cell was taking the whole copied block and committing it as that one device's name, leaving every other device correct and that one wrong.
+
+### Worth knowing
+
+Pasting directly into a cell only shows once you finish editing that cell — the table will not refresh mid-edit, because doing so would take the cursor away while you type. The **Paste from Spreadsheet** button updates immediately and needs nothing selected.
 ## v0.7.29 — 2026-08-07
 
 Tested on a live show rig. The headline is heat: the app now uses less than half the CPU it did this morning, and a fault that made it get steadily worse the longer it ran is fixed.
@@ -217,22 +235,6 @@ A 30 second profile of a live rig running at 85% CPU found the cost was not the 
 ### Still to be confirmed on hardware
 
 These are believed right but have not been proven against real switches: the CPU improvement, the poll limit, the link-down alert for redundant links, link detection timing, and the fan/spanning-tree split. Each is tracked on its issue with what to check.
-## v0.7.27 — 2026-08-04
-
-Tested by taking a redundant link down on a live show network and watching what the app did, frame by frame. It turned up several ways a failed link could go unnoticed.
-
-### A failed link is now visible
-
-- **A copper link between two switches no longer disappears when it fails.** Previously it was simply forgotten and vanished from the map — the redundant leg you would never notice failing by any other means. It now stays put and turns red. Copper links to endpoints like laptops and access points still come and go as before
-- **A dead link shows red even when spanning tree had it blocked.** The blocked colour was winning, so a failure on a redundant leg looked exactly like normal operation
-- **Two links between the same pair of switches now sit side by side.** They were being drawn exactly on top of one another, so the second link was invisible underneath the first
-- **Link failures show up in seconds again.** A change in v0.7.26 let the slow background scan monopolise polling, so a dropped link could take the best part of a minute to appear. Each switch is now polled independently
-
-### Fixes
-
-- Fibre labels no longer swap in front of and behind each other every few seconds
-- A link that recovers is picked up sooner — the switch it belongs to is re-read straight away rather than waiting its turn
-- Temperature graphs, the console log and device naming fixes from v0.7.26 carried forward
 
 **[Full changelog →](CHANGELOG.md)** — every release since v0.3.0.
 

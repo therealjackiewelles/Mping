@@ -5,6 +5,27 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.7.30 — 2026-08-07
+
+Building a workspace is much quicker: add devices in bulk, then paste their names and addresses in from a spreadsheet.
+
+### Building a workspace
+
+- **Add Devices…** in the Devices menu (⌥⌘D) — choose how many of each device type and add them all at once. They lay out across the canvas without overlapping, and the whole batch is a single undo.
+- **Paste from Spreadsheet** in Device Manager — copy a column of names, or two columns of names and addresses, and paste them straight in. More rows than devices creates the devices needed, so a workspace can be built from an empty canvas.
+- Pasting into a row fills from that row down, so you can top up part of a list.
+- Pasting into the address column fills addresses, even when the values do not look like typical addresses.
+
+### Fixed
+
+- **Pasting no longer ruins the device you paste into.** The cell was taking the whole copied block and committing it as that one device's name, leaving every other device correct and that one wrong.
+
+### Worth knowing
+
+Pasting directly into a cell only shows once you finish editing that cell — the table will not refresh mid-edit, because doing so would take the cursor away while you type. The **Paste from Spreadsheet** button updates immediately and needs nothing selected.
+
+---
+
 ## v0.7.29 — 2026-08-07
 
 Tested on a live show rig. The headline is heat: the app now uses less than half the CPU it did this morning, and a fault that made it get steadily worse the longer it ran is fixed.
