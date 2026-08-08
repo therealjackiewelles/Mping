@@ -7,7 +7,15 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ## v0.7.32 — 2026-08-08
 
-Fibre link direction fixes, a duplicate SNMP reading removed, and a small improvement to panning.
+Fibre link direction fixes, a crash fix, network polling that no longer drags the interface, a duplicate SNMP reading removed, and a small improvement to panning.
+
+### A crash, fixed
+
+Away from the rig — where every ping times out and gets forcibly stopped — reading the output of a stopped ping could raise an error of a kind the app cannot intercept, which brought the whole app down. Seen once after about 90 minutes. The read now uses the variant that reports failure as an ordinary, ignorable error: a dead pipe just means no output, which is what a timed-out ping is anyway.
+
+### Network waits no longer drag the interface
+
+All of the app's background work — polling, redrawing, alert evaluation — shares one small pool of worker threads, one per processor core. Pings and SNMP requests were waiting for their replies *on those threads*, and a device that never answers holds its thread for the full timeout. Off the rig, everything times out at maximum, so a normal device list could occupy the entire pool and everything else queued behind it — which is exactly the interface sluggishness reported while polling ran. The waiting now happens on separate threads that the system grows as needed, so a slow or absent device costs patience, not the app's responsiveness.
 
 ### Link flow arrows stop reversing
 
