@@ -5,6 +5,18 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.7.32 — 2026-08-07
+
+A small improvement to panning, and a note about what is actually causing it.
+
+### Panning
+
+Moving the canvas made the app rebuild its entire view tree on every frame — all forty tiles, the links and the port boxes — to work out what to draw. One of the reasons for that has been removed, which cuts the layout work during a pan by roughly a quarter.
+
+**It does not fix the stutter.** The main cause sits higher up: the zoom and pan position are stored above the canvas, so moving the view rebuilds everything beneath it. Fixing that properly means changing where that position is kept, which touches plane switching, the minimap and zoom-at-cursor, so it is being done deliberately rather than quickly. Tracked as issue #80, along with the profiling behind it and three attempts that did not work.
+
+---
+
 ## v0.7.31 — 2026-08-07
 
 One change, aimed squarely at heat.

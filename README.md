@@ -138,6 +138,15 @@ The application source is maintained in a private repository; this repository ho
 
 <!-- CHANGELOG:START -->
 
+## v0.7.32 — 2026-08-07
+
+A small improvement to panning, and a note about what is actually causing it.
+
+### Panning
+
+Moving the canvas made the app rebuild its entire view tree on every frame — all forty tiles, the links and the port boxes — to work out what to draw. One of the reasons for that has been removed, which cuts the layout work during a pan by roughly a quarter.
+
+**It does not fix the stutter.** The main cause sits higher up: the zoom and pan position are stored above the canvas, so moving the view rebuilds everything beneath it. Fixing that properly means changing where that position is kept, which touches plane switching, the minimap and zoom-at-cursor, so it is being done deliberately rather than quickly. Tracked as issue #80, along with the profiling behind it and three attempts that did not work.
 ## v0.7.31 — 2026-08-07
 
 One change, aimed squarely at heat.
@@ -176,48 +185,6 @@ Building a workspace is much quicker: add devices in bulk, then paste their name
 ### Worth knowing
 
 Pasting directly into a cell only shows once you finish editing that cell — the table will not refresh mid-edit, because doing so would take the cursor away while you type. The **Paste from Spreadsheet** button updates immediately and needs nothing selected.
-## v0.7.29 — 2026-08-07
-
-Tested on a live show rig. The headline is heat: the app now uses less than half the CPU it did this morning, and a fault that made it get steadily worse the longer it ran is fixed.
-
-### Much cooler
-
-Measured on the same rig, same workspace, 16 of 16 links live throughout:
-
-| | CPU |
-|---|---|
-| v0.7.28 | 79% |
-| **v0.7.29** | **35%** |
-
-Three separate causes, found by profiling rather than guesswork:
-
-- **It got worse the longer it ran.** Raising the console log to 50,000 entries in v0.7.28 meant that once the log filled, every single line copied the whole log. Fine on launch, bad after ten minutes. It now trims in blocks. This was a fault introduced in v0.7.28 and is the main reason to update.
-- **The map was describing itself to nobody.** Roughly 60% of the work in each canvas redraw was macOS accessibility machinery, rebuilding descriptions of every tile and link on every pass. See the note below.
-- **One reading arriving caused several redraws.** A single poll updates fibre results, bandwidth, temperature history and alerts, and each one separately told the screen to redraw. They now share one.
-
-### A link going down is now caught in about 4 seconds
-
-Confirmed on the rig by taking a redundant leg down:
-
-- **An alert is raised even when the link is redundant** and nothing else appears to break — the case where a rig quietly loses its backup path. This had never been seen work before.
-- **Detection takes about 4 seconds**, and recovery about 5. Previously both took around 45.
-
-### Fixes
-
-- **SFP temperature and optical readings no longer stop on some switches.** A single failed or timed-out discovery could empty a switch's SFP list, and once empty the readings had nothing to attach to, so that switch stayed blank until a later sweep happened to rediscover it. The list now keeps its contents when a discovery comes back empty. The same protection was added to the per-port list.
-- **Selecting several devices works properly.** Dragging a selection box towards the sidebar no longer stops it growing, releasing outside no longer leaves the box stranded on screen, and it selects what it covers.
-- **Fibre Box Editor** shows the real fibre label instead of a preview that had drifted a long way from it, and its bold, line spacing and border controls now do something.
-- **Undo no longer risks a burst of false Link Down alerts.**
-
-### New
-
-- **Paste device names and addresses straight from a spreadsheet** into Device Manager. Copy the columns, select a row, paste. Two columns are read as name then address; a single column is worked out from what it contains. More rows than devices creates the devices it needs.
-
-### Worth knowing
-
-**The map is no longer reachable by VoiceOver or Voice Control.** That was a deliberate trade for a third of the CPU saving. Everything else — sidebar, inspector, Device Manager, port tables, menus — is unaffected.
-
-**CPU is much better, not solved.** The system compositor still spends a significant amount drawing the canvas, so the machine will still warm up on a large workspace. That work continues.
 
 **[Full changelog →](CHANGELOG.md)** — every release since v0.3.0.
 
