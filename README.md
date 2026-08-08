@@ -138,6 +138,21 @@ The application source is maintained in a private repository; this repository ho
 
 <!-- CHANGELOG:START -->
 
+## v0.7.34 — 2026-08-08
+
+Two fixes, both found in the field the same day.
+
+### Opening a recent workspace works again
+
+Clicking an entry in File → Open Recent closed the menu and did nothing. macOS forgets an app's file permissions between launches, and only the last-used workspace kept a stored permission — every other recent was unreadable, and the failure was silent.
+
+Every recent now keeps its own stored permission and opens on click, across restarts. Entries saved by older versions ask once, with the file already selected in the dialog — one click re-grants access for good. A file that genuinely cannot be read now says so instead of doing nothing.
+
+### The console no longer drowns in "Unmatched neighbour"
+
+Running a workspace that monitors only the switches — a handover copy on a second machine did exactly this — flooded the console with error lines: every amplifier the switches could see was reported as an unmatched LLDP neighbour, on every topology rebuild, a few seconds apart. 1,950 error lines in 100 seconds, all saying the same fifty things.
+
+A neighbour that is not a monitored device is information, not a fault. It is now reported once per session, at info level, in plain words.
 ## v0.7.33 — 2026-08-08
 
 Quality-of-life release for building a workspace, plus a menu fix. Every item below was found and verified on the machine during a live working session.
@@ -194,26 +209,6 @@ This also fixed something quieter: switches that do not publish a temperature ta
 Moving the canvas made the app rebuild its entire view tree on every frame — all forty tiles, the links and the port boxes — to work out what to draw. One of the reasons for that has been removed, which cuts the layout work during a pan by roughly a quarter.
 
 **It does not fix the stutter.** The main cause sits higher up: the zoom and pan position are stored above the canvas, so moving the view rebuilds everything beneath it. Fixing that properly means changing where that position is kept, which touches plane switching, the minimap and zoom-at-cursor, so it is being done deliberately rather than quickly. Tracked as issue #80, along with the profiling behind it and three attempts that did not work.
-## v0.7.31 — 2026-08-07
-
-One change, aimed squarely at heat.
-
-### SNMP stops building a network connection for every reading
-
-Profiling a live rig showed the app spending as much effort on *setting up and tearing down* network connections as on anything else. Every time it asked a switch for a reading — and with eight readings rotating across sixteen switches, that is constantly — it built a network flow, worked out a route, installed a handler, then dismantled the lot.
-
-It now uses a plain socket, the same way the ping engine always has.
-
-Measured on a live rig with both versions running side by side against the same switches:
-
-| | CPU | Wake-ups per second |
-|---|---|---|
-| v0.7.30 | ~39% | 121 |
-| **v0.7.31** | **~27%** | **16** |
-
-The wake-up figure matters as much as the CPU one. Every wake-up pulls the processor out of its low-power state, and at 121 a second it never gets to rest — which is what keeps a laptop warm and the fans audible.
-
-Switches see exactly the same requests as before; only the way the app opens its socket has changed.
 
 **[Full changelog →](CHANGELOG.md)** — every release since v0.3.0.
 

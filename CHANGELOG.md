@@ -5,6 +5,24 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.7.34 — 2026-08-08
+
+Two fixes, both found in the field the same day.
+
+### Opening a recent workspace works again
+
+Clicking an entry in File → Open Recent closed the menu and did nothing. macOS forgets an app's file permissions between launches, and only the last-used workspace kept a stored permission — every other recent was unreadable, and the failure was silent.
+
+Every recent now keeps its own stored permission and opens on click, across restarts. Entries saved by older versions ask once, with the file already selected in the dialog — one click re-grants access for good. A file that genuinely cannot be read now says so instead of doing nothing.
+
+### The console no longer drowns in "Unmatched neighbour"
+
+Running a workspace that monitors only the switches — a handover copy on a second machine did exactly this — flooded the console with error lines: every amplifier the switches could see was reported as an unmatched LLDP neighbour, on every topology rebuild, a few seconds apart. 1,950 error lines in 100 seconds, all saying the same fifty things.
+
+A neighbour that is not a monitored device is information, not a fault. It is now reported once per session, at info level, in plain words.
+
+---
+
 ## v0.7.33 — 2026-08-08
 
 Quality-of-life release for building a workspace, plus a menu fix. Every item below was found and verified on the machine during a live working session.
