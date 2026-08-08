@@ -138,9 +138,56 @@ The application source is maintained in a private repository; this repository ho
 
 <!-- CHANGELOG:START -->
 
-## v0.7.32 — 2026-08-07
+## v0.7.33 — 2026-08-08
 
-A small improvement to panning, and a note about what is actually causing it.
+Quality-of-life release for building a workspace, plus a menu fix. Every item below was found and verified on the machine during a live working session.
+
+### Spreadsheet paste that actually behaves
+
+Copy device names — or names and addresses — from a spreadsheet and press ⌘V in Device Manager:
+
+- **The rows fill the moment the paste lands.** No pressing Enter, no clicking away. Previously the data applied but stayed invisible until the edit ended — three separate faults stacked on that one symptom, all found by tracing on the machine.
+- **It fills from the row you have selected**, so a paste can start anywhere in the list, not just at the top.
+- **Works from any state** — mid-edit with the cursor blinking, a row selected, or nothing focused at all.
+- Excel-style line endings handled; more rows than devices creates the devices needed.
+
+### Editing device fields
+
+- **One click puts the cursor in a cell.** Previously the first click selected the row and the second was held while macOS decided whether you were starting a drag — measured at over a second on the redundant-mode tables, and on a live rig the table could refresh between the two clicks and undo the first one. The trade: rows can no longer be dragged to reorder *by their text fields* — the checkbox column and row padding still drag.
+- **A refresh can no longer destroy an edit in progress.** Typing in one table while the other refreshed could tear the cursor out mid-word.
+
+### Menus
+
+- **File → Open Recent no longer flickers away under the pointer.** The menu bar was being rebuilt four times a second by telemetry updates — macOS closes an open submenu whenever its items are replaced. The menu bar now only rebuilds when something it actually displays changes.
+
+### Under the hood
+
+- **Devices still awaiting setup are no longer SNMP-polled.** A workspace of freshly created devices was being polled continuously at placeholder addresses — pure timeout churn, for nothing.
+## v0.7.32 — 2026-08-08
+
+Fibre link direction fixes, a crash fix, network polling that no longer drags the interface, a duplicate SNMP reading removed, and a small improvement to panning.
+
+### A crash, fixed
+
+Away from the rig — where every ping times out and gets forcibly stopped — reading the output of a stopped ping could raise an error of a kind the app cannot intercept, which brought the whole app down. Seen once after about 90 minutes. The read now uses the variant that reports failure as an ordinary, ignorable error: a dead pipe just means no output, which is what a timed-out ping is anyway.
+
+### Network waits no longer drag the interface
+
+All of the app's background work — polling, redrawing, alert evaluation — shares one small pool of worker threads, one per processor core. Pings and SNMP requests were waiting for their replies *on those threads*, and a device that never answers holds its thread for the full timeout. Off the rig, everything times out at maximum, so a normal device list could occupy the entire pool and everything else queued behind it — which is exactly the interface sluggishness reported while polling ran. The waiting now happens on separate threads that the system grows as needed, so a slow or absent device costs patience, not the app's responsiveness.
+
+### Link flow arrows stop reversing
+
+Reported from a live rig: the flow animation on a link would run the wrong way, come right, then go wrong again. Three separate faults were behind it, all of which looked identical on screen.
+
+- **A link had no fixed orientation.** Its identity was already consistent whichever switch reported it, but which end counted as the "start" was simply whichever switch happened to be polled. Seen from the other end, the same unchanged flow was recorded as its opposite — and because the identity matched, the app treated the reversal as a genuine change and committed it. Poll order rotates, so it flipped intermittently. Links now hold one orientation whoever reports them.
+- **Link identities did not survive a restart.** They were derived using a value that macOS deliberately randomises for each app launch, so a link got a different identity every time the app started, while saved links kept their old one. The same physical link then existed twice — once live, once remembered — and the two disagreed. Identities are now derived properly and are the same on every launch.
+- **Links saved by earlier versions lingered as ghosts.** Anything remembered under the old scheme could never match a live link again, so it stayed on the map until topology links were cleared by hand. Saved links are now matched up on load, so this corrects itself.
+
+### One less SNMP reading per switch
+
+Switch temperature was being fetched twice every cycle — once by the temperature reading and again by the discovery pass. The discovery pass no longer asks for it.
+
+This also fixed something quieter: switches that do not publish a temperature table were falling down a different path that skipped their port and fan readings entirely. Every switch now gets the same treatment.
 
 ### Panning
 
@@ -167,24 +214,6 @@ Measured on a live rig with both versions running side by side against the same 
 The wake-up figure matters as much as the CPU one. Every wake-up pulls the processor out of its low-power state, and at 121 a second it never gets to rest — which is what keeps a laptop warm and the fans audible.
 
 Switches see exactly the same requests as before; only the way the app opens its socket has changed.
-## v0.7.30 — 2026-08-07
-
-Building a workspace is much quicker: add devices in bulk, then paste their names and addresses in from a spreadsheet.
-
-### Building a workspace
-
-- **Add Devices…** in the Devices menu (⌥⌘D) — choose how many of each device type and add them all at once. They lay out across the canvas without overlapping, and the whole batch is a single undo.
-- **Paste from Spreadsheet** in Device Manager — copy a column of names, or two columns of names and addresses, and paste them straight in. More rows than devices creates the devices needed, so a workspace can be built from an empty canvas.
-- Pasting into a row fills from that row down, so you can top up part of a list.
-- Pasting into the address column fills addresses, even when the values do not look like typical addresses.
-
-### Fixed
-
-- **Pasting no longer ruins the device you paste into.** The cell was taking the whole copied block and committing it as that one device's name, leaving every other device correct and that one wrong.
-
-### Worth knowing
-
-Pasting directly into a cell only shows once you finish editing that cell — the table will not refresh mid-edit, because doing so would take the cursor away while you type. The **Paste from Spreadsheet** button updates immediately and needs nothing selected.
 
 **[Full changelog →](CHANGELOG.md)** — every release since v0.3.0.
 

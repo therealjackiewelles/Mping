@@ -5,6 +5,34 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.7.33 — 2026-08-08
+
+Quality-of-life release for building a workspace, plus a menu fix. Every item below was found and verified on the machine during a live working session.
+
+### Spreadsheet paste that actually behaves
+
+Copy device names — or names and addresses — from a spreadsheet and press ⌘V in Device Manager:
+
+- **The rows fill the moment the paste lands.** No pressing Enter, no clicking away. Previously the data applied but stayed invisible until the edit ended — three separate faults stacked on that one symptom, all found by tracing on the machine.
+- **It fills from the row you have selected**, so a paste can start anywhere in the list, not just at the top.
+- **Works from any state** — mid-edit with the cursor blinking, a row selected, or nothing focused at all.
+- Excel-style line endings handled; more rows than devices creates the devices needed.
+
+### Editing device fields
+
+- **One click puts the cursor in a cell.** Previously the first click selected the row and the second was held while macOS decided whether you were starting a drag — measured at over a second on the redundant-mode tables, and on a live rig the table could refresh between the two clicks and undo the first one. The trade: rows can no longer be dragged to reorder *by their text fields* — the checkbox column and row padding still drag.
+- **A refresh can no longer destroy an edit in progress.** Typing in one table while the other refreshed could tear the cursor out mid-word.
+
+### Menus
+
+- **File → Open Recent no longer flickers away under the pointer.** The menu bar was being rebuilt four times a second by telemetry updates — macOS closes an open submenu whenever its items are replaced. The menu bar now only rebuilds when something it actually displays changes.
+
+### Under the hood
+
+- **Devices still awaiting setup are no longer SNMP-polled.** A workspace of freshly created devices was being polled continuously at placeholder addresses — pure timeout churn, for nothing.
+
+---
+
 ## v0.7.32 — 2026-08-08
 
 Fibre link direction fixes, a crash fix, network polling that no longer drags the interface, a duplicate SNMP reading removed, and a small improvement to panning.
