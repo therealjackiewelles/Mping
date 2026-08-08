@@ -5,6 +5,29 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.7.31 — 2026-08-07
+
+One change, aimed squarely at heat.
+
+### SNMP stops building a network connection for every reading
+
+Profiling a live rig showed the app spending as much effort on *setting up and tearing down* network connections as on anything else. Every time it asked a switch for a reading — and with eight readings rotating across sixteen switches, that is constantly — it built a network flow, worked out a route, installed a handler, then dismantled the lot.
+
+It now uses a plain socket, the same way the ping engine always has.
+
+Measured on a live rig with both versions running side by side against the same switches:
+
+| | CPU | Wake-ups per second |
+|---|---|---|
+| v0.7.30 | ~39% | 121 |
+| **v0.7.31** | **~27%** | **16** |
+
+The wake-up figure matters as much as the CPU one. Every wake-up pulls the processor out of its low-power state, and at 121 a second it never gets to rest — which is what keeps a laptop warm and the fans audible.
+
+Switches see exactly the same requests as before; only the way the app opens its socket has changed.
+
+---
+
 ## v0.7.30 — 2026-08-07
 
 Building a workspace is much quicker: add devices in bulk, then paste their names and addresses in from a spreadsheet.
