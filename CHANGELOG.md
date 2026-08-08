@@ -5,6 +5,17 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.7.36 — 2026-08-08
+
+One fix: the jitter quieting in v0.7.35 did not hold — sixteen alerts within seconds of launch. Two holes, both now closed.
+
+- **Jitter needs a real sample base.** It was computed from as few as two pings, and the first pings of a session land during the startup storm, when every switch is being swept at once. No jitter figure exists now until nine samples (~16 seconds) — variation measured from two points is not a statistic.
+- **"Three consecutive cycles" now means cycles.** The breach counter advanced on every alert evaluation, and evaluations run from several places — one ping cycle could pass the gate in milliseconds. The counter now only advances when a genuinely new ping sample exists.
+
+Expected behaviour after this: silence for the first ~16 seconds after launch while a base is measured, then jitter alerts only for breaches that persist across three real ping cycles.
+
+---
+
 ## v0.7.35 — 2026-08-08
 
 Three changes, all shaped by a day of two machines watching the same live rig.

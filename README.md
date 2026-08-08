@@ -138,6 +138,14 @@ The application source is maintained in a private repository; this repository ho
 
 <!-- CHANGELOG:START -->
 
+## v0.7.36 — 2026-08-08
+
+One fix: the jitter quieting in v0.7.35 did not hold — sixteen alerts within seconds of launch. Two holes, both now closed.
+
+- **Jitter needs a real sample base.** It was computed from as few as two pings, and the first pings of a session land during the startup storm, when every switch is being swept at once. No jitter figure exists now until nine samples (~16 seconds) — variation measured from two points is not a statistic.
+- **"Three consecutive cycles" now means cycles.** The breach counter advanced on every alert evaluation, and evaluations run from several places — one ping cycle could pass the gate in milliseconds. The counter now only advances when a genuinely new ping sample exists.
+
+Expected behaviour after this: silence for the first ~16 seconds after launch while a base is measured, then jitter alerts only for breaches that persist across three real ping cycles.
 ## v0.7.35 — 2026-08-08
 
 Three changes, all shaped by a day of two machines watching the same live rig.
@@ -174,31 +182,6 @@ Every recent now keeps its own stored permission and opens on click, across rest
 Running a workspace that monitors only the switches — a handover copy on a second machine did exactly this — flooded the console with error lines: every amplifier the switches could see was reported as an unmatched LLDP neighbour, on every topology rebuild, a few seconds apart. 1,950 error lines in 100 seconds, all saying the same fifty things.
 
 A neighbour that is not a monitored device is information, not a fault. It is now reported once per session, at info level, in plain words.
-## v0.7.33 — 2026-08-08
-
-Quality-of-life release for building a workspace, plus a menu fix. Every item below was found and verified on the machine during a live working session.
-
-### Spreadsheet paste that actually behaves
-
-Copy device names — or names and addresses — from a spreadsheet and press ⌘V in Device Manager:
-
-- **The rows fill the moment the paste lands.** No pressing Enter, no clicking away. Previously the data applied but stayed invisible until the edit ended — three separate faults stacked on that one symptom, all found by tracing on the machine.
-- **It fills from the row you have selected**, so a paste can start anywhere in the list, not just at the top.
-- **Works from any state** — mid-edit with the cursor blinking, a row selected, or nothing focused at all.
-- Excel-style line endings handled; more rows than devices creates the devices needed.
-
-### Editing device fields
-
-- **One click puts the cursor in a cell.** Previously the first click selected the row and the second was held while macOS decided whether you were starting a drag — measured at over a second on the redundant-mode tables, and on a live rig the table could refresh between the two clicks and undo the first one. The trade: rows can no longer be dragged to reorder *by their text fields* — the checkbox column and row padding still drag.
-- **A refresh can no longer destroy an edit in progress.** Typing in one table while the other refreshed could tear the cursor out mid-word.
-
-### Menus
-
-- **File → Open Recent no longer flickers away under the pointer.** The menu bar was being rebuilt four times a second by telemetry updates — macOS closes an open submenu whenever its items are replaced. The menu bar now only rebuilds when something it actually displays changes.
-
-### Under the hood
-
-- **Devices still awaiting setup are no longer SNMP-polled.** A workspace of freshly created devices was being polled continuously at placeholder addresses — pure timeout churn, for nothing.
 
 **[Full changelog →](CHANGELOG.md)** — every release since v0.3.0.
 
