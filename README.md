@@ -69,11 +69,11 @@ Optical TX/RX power, temperature, voltage and laser bias for every SFP, read ove
 
 ### Spanning tree, drawn honestly
 
-The root bridge wears a gold badge, blocked ports draw as dashed amber, and the dedicated STP plane shows the whole tree at once. Flow arrows are computed from the switches' own designated-bridge votes — and if the data cannot prove a direction, Mping draws **no arrow rather than a guessed one**.
+STP state lives right on the map: the root bridge wears a gold badge, blocked redundant paths draw as dashed amber, and traffic-flow arrows animate toward the root — computed from the switches' own designated-bridge votes. If the data cannot prove a direction, Mping draws **no arrow rather than a guessed one**.
 
 </td>
 <td width="45%" valign="top">
-<img src="docs/screenshots/stp-plane.png" alt="STP plane: root bridge in gold, blocking link dashed, active links animated" width="100%" />
+<img src="docs/screenshots/stp-detail.png" alt="Root bridge badge, dashed blocked path, and flow arrows on the topology map" width="100%" />
 </td>
 </tr>
 <tr>
