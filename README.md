@@ -29,7 +29,124 @@ Network monitoring built for show engineers, not IT departments. Everything on o
 - The numbers that matter: RTT, jitter, packet loss, fibre loss, SFP temperature and signal
 - Built around **Netgear AV**, **AVB/Milan**, **L-Acoustics** and fibre rigs
 
-![Mping monitoring a live show network](docs/mping-demo.gif)
+## Features
+
+*Every screenshot below is Mping's built-in example workspace — a redundant four-switch fibre rig with access points — exactly as the app draws it.*
+
+### The whole rig on one canvas
+
+<img src="docs/screenshots/topology.png" alt="Live topology canvas: four zones, fibre links with loss and bandwidth, an RSTP-blocked redundant path" width="100%" />
+
+Every switch, amplifier and access point is a live tile — round-trip time, temperature and status readable from across the room. Fibre links are discovered automatically over LLDP and drawn with **per-end optical loss in dB** and **live per-port bandwidth**. Traffic direction animates toward the root bridge, and a blocked redundant path is drawn as exactly that — an orange dashed line, not a healthy link. Zone boxes group the rig the way it is racked, tiles drag freely, and a venue plan can sit behind everything (PNG, JPEG or PDF, with smart invert so black-on-white drawings read correctly on the dark canvas).
+
+<table>
+<tr>
+<td width="55%" valign="top">
+
+### Ping you can trust
+
+A device is **never marked offline until a verification burst confirms it** — one lost packet on a busy network does not page you. Round-trip times are stamped by the kernel at packet arrival, so the numbers match `ping` in a terminal instead of inheriting the app's scheduling noise. Loss %, jitter and uptime are tracked per device, and jitter alerts only fire on a breach sustained across consecutive real cycles.
+
+</td>
+<td width="45%" valign="top">
+<img src="docs/screenshots/device-tile.png" alt="Device tile with RTT, temperature, root bridge badge and port status box" width="100%" />
+</td>
+</tr>
+<tr>
+<td width="55%" valign="top">
+
+### Fibre and SFP optics, per module
+
+Optical TX/RX power, temperature, voltage and laser bias for every SFP, read over DDM. Link labels carry the measured **loss of each direction** of every span, with alerts on your dB threshold — and a link whose light disappears goes red immediately. Copper SFPs are told apart from optical automatically, so the map never claims fibre where there is none.
+
+</td>
+<td width="45%" valign="top">
+<img src="docs/screenshots/fibre-links.png" alt="Fibre links with per-end dB loss, bandwidth labels, and an STP-blocked dashed path" width="100%" />
+</td>
+</tr>
+<tr>
+<td width="55%" valign="top">
+
+### Spanning tree, drawn honestly
+
+The root bridge wears a gold badge, blocked ports draw as dashed amber, and the dedicated STP plane shows the whole tree at once. Flow arrows are computed from the switches' own designated-bridge votes — and if the data cannot prove a direction, Mping draws **no arrow rather than a guessed one**.
+
+</td>
+<td width="45%" valign="top">
+<img src="docs/screenshots/stp-plane.png" alt="STP plane: root bridge in gold, blocking link dashed, active links animated" width="100%" />
+</td>
+</tr>
+<tr>
+<td width="55%" valign="top">
+
+### Redundant networks are first-class
+
+Primary and secondary planes as two tabs of one workspace. Devices pair with their redundant twins, share canvas position and port-box layout, and wear P/S badges. Each plane keeps its own topology, its own link map and its own alert focus — clicking a secondary alert takes you to the secondary plane.
+
+</td>
+<td width="45%" valign="top">
+<img src="docs/screenshots/redundant.png" alt="Secondary network plane with blue-tinted zones and paired switches" width="100%" />
+</td>
+</tr>
+<tr>
+<td width="55%" valign="top">
+
+### Heat, before it becomes a problem
+
+Both temperature sensors and all four fans of every switch, polled continuously with configurable alert thresholds. The Temperatures plane turns every tile into a **rolling one-hour graph** of sensors and fans, with hover readouts — a quiet rack at load-in and a hot one at showtime are one glance apart.
+
+</td>
+<td width="45%" valign="top">
+<img src="docs/screenshots/temperatures.png" alt="Temperatures plane: per-switch rolling graphs of sensors and fans" width="100%" />
+</td>
+</tr>
+<tr>
+<td width="55%" valign="top">
+
+### Search that knows your patch
+
+Search matches devices — and **switch ports**, by LLDP neighbour name or by the endpoint IP resolved from the switch's own learned-MAC and ARP tables. Type an amplifier's IP and Mping finds the port it is plugged into, opens that switch's port box, and flashes the exact cell.
+
+</td>
+<td width="45%" valign="top">
+<img src="docs/screenshots/search.png" alt="Sidebar search returning devices and the switch ports they are plugged into" width="100%" />
+</td>
+</tr>
+<tr>
+<td width="55%" valign="top">
+
+### One click, whole story
+
+The inspector shows a device's live RTT sparkline, loss, jitter and uptime, temperature history, and a card per SFP — TX/RX, temperature, voltage, bias, vendor and serial. Per-device toggles for ping and SNMP monitoring, and a protocols strip showing per-transport health at a glance.
+
+</td>
+<td width="45%" valign="top">
+<img src="docs/screenshots/inspector.png" alt="Device inspector: ping statistics, temperature history and fibre optics per SFP" width="100%" />
+</td>
+</tr>
+<tr>
+<td width="55%" valign="top">
+
+### Set up a rig in minutes
+
+Add a show's worth of devices in one action, then **paste names and IPs straight from a spreadsheet** — the table fills live as you paste. Bulk-edit zone, type, community and monitoring state across a selection. In redundant mode the manager pairs both networks side by side.
+
+</td>
+<td width="45%" valign="top">
+<img src="docs/screenshots/device-manager.png" alt="Device Manager: redundant-mode table with spreadsheet paste" width="100%" />
+</td>
+</tr>
+</table>
+
+### And for the engineer who reads spec sheets
+
+- **Port status boxes** — a draggable companion per switch that replicates the physical amp rack: per-column heights, drag-in placement, cells labelled with LLDP name, endpoint IP or drop counters, red-until-verified on reopen
+- **Alerts that latch** — offline, RTT, jitter, fibre loss and temperature alerts stand until acknowledged, with full history; recovered-but-unacknowledged shows amber, and macOS notifications reach you when Mping is in the background
+- **Hold ⌥ Option** to flip every tile's IP to its MAC address, learned live from the network
+- **Honest by design** — topology memory is session-only: every launch draws only what the switches prove now, never yesterday's assumptions
+- **One portable file** — a workspace is a single `.mpw` including the venue plan; open it on another Mac and the whole rig comes with it
+- **Multi-NIC aware** — ping and SNMP bind to the interface you choose per device, built for FOH Macs riding two networks at once
+- **Show-safe footprint** — engineered for low CPU and few wake-ups so the FOH Mac stays cool and silent; read-only throughout: Mping never writes a single setting to any device
 
 ---
 
