@@ -105,7 +105,7 @@ Both temperature sensors and all four fans of every switch, polled continuously 
 
 ### Search that knows your patch
 
-Search matches devices — and **switch ports**, by LLDP neighbour name or by the endpoint IP resolved from the switch's own learned-MAC and ARP tables. Type an amplifier's IP and Mping finds the port it is plugged into, opens that switch's port box, and flashes the exact cell.
+Search matches devices — and **switch ports**, by LLDP neighbour name or by the endpoint IP resolved from the switch's own learned-MAC and ARP tables. Type an device's IP and Mping finds the port it is plugged into, opens that switch's port box, and flashes the exact cell.
 
 </td>
 <td width="45%" valign="top">
@@ -140,13 +140,13 @@ Add a show's worth of devices in one action, then **paste names and IPs straight
 
 ### And for the engineer who reads spec sheets
 
-- **Port status boxes** — a draggable companion per switch that replicates the physical amp rack: per-column heights, drag-in placement, cells labelled with LLDP name, endpoint IP or drop counters, red-until-verified on reopen
+- **Port status boxes** — a draggable companion per switch that replicates the physical racks with your kit in: per-column heights, drag-in placement, cells labelled with LLDP name, endpoint IP or drop counters, red-until-verified on reopen
 - **Alerts that latch** — offline, RTT, jitter, fibre loss and temperature alerts stand until acknowledged, with full history; recovered-but-unacknowledged shows amber, and macOS notifications reach you when Mping is in the background
 - **Hold ⌥ Option** to flip every tile's IP to its MAC address, learned live from the network
 - **Honest by design** — topology memory is session-only: every launch draws only what the switches prove now, never yesterday's assumptions
 - **One portable file** — a workspace is a single `.mpw` including the venue plan; open it on another Mac and the whole rig comes with it
 - **Multi-NIC aware** — ping and SNMP bind to the interface you choose per device, built for FOH Macs riding two networks at once
-- **Show-safe footprint** — engineered for low CPU and few wake-ups so the FOH Mac stays cool and silent; read-only throughout: Mping never writes a single setting to any device
+- **Show-safe footprint** — engineered for low CPU and few wake-ups so the Monitoring Mac stays cool and silent; read-only throughout: Mping never writes a single setting to any device
 
 ---
 
