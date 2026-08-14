@@ -5,6 +5,145 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.7.47 — 2026-08-13
+
+L-Acoustics LS10 switches become first-class citizens, and spanning-tree rendering gets materially more honest on every rig.
+
+**Full LS10 monitoring — no SNMP required.** LS10s are polled entirely over their own HTTP interface, read-only: port status boxes, link-state at the same fast cadence as the Netgears, device temperature into the graphs and alerts, per-port bandwidth on the link labels, fan readings, and full topology participation — links to Netgears and between LS10s, chassis-identity matched, with root badge, blocked-path dashes and flow direction. Discovery uses the unit's engineer-set name. The SNMP pollers no longer waste timeouts asking LS10s questions they'll never answer, so the console stays quiet.
+
+**Blocked links can no longer masquerade as live ones.** Whether a link is STP-blocked is now judged from both ends — only the blocking side ever reports it, so depending on polling order a blocked redundant path could previously render as a live flowing link. Flow animations are also properly torn down when a link's direction changes or stops: after an STP failover and recovery, the re-blocked alternate now sits correctly still.
+
+**Copper links restyled** (with a partially colourblind eye doing the tuning): a quieter grey line that no longer outshines live fibre, a legible port label, and flow dashes that actually read against the line.
+
+**Device Manager: pasting into a cell you're editing** now fills from that row with the clicked cell carrying its value — previously the pasted-into cell ended up blank.
+
+**Console CSV export always writes the complete log**, regardless of the device filter — the filter is a view, not a scope. Twice a filtered export silently discarded the diagnostic data it was taken for.
+
+**Steadier link identities on slow rigs:** a poll that fails to read a switch's chassis identity no longer wipes the stored one, which was quietly degrading link matching on rigs with tight SNMP timeouts.
+
+---
+
+## v0.7.46 — 2026-08-11
+
+Showfile-prep quality of life: redundant devices in bulk, spreadsheet pastes that land where aimed, and planning a new show while the current one stays monitored.
+
+**Device Manager: pastes follow the table you clicked.** Pasting a spreadsheet block into the secondary table used to overwrite the primary rows: keyboard shortcuts were claimed by whichever table sat higher in the window, and clicking the secondary table's Linked To column didn't move focus. Cmd-V now pastes into the focused table starting at the clicked row, the secondary section has its own Paste from Spreadsheet button (row-aligned with the primary table), and clicking anywhere on a secondary row selects it.
+
+**Redundancy in bulk.** Multi-select rows and one checkbox click marks them all redundant. The secondary list always mirrors the primary order — tick, untick and re-tick in any sequence and the rows stay aligned for pasting.
+
+**Planning windows.** File > New Workspace opens a separate window with a blank workspace and monitoring off — build next week's file while the current gig stays monitored in its own window. Menus act on whichever window is focused. Closing a planning window tears down its engines completely.
+
+**File > Save restored.** The multi-window scene change silently dropped Save, Save As and Cmd-S from the File menu; they're re-anchored to a menu position that survives it.
+
+**Port-box guard.** A truncated SNMP walk (short timeout, busy switch) can no longer shrink a switch's port table — fewer rows than the switch's fixed port count means a bad walk, and the previous table is kept.
+
+---
+
+## v0.7.45 — 2026-08-11
+
+Completes v0.7.44's topology-matching overhaul — update straight to this one.
+
+**Links are now matched by chassis identity first.** LLDP's own identity primitive — the chassis MAC each switch advertises — is now the primary match key, compared against the chassis identity Mping already reads live from every switch. Switch-to-switch rows that advertise no system name (standard on many uplinks) resolve by protocol identity instead of depending on the far end's name row. The ARP-learned MAC remains a second exact key for endpoints whose chassis ID is simply their NIC address, and name rules drop to what they should always have been: a fallback, used only when nothing exact exists, refusing to bind when ambiguous.
+
+**Auto-named devices contribute no typed name to matching.** With name source set to Auto, the LLDP-discovered name is the maintained identity — the typed name underneath (possibly stale, possibly mispasted, invisible on screen) no longer participates in link matching at all. Under manual naming the typed name remains a legitimate identity, as it should be.
+
+Together with v0.7.44's exact-first tiers and LLDP table guard, this closes the phantom-link investigation: wrong-device links can no longer be minted by hidden stale names, and the map's identity model now leans on the protocol, not on strings.
+
+---
+
+## v0.7.44 — 2026-08-11
+
+Three fixes, all traced on a live two-machine rig — including the end of a phantom-link mystery that had survived reboots, updates and a rebuilt workspace.
+
+**Topology matching: exact identity now beats fuzzy guessing.** A workspace was found carrying user names accidentally scrambled against the physical switches (a shifted paste from an older version, invisible because tiles display the automatic LLDP names — which were all correct). The link matcher's substring rules, running per candidate in list order, let the wrong device's user name steal LLDP rows from the right device's exact name — drawing live, unclearable phantom links between switches that were never connected. The matcher is now tiered: exact matches (LLDP name, user name, IP, chassis MAC) are checked across every candidate first and win outright; substring heuristics only apply when nothing exact exists; and an ambiguous fuzzy match refuses to bind at all. A link drawn to the wrong switch is worse than a link missing until better evidence arrives — the same honesty rule the flow arrows follow.
+
+**LLDP tables survive truncated sweeps.** On a machine with a tight SNMP timeout, a sweep whose neighbour walk timed out erased the switch's LLDP table outright — links flapped, alerts churned, and switches sat at "no neighbours" despite healthy cabling. The neighbour table now keeps its last data when a walk returns empty, the same protection port and SFP tables already had.
+
+**Rig replay: capture recordings now play back fully.** Raw capture-mode walks log at info level and the tape loader was filtering them out, so bandwidth never replayed. One-line fix; capture tapes now drive the complete pipeline.
+
+If a workspace was built with an affected earlier version, correcting (or simply blanking) the user names in Device Manager clears phantom links immediately — the automatic names carry the truth.
+
+---
+
+## v0.7.43 — 2026-08-10
+
+Two fixes, both found and confirmed on a live rig.
+
+**A disconnected unit's temperature no longer pretends to be alive.** When a device goes offline, its tile shows the last known temperature in red — visible, but unmistakably history — and its rolling temperature graph freezes at the final real sample and slides into the past, instead of painting edge-to-edge as if data were still arriving. Both recover the moment the device reconnects.
+
+**Acknowledged alerts survive undo.** Pressing ⌘Z after acknowledging an alert brought it back live and re-notified you — undo's workspace restore made every live condition look like it had recovered and re-fired. Undo now carries the entire alert state across untouched: acknowledgements, armed links and jitter streaks all survive, because undo is for workspace edits, not for alert history.
+
+---
+
+## v0.7.42 — 2026-08-10
+
+**SFP alerts point at the module that is hot.** An SFP over-temperature alert now pulses the affected module's own link label yellow instead of the whole parent switch tile — the tile keeps its pulse for things genuinely about the switch (offline, RTT, jitter, its own sensors). Same latching, same acknowledge behaviour, same zero-cost render-server pulse.
+
+**Fibre link labels redesigned — clearer and quieter at once.** The port number now sits in a chip carrying the link-state colour (muted when healthy, saturating on caution), replacing the old 2.5pt edge sliver, and one value leads beside it: signal loss on the Overview, SFP temperature on the Temperatures plane — each plane answers its own question, never both at once. Zoomed out, labels collapse to the chip alone, following the tiles' progressive disclosure.
+
+**Readable without relying on colour.** Built with partially colourblind eyes on the team: value digits run near-white at medium weight, caution states embolden as well as colour, and the label background keeps a minimum opacity so the animated link dashes behind it can never wash out the numbers.
+
+---
+
+## v0.7.41 — 2026-08-09
+
+**Crash fix — update recommended.** Reading the Mac's own ARP table (a local command that feeds MAC learning and port-box IP labels) used a file-reading call that raises an uncatchable error if the command's pipe tears down at exactly the wrong moment. The result was a silent whole-app crash from a background task — rare, but the read runs every polling lap, so a long session could hit it. It is the same crash class the ping engine was hardened against previously; this was the one remaining call site of the unsafe API, now fixed the same way. A failed read simply means the ARP table skips one cycle.
+
+---
+
+## v0.7.40 — 2026-08-09
+
+**The STP plane is gone — on purpose.** The map itself has always told the spanning-tree story: the root bridge wears its gold badge, blocked redundant paths draw as amber dashes, and traffic-flow arrows animate toward the root. The dedicated STP plane was a second copy of that same truth, and second copies grow their own bugs — it was found showing the secondary network's switches while the Primary tab was selected (#84). Removed rather than repaired: the plane switcher now offers Overview and Temperatures, and STP state lives in exactly one place.
+
+**The example workspace demonstrates flow direction properly.** Its fabricated spanning-tree data lacked the designated-bridge votes real switches report, so the Stage Left ↔ Stage Right link — the only active link not touching the root — could not prove a direction, and the app (correctly) refused to animate a guess. The example now seeds the same votes a real rig would, and every active link animates toward the root. Existing example workspaces regenerate on first launch of a fresh install.
+
+Also: the project README now carries a full illustrated feature tour for AV engineers, shot entirely from the example workspace.
+
+---
+
+## v0.7.39 — 2026-08-09
+
+Two live-monitoring fixes and a major new capability — and the new capability found one of the fixes.
+
+**New: Rig Replay (issue #82).** Debugging > Rig Replay (password-gated) loads a Console Output CSV export and drives the whole app from it — pings, topology, port states, temperatures, SFP signal, STP, alerts — through the same pipeline live polling uses. The tape is validated against the open workspace by IP before it can start, playback runs at 1×/10×/30×, and the workspace carries a REPLAY watermark for the entire session so a recording can never be mistaken for the live rig. A ten-minute console export now stands in for the rig at a desk; the same tape replayed twice gives identical conditions, which live hardware never does. Recordings made with capture mode (`MPING_CAPTURE=1`, also new) additionally replay port bandwidth and complete STP detail.
+
+**Fixed: three readings were being delivered at a third of their configured rate.** A 23-minute rig capture showed switch temperature, SFP temperature and dropped packets arriving every ~90s instead of every 30s — the cause of the recurring "reading has stopped updating" warnings. The three same-interval polling loops started together, stepped through the device list in lockstep, collided on the same switch every turn, and forfeited a whole lap per collision. Loops now start staggered and retry a busy switch in place, and SFP readings skip switches with no optical modules fitted. (Verification on the rig is issue #83.)
+
+**Fixed: phantom links.** When an LLDP row carried no remote-port information and the far switch's table had not arrived yet, the link builder guessed the far port by assuming symmetric numbering — fabricating links between port pairs that do not exist, which then died red and fired Link Down alerts. This fired live during every topology assembly and was caught by replaying a real tape. An unknown far port now skips the pass; the next sweep supplies the true reciprocal row. No more inventions.
+
+Also in this release: every SNMP walk and get can be recorded in full raw form with `MPING_CAPTURE=1` for replay tapes, the STP tier logs its complete table (designated bridges, port roles, root identity), and fan speeds are logged parseably.
+
+---
+
+## v0.7.38 — 2026-08-09
+
+**Ping times are now measured by the kernel, not the app.** Round-trip figures were reading 1–9ms for devices that terminal ping showed steadily under a millisecond. The cause: the RTT was stamped after the app's low-priority ping thread got rescheduled, so with a whole cycle's pings fired at once, forty threads woke together and the last in line inherited the queue as "latency". The kernel now records the exact arrival moment of each reply at the socket, so the number is immune to the app's own scheduling — verified on a live rig, where readings match terminal ping. A side benefit: jitter alerts lose their biggest source of false variation, since that noise fed directly into the jitter maths. No thread priorities were raised; the low-power design is unchanged.
+
+**New: workspace background image** (issue #81, first release). Devices > Background Image > Set Image… places a venue plan, stage plot or rack elevation behind the tiles — PNG, JPEG, TIFF, HEIC or a PDF's first page. It is downsampled at import and stored inside the .mpw, so the workspace stays one portable file. The image arrives unlocked for placement (drag to move, corner handle for aspect-locked resize), then Lock in Place makes it invisible to input — clicks and the selection box pass straight through. Smart Invert is on by default: black-on-white plans render as light lines on the dark canvas while coloured zones keep their colour; toggle it off for photographs. The image is processed once into a cached bitmap and rendered as a static layer, so it costs nothing while monitoring runs.
+
+---
+
+## v0.7.37 — 2026-08-09
+
+Monitoring efficiency and honesty, plus a round of workflow polish.
+
+**Ping response is now a prerequisite for SNMP polling.** A switch that ping has confirmed offline cannot answer an SNMP walk either — every attempt just burned a full timeout inside the polling rotation, slowing the lap for every switch that was answering. All automatic SNMP paths now skip confirmed-offline devices and resume by themselves the moment ping sees the device again. On a partially powered rig this makes polling of the live switches noticeably more even. (New in this build — worth watching on first run.)
+
+**The map fills fast at launch.** Topology starts from nothing every boot by design, but waiting a minute-plus for the rotation to paint it was wrong. Two full discovery rounds now run up front — still throttled three-at-a-time — so the map fills in tens of seconds. Link alerts arm only after a link has been seen up on two consecutive passes, so the assembly no longer fires a storm of false "link down" alerts while it builds.
+
+**Flow arrows only when the data proves a direction.** Some links showed animations flowing the wrong way — stably. When the two ends' spanning-tree votes tie and neither side can see the root, the app previously picked a direction arbitrarily and stuck with it. It now draws no arrow rather than a guessed one.
+
+**Fibre classification held, duplicate walks removed.** SFP temperature was being read twice per lap; now once. TX/RX stays in the discovery sweep deliberately — optical power is how fibre is told from copper, proven the hard way when removing it turned every fibre link copper on the live rig (caught and reverted within minutes, never released).
+
+**A reading that stops updating now leaves a trail.** The inspector's stale-reading warning was ephemeral — nothing to investigate afterwards. Every crossing into stale and every recovery is now logged to the console with age and threshold, so an exported CSV shows exactly which reading went quiet, when, and why. Offline devices are exempt: their silence is expected and already covered by the offline alert.
+
+**Workflow polish**
+- Hold **Option** to flip every tile's address line from IP to its learned MAC address (session-learned from the host ARP table; "MAC unknown" until the device has actually been seen).
+- Console Output window resizes freely in both directions and remembers its size.
+- Inspector: Name and IP share a row; the device type picker gets the full width so long type names stop truncating. The name-source checkbox now reads "Auto".
+
+---
+
 ## v0.7.36 — 2026-08-08
 
 One fix: the jitter quieting in v0.7.35 did not hold — sixteen alerts within seconds of launch. Two holes, both now closed.
