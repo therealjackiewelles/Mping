@@ -255,51 +255,44 @@ The application source is maintained in a private repository; this repository ho
 
 <!-- CHANGELOG:START -->
 
-## v0.7.36 — 2026-08-08
+## v0.7.47 — 2026-08-13
 
-One fix: the jitter quieting in v0.7.35 did not hold — sixteen alerts within seconds of launch. Two holes, both now closed.
+L-Acoustics LS10 switches become first-class citizens, and spanning-tree rendering gets materially more honest on every rig.
 
-- **Jitter needs a real sample base.** It was computed from as few as two pings, and the first pings of a session land during the startup storm, when every switch is being swept at once. No jitter figure exists now until nine samples (~16 seconds) — variation measured from two points is not a statistic.
-- **"Three consecutive cycles" now means cycles.** The breach counter advanced on every alert evaluation, and evaluations run from several places — one ping cycle could pass the gate in milliseconds. The counter now only advances when a genuinely new ping sample exists.
+**Full LS10 monitoring — no SNMP required.** LS10s are polled entirely over their own HTTP interface, read-only: port status boxes, link-state at the same fast cadence as the Netgears, device temperature into the graphs and alerts, per-port bandwidth on the link labels, fan readings, and full topology participation — links to Netgears and between LS10s, chassis-identity matched, with root badge, blocked-path dashes and flow direction. Discovery uses the unit's engineer-set name. The SNMP pollers no longer waste timeouts asking LS10s questions they'll never answer, so the console stays quiet.
 
-Expected behaviour after this: silence for the first ~16 seconds after launch while a base is measured, then jitter alerts only for breaches that persist across three real ping cycles.
-## v0.7.35 — 2026-08-08
+**Blocked links can no longer masquerade as live ones.** Whether a link is STP-blocked is now judged from both ends — only the blocking side ever reports it, so depending on polling order a blocked redundant path could previously render as a live flowing link. Flow animations are also properly torn down when a link's direction changes or stops: after an STP failover and recovery, the re-blocked alternate now sits correctly still.
 
-Three changes, all shaped by a day of two machines watching the same live rig.
+**Copper links restyled** (with a partially colourblind eye doing the tuning): a quieter grey line that no longer outshines live fibre, a legible port label, and flow dashes that actually read against the line.
 
-### The map starts honest, every launch
+**Device Manager: pasting into a cell you're editing** now fills from that row with the clicked cell carrying its value — previously the pasted-into cell ended up blank.
 
-Topology memory is now session-only, by design: **every boot starts from nothing and draws only what the switches prove over live LLDP.** Previously, remembered links and right-click deletions persisted per machine — so the map was partly yesterday's assumptions, two computers could show the same rig differently, and there was no way to tell observation from assumption. That ambiguity is exactly what made a field report of wrong-looking links undiagnosable after the fact.
+**Console CSV export always writes the complete log**, regardless of the device filter — the filter is a view, not a scope. Twice a filtered export silently discarded the diagnostic data it was taken for.
 
-Within a session nothing changes: a link that dies stays visible and red and raises its alert, because this session saw it up.
+**Steadier link identities on slow rigs:** a poll that fails to read a switch's chassis identity no longer wipes the stored one, which was quietly degrading link matching on rigs with tight SNMP timeouts.
 
-Expect on first launch: any link you had deleted that the switches still advertise will reappear — including real cross-plane interconnects. The map shows what is cabled and advertised, full stop.
+## v0.7.46 — 2026-08-11
 
-### Jitter alerts need a sustained breach
+Showfile-prep quality of life: redundant devices in bulk, spreadsheet pastes that land where aimed, and planning a new show while the current one stays monitored.
 
-A jitter alert now requires **three consecutive ping cycles over the limit** (about six seconds at default settings) instead of one. Eight devices alerting within the same seven seconds is the signature of the measuring Mac stalling for a moment — a compile, a spotlight index, anything — not of eight network paths degrading at once. Real jitter persists and still alerts quickly; a machine hiccup no longer pages you. The alert text says "sustained" so the rule is visible.
+**Device Manager: pastes follow the table you clicked.** Pasting a spreadsheet block into the secondary table used to overwrite the primary rows: keyboard shortcuts were claimed by whichever table sat higher in the window, and clicking the secondary table's Linked To column didn't move focus. Cmd-V now pastes into the focused table starting at the clicked row, the secondary section has its own Paste from Spreadsheet button (row-aligned with the primary table), and clicking anywhere on a secondary row selects it.
 
-### Spreadsheet paste lands on the rows you see
+**Redundancy in bulk.** Multi-select rows and one checkbox click marks them all redundant. The secondary list always mirrors the primary order — tick, untick and re-tick in any sequence and the rows stay aligned for pasting.
 
-In a redundant-mode workspace, pasting wrote to the store's internal device order rather than the filtered, reorderable table on screen — names and addresses could land on an interleaved mix of primary and secondary devices, and a workspace rebuilt that way drew wildly wrong topology because tiles were, by address, different switches than their labels claimed. Every paste path now maps through the exact row order of the table it happens in, drag-reordering included.
+**Planning windows.** File > New Workspace opens a separate window with a blank workspace and monitoring off — build next week's file while the current gig stays monitored in its own window. Menus act on whichever window is focused. Closing a planning window tears down its engines completely.
 
-If you rebuilt a workspace with paste on an earlier build and the map looks wrong: check Device Manager's SNMP/LLDP Name column against your row names, then re-paste names and addresses on this build.
-## v0.7.34 — 2026-08-08
+**File > Save restored.** The multi-window scene change silently dropped Save, Save As and Cmd-S from the File menu; they're re-anchored to a menu position that survives it.
 
-Two fixes, both found in the field the same day.
+**Port-box guard.** A truncated SNMP walk (short timeout, busy switch) can no longer shrink a switch's port table — fewer rows than the switch's fixed port count means a bad walk, and the previous table is kept.
 
-### Opening a recent workspace works again
+## v0.7.45 — 2026-08-11
 
-Clicking an entry in File → Open Recent closed the menu and did nothing. macOS forgets an app's file permissions between launches, and only the last-used workspace kept a stored permission — every other recent was unreadable, and the failure was silent.
+Completes v0.7.44's topology-matching overhaul — update straight to this one.
 
-Every recent now keeps its own stored permission and opens on click, across restarts. Entries saved by older versions ask once, with the file already selected in the dialog — one click re-grants access for good. A file that genuinely cannot be read now says so instead of doing nothing.
+**Links are now matched by chassis identity first.** LLDP's own identity primitive — the chassis MAC each switch advertises — is now the primary match key, compared against the chassis identity Mping already reads live from every switch. Switch-to-switch rows that advertise no system name (standard on many uplinks) resolve by protocol identity instead of depending on the far end's name row. The ARP-learned MAC remains a second exact key for endpoints whose chassis ID is simply their NIC address, and name rules drop to what they should always have been: a fallback, used only when nothing exact exists, refusing to bind when ambiguous.
 
-### The console no longer drowns in "Unmatched neighbour"
+**Auto-named devices contribute no typed name to matching.** With name source set to Auto, the LLDP-discovered name is the maintained identity — the typed name underneath (possibly stale, possibly mispasted, invisible on screen) no longer participates in link matching at all. Under manual naming the typed name remains a legitimate identity, as it should be.
 
-Running a workspace that monitors only the switches — a handover copy on a second machine did exactly this — flooded the console with error lines: every amplifier the switches could see was reported as an unmatched LLDP neighbour, on every topology rebuild, a few seconds apart. 1,950 error lines in 100 seconds, all saying the same fifty things.
-
-A neighbour that is not a monitored device is information, not a fault. It is now reported once per session, at info level, in plain words.
-
-**[Full changelog →](CHANGELOG.md)** — every release since v0.3.0.
+Together with v0.7.44's exact-first tiers and LLDP table guard, this closes the phantom-link investigation: wrong-device links can no longer be minted by hidden stale names, and the map's identity model now leans on the protocol, not on strings.
 
 <!-- CHANGELOG:END -->
