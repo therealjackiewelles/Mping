@@ -5,6 +5,31 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.7.48 — 2026-08-15
+
+**Bug fixes**
+- Stripped LS10 fan/temperature readings the hardware never actually provided
+- Redundant rigs: links match by chassis identity before name — duplicated names across networks no longer block link drawing
+- Link labels stay at the port they describe and no longer vanish between close tiles
+- Port status boxes never overlap device tiles
+- Tile badges (ROOT, gPTP GM, data chips) ride the tile edge instead of crowding the name row
+- Port box tether is quieter and fades away as the box docks
+- Clock-flow animation never runs along an STP-blocked path
+
+**Features added**
+- Rig replay transport in the sidebar: play, stop, ±1 minute, timeline, open tape, exit
+- AVB view: gPTP grandmaster tags, clock flow from the grandmaster toward listeners, four sub-views (stream locks / amp temps / clock / streams)
+- Amplifier monitoring — read-only and identity-gated: nothing is ever polled unless LLDP already shows a known L-Acoustics amp there, and an imposter locks the port out
+- Amp vitals in the port racks, every AVB view reading "number - model - data"
+- Left-edge toolbars glide open on hover to name their buttons
+- LS10 port-error view ("err N")
+- Amplifier polling master switch in Preferences (default off)
+
+**Prep work started**
+- Amp channel-fault flags and stream-unlock alerts
+
+---
+
 ## v0.7.47 — 2026-08-13
 
 L-Acoustics LS10 switches become first-class citizens, and spanning-tree rendering gets materially more honest on every rig.

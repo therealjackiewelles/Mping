@@ -255,6 +255,28 @@ The application source is maintained in a private repository; this repository ho
 
 <!-- CHANGELOG:START -->
 
+## v0.7.48 — 2026-08-15
+
+**Bug fixes**
+- Stripped LS10 fan/temperature readings the hardware never actually provided
+- Redundant rigs: links match by chassis identity before name — duplicated names across networks no longer block link drawing
+- Link labels stay at the port they describe and no longer vanish between close tiles
+- Port status boxes never overlap device tiles
+- Tile badges (ROOT, gPTP GM, data chips) ride the tile edge instead of crowding the name row
+- Port box tether is quieter and fades away as the box docks
+- Clock-flow animation never runs along an STP-blocked path
+
+**Features added**
+- Rig replay transport in the sidebar: play, stop, ±1 minute, timeline, open tape, exit
+- AVB view: gPTP grandmaster tags, clock flow from the grandmaster toward listeners, four sub-views (stream locks / amp temps / clock / streams)
+- Amplifier monitoring — read-only and identity-gated: nothing is ever polled unless LLDP already shows a known L-Acoustics amp there, and an imposter locks the port out
+- Amp vitals in the port racks, every AVB view reading "number - model - data"
+- Left-edge toolbars glide open on hover to name their buttons
+- LS10 port-error view ("err N")
+- Amplifier polling master switch in Preferences (default off)
+
+**Prep work started**
+- Amp channel-fault flags and stream-unlock alerts
 ## v0.7.47 — 2026-08-13
 
 L-Acoustics LS10 switches become first-class citizens, and spanning-tree rendering gets materially more honest on every rig.
@@ -270,7 +292,6 @@ L-Acoustics LS10 switches become first-class citizens, and spanning-tree renderi
 **Console CSV export always writes the complete log**, regardless of the device filter — the filter is a view, not a scope. Twice a filtered export silently discarded the diagnostic data it was taken for.
 
 **Steadier link identities on slow rigs:** a poll that fails to read a switch's chassis identity no longer wipes the stored one, which was quietly degrading link matching on rigs with tight SNMP timeouts.
-
 ## v0.7.46 — 2026-08-11
 
 Showfile-prep quality of life: redundant devices in bulk, spreadsheet pastes that land where aimed, and planning a new show while the current one stays monitored.
@@ -285,14 +306,6 @@ Showfile-prep quality of life: redundant devices in bulk, spreadsheet pastes tha
 
 **Port-box guard.** A truncated SNMP walk (short timeout, busy switch) can no longer shrink a switch's port table — fewer rows than the switch's fixed port count means a bad walk, and the previous table is kept.
 
-## v0.7.45 — 2026-08-11
-
-Completes v0.7.44's topology-matching overhaul — update straight to this one.
-
-**Links are now matched by chassis identity first.** LLDP's own identity primitive — the chassis MAC each switch advertises — is now the primary match key, compared against the chassis identity Mping already reads live from every switch. Switch-to-switch rows that advertise no system name (standard on many uplinks) resolve by protocol identity instead of depending on the far end's name row. The ARP-learned MAC remains a second exact key for endpoints whose chassis ID is simply their NIC address, and name rules drop to what they should always have been: a fallback, used only when nothing exact exists, refusing to bind when ambiguous.
-
-**Auto-named devices contribute no typed name to matching.** With name source set to Auto, the LLDP-discovered name is the maintained identity — the typed name underneath (possibly stale, possibly mispasted, invisible on screen) no longer participates in link matching at all. Under manual naming the typed name remains a legitimate identity, as it should be.
-
-Together with v0.7.44's exact-first tiers and LLDP table guard, this closes the phantom-link investigation: wrong-device links can no longer be minted by hidden stale names, and the map's identity model now leans on the protocol, not on strings.
+**[Full changelog →](CHANGELOG.md)** — every release since v0.3.0.
 
 <!-- CHANGELOG:END -->
