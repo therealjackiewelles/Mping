@@ -255,6 +255,32 @@ The application source is maintained in a private repository; this repository ho
 
 <!-- CHANGELOG:START -->
 
+## v0.7.49 — 2026-08-17
+
+**Bug fixes**
+- gPTP grandmaster badge sits on the actual grandmaster — hop counts are 1-indexed, so "1 hop" is the GM itself
+- Switch-to-switch links: a switch's word about its own ports now beats its neighbour's guess, so the constant "port 1" every LS10 broadcasts can no longer mislabel a link that really rides port 2
+- A link that drops and returns under a different port identity no longer leaves a permanent red ghost on the map
+- Link bandwidth comes from the Netgear octet counters only — total measured traffic, not AVB reservations; the LS10 figure (also being read 1000× too large) is deliberately dropped
+- A legitimate zero on one end of a link no longer hides the other end's measured traffic
+- Netgear-to-Netgear trunks always draw as fibre, including where the SFP offers no diagnostics
+- Selected tiles no longer go jagged when zoomed in
+- Missing 24V aux input is no longer a fault — that input is optional kit
+- Port box cells are sized for a worst-case IP address, so addresses always show whole
+- Phantom dual links: VID text can no longer mint a far port number, and idle RSTP earns no root crown
+- Paired tiles can be dragged again
+
+**Features added**
+- AVB view: five live per-amp tabs — Power, Streams, Clock, Temperature, Errors — mirrored in Device Debug
+- Everything polled now reaches the console log and replays from a tape: amp vitals, raw LS10 responses, and a port-resolution trail explaining every switch-to-switch link
+- Rig Replay opens without a password
+- Rack editor: drop a port onto an occupied unit to swap them, with motion
+- Port boxes: own close button, amp IPs in Device IP style, steadier cell fonts, quieter card colour
+- Amp identity requests authenticate before an amp is trusted
+- NIC picker names the Mac's own adapters
+
+**Prep work started**
+- Sharp tile text at any zoom: re-render the canvas at the settled zoom level instead of stretching the 1× picture
 ## v0.7.48 — 2026-08-15
 
 **Bug fixes**
@@ -292,19 +318,6 @@ L-Acoustics LS10 switches become first-class citizens, and spanning-tree renderi
 **Console CSV export always writes the complete log**, regardless of the device filter — the filter is a view, not a scope. Twice a filtered export silently discarded the diagnostic data it was taken for.
 
 **Steadier link identities on slow rigs:** a poll that fails to read a switch's chassis identity no longer wipes the stored one, which was quietly degrading link matching on rigs with tight SNMP timeouts.
-## v0.7.46 — 2026-08-11
-
-Showfile-prep quality of life: redundant devices in bulk, spreadsheet pastes that land where aimed, and planning a new show while the current one stays monitored.
-
-**Device Manager: pastes follow the table you clicked.** Pasting a spreadsheet block into the secondary table used to overwrite the primary rows: keyboard shortcuts were claimed by whichever table sat higher in the window, and clicking the secondary table's Linked To column didn't move focus. Cmd-V now pastes into the focused table starting at the clicked row, the secondary section has its own Paste from Spreadsheet button (row-aligned with the primary table), and clicking anywhere on a secondary row selects it.
-
-**Redundancy in bulk.** Multi-select rows and one checkbox click marks them all redundant. The secondary list always mirrors the primary order — tick, untick and re-tick in any sequence and the rows stay aligned for pasting.
-
-**Planning windows.** File > New Workspace opens a separate window with a blank workspace and monitoring off — build next week's file while the current gig stays monitored in its own window. Menus act on whichever window is focused. Closing a planning window tears down its engines completely.
-
-**File > Save restored.** The multi-window scene change silently dropped Save, Save As and Cmd-S from the File menu; they're re-anchored to a menu position that survives it.
-
-**Port-box guard.** A truncated SNMP walk (short timeout, busy switch) can no longer shrink a switch's port table — fewer rows than the switch's fixed port count means a bad walk, and the previous table is kept.
 
 **[Full changelog →](CHANGELOG.md)** — every release since v0.3.0.
 

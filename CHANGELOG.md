@@ -5,6 +5,35 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.7.49 — 2026-08-17
+
+**Bug fixes**
+- gPTP grandmaster badge sits on the actual grandmaster — hop counts are 1-indexed, so "1 hop" is the GM itself
+- Switch-to-switch links: a switch's word about its own ports now beats its neighbour's guess, so the constant "port 1" every LS10 broadcasts can no longer mislabel a link that really rides port 2
+- A link that drops and returns under a different port identity no longer leaves a permanent red ghost on the map
+- Link bandwidth comes from the Netgear octet counters only — total measured traffic, not AVB reservations; the LS10 figure (also being read 1000× too large) is deliberately dropped
+- A legitimate zero on one end of a link no longer hides the other end's measured traffic
+- Netgear-to-Netgear trunks always draw as fibre, including where the SFP offers no diagnostics
+- Selected tiles no longer go jagged when zoomed in
+- Missing 24V aux input is no longer a fault — that input is optional kit
+- Port box cells are sized for a worst-case IP address, so addresses always show whole
+- Phantom dual links: VID text can no longer mint a far port number, and idle RSTP earns no root crown
+- Paired tiles can be dragged again
+
+**Features added**
+- AVB view: five live per-amp tabs — Power, Streams, Clock, Temperature, Errors — mirrored in Device Debug
+- Everything polled now reaches the console log and replays from a tape: amp vitals, raw LS10 responses, and a port-resolution trail explaining every switch-to-switch link
+- Rig Replay opens without a password
+- Rack editor: drop a port onto an occupied unit to swap them, with motion
+- Port boxes: own close button, amp IPs in Device IP style, steadier cell fonts, quieter card colour
+- Amp identity requests authenticate before an amp is trusted
+- NIC picker names the Mac's own adapters
+
+**Prep work started**
+- Sharp tile text at any zoom: re-render the canvas at the settled zoom level instead of stretching the 1× picture
+
+---
+
 ## v0.7.48 — 2026-08-15
 
 **Bug fixes**
