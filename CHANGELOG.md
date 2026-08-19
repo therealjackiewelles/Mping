@@ -5,6 +5,34 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.8.0 — 2026-08-19
+
+**Features added**
+- IME Nemo 96HD power analyzers (#46): mains power on the map — the meter's full reading set in the inspector, fresh measurements every 5 seconds on a dedicated loop, spoken over the module's own web protocol (its embedded server speaks broken HTTP; Mping now speaks it back), with a Module Password field on the device
+- Nemo graphs: phase voltages, line-to-line voltages, phase and neutral currents, per-phase power, power factor, and voltage/current THD — in the inspector, and in a draggable graph box that pops out of the tile with 15m/30m/1h/3h windows; console replays draw them too
+- Amplifiers alert panel: session-gated (hidden until amps are detected on the rig), carrying the first two amp alerts — media-clock unlock and stream loss against the session's high-water mark — evaluated identically live and in replay
+- AVB clock view animates the clock tree outward from the grandmaster, placed on real rig hop numbers
+- Streams view grows a detail rail: locks, faults, errors, format
+- Clock faces wear lock glyphs with resolved grandmaster names; an unlocked amp prints its own status word, never a guessed master
+- AVB temperature cells read degrees and humidity, state only when hot
+- Power faces surface the 15V rail errors and the amp's fault message
+- Small LS10 racks (three amps or fewer) fold their port box into the tile itself; LS10 tiles drop the temperature badge — the hardware provides none
+- Alert rows wear the P/S network badge beside the device name
+- Sharp canvas text at any zoom — supersampled glyphs, same layout — on tiles and port boxes alike (#55)
+- The launch map fills as data lands instead of waiting for a full polling lap
+- Console: the complete rig in one log, a tick-box filter tree (device type, then poll category), and tape playback that streams rows on the tape's own clock
+
+**Bug fixes**
+- Ping RTT no longer counts the app's own scheduling — values match terminal ping
+- AVB rack cards share one font size fitted to a common worst case, the ID column stays constant, and cells read as a table: fixed ID column, hairline rule, data
+- Amp validation counts physical units, resolves each leg's parent by subnet rather than label, and reports genuinely ambiguous legs as unplaced instead of guessing
+- Replay validation understands sub-devices, and legacy LS10 labels migrate without minting false SNMP folders
+- Bandwidth labels never vanish one-sided — a quiet direction says 0
+- Links and alerts wear the same name the tile does
+- LA7.16 Amp Vitals console dumps no longer truncate
+
+---
+
 ## v0.7.49 — 2026-08-17
 
 **Bug fixes**

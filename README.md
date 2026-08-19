@@ -255,6 +255,31 @@ The application source is maintained in a private repository; this repository ho
 
 <!-- CHANGELOG:START -->
 
+## v0.8.0 — 2026-08-19
+
+**Features added**
+- IME Nemo 96HD power analyzers (#46): mains power on the map — the meter's full reading set in the inspector, fresh measurements every 5 seconds on a dedicated loop, spoken over the module's own web protocol (its embedded server speaks broken HTTP; Mping now speaks it back), with a Module Password field on the device
+- Nemo graphs: phase voltages, line-to-line voltages, phase and neutral currents, per-phase power, power factor, and voltage/current THD — in the inspector, and in a draggable graph box that pops out of the tile with 15m/30m/1h/3h windows; console replays draw them too
+- Amplifiers alert panel: session-gated (hidden until amps are detected on the rig), carrying the first two amp alerts — media-clock unlock and stream loss against the session's high-water mark — evaluated identically live and in replay
+- AVB clock view animates the clock tree outward from the grandmaster, placed on real rig hop numbers
+- Streams view grows a detail rail: locks, faults, errors, format
+- Clock faces wear lock glyphs with resolved grandmaster names; an unlocked amp prints its own status word, never a guessed master
+- AVB temperature cells read degrees and humidity, state only when hot
+- Power faces surface the 15V rail errors and the amp's fault message
+- Small LS10 racks (three amps or fewer) fold their port box into the tile itself; LS10 tiles drop the temperature badge — the hardware provides none
+- Alert rows wear the P/S network badge beside the device name
+- Sharp canvas text at any zoom — supersampled glyphs, same layout — on tiles and port boxes alike (#55)
+- The launch map fills as data lands instead of waiting for a full polling lap
+- Console: the complete rig in one log, a tick-box filter tree (device type, then poll category), and tape playback that streams rows on the tape's own clock
+
+**Bug fixes**
+- Ping RTT no longer counts the app's own scheduling — values match terminal ping
+- AVB rack cards share one font size fitted to a common worst case, the ID column stays constant, and cells read as a table: fixed ID column, hairline rule, data
+- Amp validation counts physical units, resolves each leg's parent by subnet rather than label, and reports genuinely ambiguous legs as unplaced instead of guessing
+- Replay validation understands sub-devices, and legacy LS10 labels migrate without minting false SNMP folders
+- Bandwidth labels never vanish one-sided — a quiet direction says 0
+- Links and alerts wear the same name the tile does
+- LA7.16 Amp Vitals console dumps no longer truncate
 ## v0.7.49 — 2026-08-17
 
 **Bug fixes**
@@ -303,21 +328,6 @@ The application source is maintained in a private repository; this repository ho
 
 **Prep work started**
 - Amp channel-fault flags and stream-unlock alerts
-## v0.7.47 — 2026-08-13
-
-L-Acoustics LS10 switches become first-class citizens, and spanning-tree rendering gets materially more honest on every rig.
-
-**Full LS10 monitoring — no SNMP required.** LS10s are polled entirely over their own HTTP interface, read-only: port status boxes, link-state at the same fast cadence as the Netgears, device temperature into the graphs and alerts, per-port bandwidth on the link labels, fan readings, and full topology participation — links to Netgears and between LS10s, chassis-identity matched, with root badge, blocked-path dashes and flow direction. Discovery uses the unit's engineer-set name. The SNMP pollers no longer waste timeouts asking LS10s questions they'll never answer, so the console stays quiet.
-
-**Blocked links can no longer masquerade as live ones.** Whether a link is STP-blocked is now judged from both ends — only the blocking side ever reports it, so depending on polling order a blocked redundant path could previously render as a live flowing link. Flow animations are also properly torn down when a link's direction changes or stops: after an STP failover and recovery, the re-blocked alternate now sits correctly still.
-
-**Copper links restyled** (with a partially colourblind eye doing the tuning): a quieter grey line that no longer outshines live fibre, a legible port label, and flow dashes that actually read against the line.
-
-**Device Manager: pasting into a cell you're editing** now fills from that row with the clicked cell carrying its value — previously the pasted-into cell ended up blank.
-
-**Console CSV export always writes the complete log**, regardless of the device filter — the filter is a view, not a scope. Twice a filtered export silently discarded the diagnostic data it was taken for.
-
-**Steadier link identities on slow rigs:** a poll that fails to read a switch's chassis identity no longer wipes the stored one, which was quietly degrading link matching on rigs with tight SNMP timeouts.
 
 **[Full changelog →](CHANGELOG.md)** — every release since v0.3.0.
 
