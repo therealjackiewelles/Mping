@@ -5,6 +5,20 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.8.1 — 2026-08-20
+
+**Features added**
+- Nemo graph box is resizable: drag the bottom-right grip (up to 780×560, size remembered per device) — the graph absorbs all the extra room, and a wider box draws more points, so expanding genuinely shows more detail
+- Nemo graph box exports its complete recorded history as CSV — every series, ISO timestamps — via the CSV button in its header
+- Nemo graph box hover readout moved beside the card: the graph itself is never covered, and only a thin guideline marks the hovered moment
+
+**Bug fixes**
+- Jitter alerts require persistence: one RTT spike used to hold the rolling average over the limit for minutes and fire a "sustained" alert — the alert now forgives the single worst sample, so only repeated spikes register (displayed jitter unchanged)
+- Nemo graph scale stops snapping every tick: bounds round outward to a clean grid step and the long-window sample thinning is anchored to the newest data, so the line holds still while values drift
+- Nemo box resizing tracks the cursor instead of lagging and jittering, and click-dragging on the box no longer starts the canvas selection band underneath it
+
+---
+
 ## v0.8.0 — 2026-08-19
 
 **Features added**

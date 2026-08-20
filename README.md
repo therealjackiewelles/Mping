@@ -255,6 +255,17 @@ The application source is maintained in a private repository; this repository ho
 
 <!-- CHANGELOG:START -->
 
+## v0.8.1 — 2026-08-20
+
+**Features added**
+- Nemo graph box is resizable: drag the bottom-right grip (up to 780×560, size remembered per device) — the graph absorbs all the extra room, and a wider box draws more points, so expanding genuinely shows more detail
+- Nemo graph box exports its complete recorded history as CSV — every series, ISO timestamps — via the CSV button in its header
+- Nemo graph box hover readout moved beside the card: the graph itself is never covered, and only a thin guideline marks the hovered moment
+
+**Bug fixes**
+- Jitter alerts require persistence: one RTT spike used to hold the rolling average over the limit for minutes and fire a "sustained" alert — the alert now forgives the single worst sample, so only repeated spikes register (displayed jitter unchanged)
+- Nemo graph scale stops snapping every tick: bounds round outward to a clean grid step and the long-window sample thinning is anchored to the newest data, so the line holds still while values drift
+- Nemo box resizing tracks the cursor instead of lagging and jittering, and click-dragging on the box no longer starts the canvas selection band underneath it
 ## v0.8.0 — 2026-08-19
 
 **Features added**
@@ -306,28 +317,6 @@ The application source is maintained in a private repository; this repository ho
 
 **Prep work started**
 - Sharp tile text at any zoom: re-render the canvas at the settled zoom level instead of stretching the 1× picture
-## v0.7.48 — 2026-08-15
-
-**Bug fixes**
-- Stripped LS10 fan/temperature readings the hardware never actually provided
-- Redundant rigs: links match by chassis identity before name — duplicated names across networks no longer block link drawing
-- Link labels stay at the port they describe and no longer vanish between close tiles
-- Port status boxes never overlap device tiles
-- Tile badges (ROOT, gPTP GM, data chips) ride the tile edge instead of crowding the name row
-- Port box tether is quieter and fades away as the box docks
-- Clock-flow animation never runs along an STP-blocked path
-
-**Features added**
-- Rig replay transport in the sidebar: play, stop, ±1 minute, timeline, open tape, exit
-- AVB view: gPTP grandmaster tags, clock flow from the grandmaster toward listeners, four sub-views (stream locks / amp temps / clock / streams)
-- Amplifier monitoring — read-only and identity-gated: nothing is ever polled unless LLDP already shows a known L-Acoustics amp there, and an imposter locks the port out
-- Amp vitals in the port racks, every AVB view reading "number - model - data"
-- Left-edge toolbars glide open on hover to name their buttons
-- LS10 port-error view ("err N")
-- Amplifier polling master switch in Preferences (default off)
-
-**Prep work started**
-- Amp channel-fault flags and stream-unlock alerts
 
 **[Full changelog →](CHANGELOG.md)** — every release since v0.3.0.
 
