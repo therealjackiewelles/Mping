@@ -5,6 +5,13 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.8.2 — 2026-08-20
+
+**Bug fixes**
+- Standby amps read as "standby" on the AVB power face, not FAULT — an amp told to stand by has its power supply off by design, and the amp's own state word now wins before any electrical judgment
+
+---
+
 ## v0.8.1 — 2026-08-20
 
 **Features added**
