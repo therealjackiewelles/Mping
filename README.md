@@ -255,6 +255,20 @@ The application source is maintained in a private repository; this repository ho
 
 <!-- CHANGELOG:START -->
 
+## v0.8.3 — 2026-08-21
+
+**Bug fixes**
+- Nemo power graph scale no longer snaps every tick: bounds round outward to a clean grid step and the long-window sample thinning is anchored to the newest data
+- Nemo graph box is resizable (drag the corner grip, up to 780×560), exports its full recorded history as CSV, and its hover readout moved beside the card so the graph itself is never covered
+- Jitter alerts require persistence: one RTT spike no longer holds the rolling average over the limit for minutes — the alert now forgives the single worst sample, so only repeated spikes register
+- The port-box and Nemo hover buttons grow in place again — a same-day change meant to save layout cost made them swing in from the side instead, so it's been reverted
+- The inspector's Power graph shows the same per-phase detail (L1/L2/L3 + total) as the canvas graph box, instead of a single total that could leave the hover tooltip nearly empty
+- LS10 password reads are memoised — every amp HTTP request was a live keychain round trip
+- SFP signal readings compare at the same precision the screen displays, not exact floating point — real transceivers report enough sub-visible sensor jitter that the old comparison was rebuilding the entire fibre topology many times a second for changes nobody could ever see
+
+**Performance**
+- A CPU audit across the whole app found and fixed several places doing real, avoidable work on every poll cycle: three files were each compiling a fresh regex on every call instead of once (one sat inside the fibre-topology rebuild, another inside SNMP value parsing); every RTT/jitter/temperature alert was formatting a detail string on every poll even when it would be discarded unread; three sidebar views reallocated a date formatter on every redraw; the ping-success console line used a heavier locale-aware formatter than it needed
+- LS10/amp HTTP requests now share one long-lived connection instead of opening a fresh one (with a full authentication round trip) for every single request — the single biggest change in this pass, touching every amp poll
 ## v0.8.2 — 2026-08-20
 
 **Bug fixes**
@@ -270,31 +284,6 @@ The application source is maintained in a private repository; this repository ho
 - Jitter alerts require persistence: one RTT spike used to hold the rolling average over the limit for minutes and fire a "sustained" alert — the alert now forgives the single worst sample, so only repeated spikes register (displayed jitter unchanged)
 - Nemo graph scale stops snapping every tick: bounds round outward to a clean grid step and the long-window sample thinning is anchored to the newest data, so the line holds still while values drift
 - Nemo box resizing tracks the cursor instead of lagging and jittering, and click-dragging on the box no longer starts the canvas selection band underneath it
-## v0.8.0 — 2026-08-19
-
-**Features added**
-- IME Nemo 96HD power analyzers (#46): mains power on the map — the meter's full reading set in the inspector, fresh measurements every 5 seconds on a dedicated loop, spoken over the module's own web protocol (its embedded server speaks broken HTTP; Mping now speaks it back), with a Module Password field on the device
-- Nemo graphs: phase voltages, line-to-line voltages, phase and neutral currents, per-phase power, power factor, and voltage/current THD — in the inspector, and in a draggable graph box that pops out of the tile with 15m/30m/1h/3h windows; console replays draw them too
-- Amplifiers alert panel: session-gated (hidden until amps are detected on the rig), carrying the first two amp alerts — media-clock unlock and stream loss against the session's high-water mark — evaluated identically live and in replay
-- AVB clock view animates the clock tree outward from the grandmaster, placed on real rig hop numbers
-- Streams view grows a detail rail: locks, faults, errors, format
-- Clock faces wear lock glyphs with resolved grandmaster names; an unlocked amp prints its own status word, never a guessed master
-- AVB temperature cells read degrees and humidity, state only when hot
-- Power faces surface the 15V rail errors and the amp's fault message
-- Small LS10 racks (three amps or fewer) fold their port box into the tile itself; LS10 tiles drop the temperature badge — the hardware provides none
-- Alert rows wear the P/S network badge beside the device name
-- Sharp canvas text at any zoom — supersampled glyphs, same layout — on tiles and port boxes alike (#55)
-- The launch map fills as data lands instead of waiting for a full polling lap
-- Console: the complete rig in one log, a tick-box filter tree (device type, then poll category), and tape playback that streams rows on the tape's own clock
-
-**Bug fixes**
-- Ping RTT no longer counts the app's own scheduling — values match terminal ping
-- AVB rack cards share one font size fitted to a common worst case, the ID column stays constant, and cells read as a table: fixed ID column, hairline rule, data
-- Amp validation counts physical units, resolves each leg's parent by subnet rather than label, and reports genuinely ambiguous legs as unplaced instead of guessing
-- Replay validation understands sub-devices, and legacy LS10 labels migrate without minting false SNMP folders
-- Bandwidth labels never vanish one-sided — a quiet direction says 0
-- Links and alerts wear the same name the tile does
-- LA7.16 Amp Vitals console dumps no longer truncate
 
 **[Full changelog →](CHANGELOG.md)** — every release since v0.3.0.
 

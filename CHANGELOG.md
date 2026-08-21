@@ -5,6 +5,23 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.8.3 — 2026-08-21
+
+**Bug fixes**
+- Nemo power graph scale no longer snaps every tick: bounds round outward to a clean grid step and the long-window sample thinning is anchored to the newest data
+- Nemo graph box is resizable (drag the corner grip, up to 780×560), exports its full recorded history as CSV, and its hover readout moved beside the card so the graph itself is never covered
+- Jitter alerts require persistence: one RTT spike no longer holds the rolling average over the limit for minutes — the alert now forgives the single worst sample, so only repeated spikes register
+- The port-box and Nemo hover buttons grow in place again — a same-day change meant to save layout cost made them swing in from the side instead, so it's been reverted
+- The inspector's Power graph shows the same per-phase detail (L1/L2/L3 + total) as the canvas graph box, instead of a single total that could leave the hover tooltip nearly empty
+- LS10 password reads are memoised — every amp HTTP request was a live keychain round trip
+- SFP signal readings compare at the same precision the screen displays, not exact floating point — real transceivers report enough sub-visible sensor jitter that the old comparison was rebuilding the entire fibre topology many times a second for changes nobody could ever see
+
+**Performance**
+- A CPU audit across the whole app found and fixed several places doing real, avoidable work on every poll cycle: three files were each compiling a fresh regex on every call instead of once (one sat inside the fibre-topology rebuild, another inside SNMP value parsing); every RTT/jitter/temperature alert was formatting a detail string on every poll even when it would be discarded unread; three sidebar views reallocated a date formatter on every redraw; the ping-success console line used a heavier locale-aware formatter than it needed
+- LS10/amp HTTP requests now share one long-lived connection instead of opening a fresh one (with a full authentication round trip) for every single request — the single biggest change in this pass, touching every amp poll
+
+---
+
 ## v0.8.2 — 2026-08-20
 
 **Bug fixes**
