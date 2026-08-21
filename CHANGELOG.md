@@ -5,6 +5,15 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.8.4 — 2026-08-21
+
+**Performance**
+- SNMP polling reuses one connection per device instead of opening a fresh one for every single reading (temperature, STP, discards, fan speed, SFP diagnostics, port states, bandwidth counters are all separate operations that used to each pay for their own socket) — confirmed on the live rig
+- Bandwidth polling now respects the same "don't touch a device someone else is mid-poll on" rule every other poller already followed — closes a gap that mattered once connections started being shared
+- Ping engine gains an experimental pooled-socket mode for advanced testing (off by default) — one long-lived connection per network leg instead of one per ping, opt-in via an environment variable while it gets more mileage on live rigs
+
+---
+
 ## v0.8.3 — 2026-08-21
 
 **Bug fixes**

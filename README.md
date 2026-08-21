@@ -255,6 +255,12 @@ The application source is maintained in a private repository; this repository ho
 
 <!-- CHANGELOG:START -->
 
+## v0.8.4 — 2026-08-21
+
+**Performance**
+- SNMP polling reuses one connection per device instead of opening a fresh one for every single reading (temperature, STP, discards, fan speed, SFP diagnostics, port states, bandwidth counters are all separate operations that used to each pay for their own socket) — confirmed on the live rig
+- Bandwidth polling now respects the same "don't touch a device someone else is mid-poll on" rule every other poller already followed — closes a gap that mattered once connections started being shared
+- Ping engine gains an experimental pooled-socket mode for advanced testing (off by default) — one long-lived connection per network leg instead of one per ping, opt-in via an environment variable while it gets more mileage on live rigs
 ## v0.8.3 — 2026-08-21
 
 **Bug fixes**
@@ -273,17 +279,6 @@ The application source is maintained in a private repository; this repository ho
 
 **Bug fixes**
 - Standby amps read as "standby" on the AVB power face, not FAULT — an amp told to stand by has its power supply off by design, and the amp's own state word now wins before any electrical judgment
-## v0.8.1 — 2026-08-20
-
-**Features added**
-- Nemo graph box is resizable: drag the bottom-right grip (up to 780×560, size remembered per device) — the graph absorbs all the extra room, and a wider box draws more points, so expanding genuinely shows more detail
-- Nemo graph box exports its complete recorded history as CSV — every series, ISO timestamps — via the CSV button in its header
-- Nemo graph box hover readout moved beside the card: the graph itself is never covered, and only a thin guideline marks the hovered moment
-
-**Bug fixes**
-- Jitter alerts require persistence: one RTT spike used to hold the rolling average over the limit for minutes and fire a "sustained" alert — the alert now forgives the single worst sample, so only repeated spikes register (displayed jitter unchanged)
-- Nemo graph scale stops snapping every tick: bounds round outward to a clean grid step and the long-window sample thinning is anchored to the newest data, so the line holds still while values drift
-- Nemo box resizing tracks the cursor instead of lagging and jittering, and click-dragging on the box no longer starts the canvas selection band underneath it
 
 **[Full changelog →](CHANGELOG.md)** — every release since v0.3.0.
 
