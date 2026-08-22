@@ -255,6 +255,13 @@ The application source is maintained in a private repository; this repository ho
 
 <!-- CHANGELOG:START -->
 
+## v0.8.6 — 2026-08-21
+
+**Bug fixes**
+- Fixed the cause of a rare but serious fault where ICMP kept working but SNMP and HTTP polling went dark app-wide: a device that's genuinely offline can make the network stack refuse to even send the probe, and that was being treated as "this app's own socket is broken," triggering a fallback to launching `/sbin/ping` as a subprocess. A burst of that fallback across many devices at once could fork enough subprocesses to starve every other kind of polling of resources. Offline devices are now recognised correctly and reported as offline directly, with no fallback triggered
+- The remaining legitimate fallback path is now capped to a handful of subprocesses running at once, so it can never itself become the kind of pileup above, whatever the trigger
+- The app now asks for its full allowance of open connections at launch instead of accepting the standard, much lower default — removes a resource ceiling that a busy show (SNMP, HTTP, and ping traffic together) could realistically approach
+- Canvas Nemo power graph box no longer re-scales on nearly every update when set to a longer time window (1h/3h) that hasn't fully filled with data yet — it was picking which points to draw based on the total sample count so far, which grows every few seconds while the window is still filling, so the whole picture reshuffled itself constantly. Point selection is now tied to fixed clock-time slots instead, which don't move once set
 ## v0.8.5 — 2026-08-21
 
 **Features added**
@@ -266,20 +273,6 @@ The application source is maintained in a private repository; this repository ho
 - SNMP polling reuses one connection per device instead of opening a fresh one for every single reading (temperature, STP, discards, fan speed, SFP diagnostics, port states, bandwidth counters are all separate operations that used to each pay for their own socket) — confirmed on the live rig
 - Bandwidth polling now respects the same "don't touch a device someone else is mid-poll on" rule every other poller already followed — closes a gap that mattered once connections started being shared
 - Ping engine gains an experimental pooled-socket mode for advanced testing (off by default) — one long-lived connection per network leg instead of one per ping, opt-in via an environment variable while it gets more mileage on live rigs
-## v0.8.3 — 2026-08-21
-
-**Bug fixes**
-- Nemo power graph scale no longer snaps every tick: bounds round outward to a clean grid step and the long-window sample thinning is anchored to the newest data
-- Nemo graph box is resizable (drag the corner grip, up to 780×560), exports its full recorded history as CSV, and its hover readout moved beside the card so the graph itself is never covered
-- Jitter alerts require persistence: one RTT spike no longer holds the rolling average over the limit for minutes — the alert now forgives the single worst sample, so only repeated spikes register
-- The port-box and Nemo hover buttons grow in place again — a same-day change meant to save layout cost made them swing in from the side instead, so it's been reverted
-- The inspector's Power graph shows the same per-phase detail (L1/L2/L3 + total) as the canvas graph box, instead of a single total that could leave the hover tooltip nearly empty
-- LS10 password reads are memoised — every amp HTTP request was a live keychain round trip
-- SFP signal readings compare at the same precision the screen displays, not exact floating point — real transceivers report enough sub-visible sensor jitter that the old comparison was rebuilding the entire fibre topology many times a second for changes nobody could ever see
-
-**Performance**
-- A CPU audit across the whole app found and fixed several places doing real, avoidable work on every poll cycle: three files were each compiling a fresh regex on every call instead of once (one sat inside the fibre-topology rebuild, another inside SNMP value parsing); every RTT/jitter/temperature alert was formatting a detail string on every poll even when it would be discarded unread; three sidebar views reallocated a date formatter on every redraw; the ping-success console line used a heavier locale-aware formatter than it needed
-- LS10/amp HTTP requests now share one long-lived connection instead of opening a fresh one (with a full authentication round trip) for every single request — the single biggest change in this pass, touching every amp poll
 
 **[Full changelog →](CHANGELOG.md)** — every release since v0.3.0.
 

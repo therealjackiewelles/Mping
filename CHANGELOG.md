@@ -5,6 +5,16 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.8.6 — 2026-08-21
+
+**Bug fixes**
+- Fixed the cause of a rare but serious fault where ICMP kept working but SNMP and HTTP polling went dark app-wide: a device that's genuinely offline can make the network stack refuse to even send the probe, and that was being treated as "this app's own socket is broken," triggering a fallback to launching `/sbin/ping` as a subprocess. A burst of that fallback across many devices at once could fork enough subprocesses to starve every other kind of polling of resources. Offline devices are now recognised correctly and reported as offline directly, with no fallback triggered
+- The remaining legitimate fallback path is now capped to a handful of subprocesses running at once, so it can never itself become the kind of pileup above, whatever the trigger
+- The app now asks for its full allowance of open connections at launch instead of accepting the standard, much lower default — removes a resource ceiling that a busy show (SNMP, HTTP, and ping traffic together) could realistically approach
+- Canvas Nemo power graph box no longer re-scales on nearly every update when set to a longer time window (1h/3h) that hasn't fully filled with data yet — it was picking which points to draw based on the total sample count so far, which grows every few seconds while the window is still filling, so the whole picture reshuffled itself constantly. Point selection is now tied to fixed clock-time slots instead, which don't move once set
+
+---
+
 ## v0.8.5 — 2026-08-21
 
 **Features added**
