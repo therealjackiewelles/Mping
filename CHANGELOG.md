@@ -5,6 +5,14 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.8.5 — 2026-08-21
+
+**Features added**
+- Temperature and Nemo power graphs now survive an accidental quit: readings from the last 3 hours are recovered automatically when a workspace reopens, so closing the app mid-show no longer throws away everything a graph had accumulated. Anything older than 3 hours (yesterday's show, say) is left behind rather than mixed in with today's
+- Graph lines now show a genuine break where a real gap in the data exists (an app-closed period, or a missed poll), instead of drawing a smooth line straight across it as if nothing happened
+
+---
+
 ## v0.8.4 — 2026-08-21
 
 **Performance**

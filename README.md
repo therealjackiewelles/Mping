@@ -255,6 +255,11 @@ The application source is maintained in a private repository; this repository ho
 
 <!-- CHANGELOG:START -->
 
+## v0.8.5 — 2026-08-21
+
+**Features added**
+- Temperature and Nemo power graphs now survive an accidental quit: readings from the last 3 hours are recovered automatically when a workspace reopens, so closing the app mid-show no longer throws away everything a graph had accumulated. Anything older than 3 hours (yesterday's show, say) is left behind rather than mixed in with today's
+- Graph lines now show a genuine break where a real gap in the data exists (an app-closed period, or a missed poll), instead of drawing a smooth line straight across it as if nothing happened
 ## v0.8.4 — 2026-08-21
 
 **Performance**
@@ -275,10 +280,6 @@ The application source is maintained in a private repository; this repository ho
 **Performance**
 - A CPU audit across the whole app found and fixed several places doing real, avoidable work on every poll cycle: three files were each compiling a fresh regex on every call instead of once (one sat inside the fibre-topology rebuild, another inside SNMP value parsing); every RTT/jitter/temperature alert was formatting a detail string on every poll even when it would be discarded unread; three sidebar views reallocated a date formatter on every redraw; the ping-success console line used a heavier locale-aware formatter than it needed
 - LS10/amp HTTP requests now share one long-lived connection instead of opening a fresh one (with a full authentication round trip) for every single request — the single biggest change in this pass, touching every amp poll
-## v0.8.2 — 2026-08-20
-
-**Bug fixes**
-- Standby amps read as "standby" on the AVB power face, not FAULT — an amp told to stand by has its power supply off by design, and the amp's own state word now wins before any electrical judgment
 
 **[Full changelog →](CHANGELOG.md)** — every release since v0.3.0.
 
