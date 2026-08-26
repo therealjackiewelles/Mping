@@ -255,6 +255,30 @@ The application source is maintained in a private repository; this repository ho
 
 <!-- CHANGELOG:START -->
 
+## v0.8.7 — 2026-08-26
+
+**Features added**
+- Simple ping devices now draw link lines to the switch port they're plugged into, port number chipped on the line — anchored on the switch's own learned-MAC tables (trunk ports disqualified; the true edge port is identified by carrying the fewest learned MACs), so no LLDP is needed from the device
+- Every device's inspector gains a "Mute link lines" checkbox — hides all lines touching that device (topology and edge alike), purely visual, alerts and telemetry unaffected, saved with the workspace
+- LS10 tiles graph their amps' temperatures on the Temperatures plane in graph mode — one line per amp with an in-tile legend and hover readout, replacing the folded-in rack while the view is active. Amp temperature history persists with the other graph data (3-hour retention), so an accidental quit doesn't lose the rack's thermal picture
+- Help ▸ Export All Logs: the complete console trace and the session's alert history zipped into one file, save panel defaulting to the Desktop. The alert history is also exportable as CSV on its own, from the History box and the full-history window
+- Nemo graph cards can be pinned to stay visible on both the Primary and Secondary network tabs, and gained a live stats readout (per-phase now/min/max) built into the card
+- Device search results are ranked best-match-first (an exact IP beats its longer continuations — typing 192.168.2.1 no longer buries it under 2.115), search highlighting updates live as you type, Escape clears the search box, and amps match by name, model, and IP — lighting just their own row inside the rack
+- Port box editor: shift-click selects a whole run of ports in one go; row and column limits now cap at the device's real port count
+
+**Bug fixes**
+- Stale "ghost ports" purged for good: a complete interface probe (every column walked to its end — the sweep now says so explicitly) replaces the stored port list wholesale, so 26-port switches no longer offer 70-port trays inherited from before logical-interface filtering existed
+- SNMP socket pool recycles silently-dead sockets: a pooled socket can die with no local error — sends succeed, replies never arrive — and previously kept its device dark until relaunch, with the victim re-rolling every launch. A proven socket now gets three consecutive timeouts before replacement; one that has never answered gets exactly one
+- SNMP answers are verified to match the question: some switch firmware answers a request for one value with a neighbouring value and no error, which is how a byte counter briefly became a device's name
+- Port box names resolve through the confirmed topology first, then the switch's learned-MAC table, then LLDP — so a neighbour advertising garbage (or nothing) still wears its real tile name, renames appear everywhere immediately, and a redundant pair's IP labels resolve to the correct network leg
+- Topology links require proof: a brand-new link must appear on two consecutive polls, and two Netgear switches must independently confirm each other, before a line is drawn — ends the phantom quadruple-links a rebooting switch's garbage LLDP row could mint
+- The amp "no longer visible on LLDP" alert requires two consecutive missing sweeps — a partial LLDP read drops rows for exactly one sweep and was firing false alerts on healthy amps; the rack cell also holds through the single miss instead of flickering out
+- Devices that report no temperatures by nature (ping devices, Nemos) keep their complete overview card on the Temperatures plane — device type and IP included — instead of an empty thermal slot; the LS10's permanently unfulfilled "Collecting…" badge is gone
+- Amp cells in the name style show just the amp's identity, and all overview port boxes now share one text size instead of each box fitting its own
+
+**Performance**
+- Voltage graphs hold a fixed ±5 V window with 1 V gridlines and a value scale, opening up only when a genuine sag or surge breaks out — normal mains drift reads as the near-flat line it is, and the axis no longer re-scales while a long window fills
+- The Nemo graph card was re-laid to give the plot nearly all the card: timescales into the header, duplicated title and legend rows removed
 ## v0.8.6 — 2026-08-21
 
 **Bug fixes**
@@ -267,12 +291,6 @@ The application source is maintained in a private repository; this repository ho
 **Features added**
 - Temperature and Nemo power graphs now survive an accidental quit: readings from the last 3 hours are recovered automatically when a workspace reopens, so closing the app mid-show no longer throws away everything a graph had accumulated. Anything older than 3 hours (yesterday's show, say) is left behind rather than mixed in with today's
 - Graph lines now show a genuine break where a real gap in the data exists (an app-closed period, or a missed poll), instead of drawing a smooth line straight across it as if nothing happened
-## v0.8.4 — 2026-08-21
-
-**Performance**
-- SNMP polling reuses one connection per device instead of opening a fresh one for every single reading (temperature, STP, discards, fan speed, SFP diagnostics, port states, bandwidth counters are all separate operations that used to each pay for their own socket) — confirmed on the live rig
-- Bandwidth polling now respects the same "don't touch a device someone else is mid-poll on" rule every other poller already followed — closes a gap that mattered once connections started being shared
-- Ping engine gains an experimental pooled-socket mode for advanced testing (off by default) — one long-lived connection per network leg instead of one per ping, opt-in via an environment variable while it gets more mileage on live rigs
 
 **[Full changelog →](CHANGELOG.md)** — every release since v0.3.0.
 
