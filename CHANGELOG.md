@@ -5,6 +5,25 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.8.8 — 2026-08-29
+
+**Features added**
+- The console now records itself to disk as it happens: every line is appended to a per-session file within two seconds of being logged, so the full night is always on file — no more losing an incident to the scroll-back limit or to the app closing. Exports hand over the complete session file; the newest 14 sessions are kept within a 4 GB budget, pruned automatically
+- A new NTP tab appears in Preferences, shipping gated as Work In Progress while it is proven on a live rig: Mping will act as the rig's time server, so every switch syncs its clock from the Mac instead of drifting months wrong, and as the rig's log collector, landing switch logs in the console and the session file interleaved with ping/SNMP traffic on one clock. A NIC picker with subnet validation walks the operator through giving the Mac the canonical rig address that all switch configs point at
+- Temperature graphs (switch and amp) gained gridlines and a value scale on the left, matching the voltage graphs, and the hover readout now sits beside the device tile instead of covering the graph it's reading from
+- The Switch Credentials tab is marked Work In Progress for now while that workflow is reworked
+- Amplifiers plugged into Netgear switches can now be identified and monitored the same way LS10-attached amps are: the switch sweep reads each neighbour's advertised model and address, and verified amps get the full treatment — rack cells, vitals, temperature graphs, disappearance alerts. Same safety rules as before: an amp that can't be fully identified and addressed is noted in the console and left alone, and nothing is contacted unless amp monitoring is enabled in Preferences
+
+**Bug fixes**
+- Nemo graphs no longer show breaks in the trace: meter polls were queueing behind full switch sweeps, leaving 78-second gaps in the readings — meters now poll on their own uninterrupted cadence
+- Two causes of healthy links vanishing en masse were found and fixed: the both-switches-must-agree rule now applies only when a link is first learned (a link already proven keeps living on one switch's word), and a link missing from a single rebuild survives one cycle before being dropped — absorbing the momentary blank neighbour tables a switch serves while a Wi-Fi access point re-registers
+- False bandwidth spikes (tens of Gbps on a link idling at 22 Mbps) eliminated: a counter that runs backwards now resets its baseline instead of producing a huge phantom delta, readings above the hardware's physical ceiling are discarded, and a switch that has once answered with 64-bit counters is never read via the overflow-prone 32-bit ones again
+
+**Performance**
+- Scroll-wheel zoom is much faster and no longer judders on a large workspace: wheel events are batched into a single zoom step, and text re-sharpens once when the zoom settles instead of re-rendering on every notch
+
+---
+
 ## v0.8.7 — 2026-08-26
 
 **Features added**
