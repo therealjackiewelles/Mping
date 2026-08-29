@@ -8,56 +8,56 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 ## v0.8.8 — 2026-08-29
 
 **Features added**
-- The console now records itself to disk as it happens: every line is appended to a per-session file within two seconds of being logged, so the full night is always on file — no more losing an incident to the scroll-back limit or to the app closing. Exports hand over the complete session file; the newest 14 sessions are kept within a 4 GB budget, pruned automatically
-- A new NTP tab appears in Preferences, shipping gated as Work In Progress while it is proven on a live rig: Mping will act as the rig's time server, so every switch syncs its clock from the Mac instead of drifting months wrong, and as the rig's log collector, landing switch logs in the console and the session file interleaved with ping/SNMP traffic on one clock. A NIC picker with subnet validation walks the operator through giving the Mac the canonical rig address that all switch configs point at
-- Temperature graphs (switch and amp) gained gridlines and a value scale on the left, matching the voltage graphs, and the hover readout now sits beside the device tile instead of covering the graph it's reading from
-- The Switch Credentials tab is marked Work In Progress for now while that workflow is reworked
-- Amplifiers plugged into Netgear switches can now be identified and monitored the same way LS10-attached amps are: the switch sweep reads each neighbour's advertised model and address, and verified amps get the full treatment — rack cells, vitals, temperature graphs, disappearance alerts. Same safety rules as before: an amp that can't be fully identified and addressed is noted in the console and left alone, and nothing is contacted unless amp monitoring is enabled in Preferences
+- Console output is written to disk live, per session — nothing is lost to scroll-back or a quit. Newest 14 sessions kept within 4 GB
+- New NTP tab in Preferences (Work In Progress): Mping as the rig's time server and syslog collector, so switch clocks stay right and switch logs land next to ping/SNMP traffic
+- Amps plugged into Netgear switches are discovered and monitored the same way LS10-attached amps are
+- Temperature graphs gained gridlines and a value scale; the hover readout sits beside the tile instead of covering the graph
 
 **Bug fixes**
-- Nemo graphs no longer show breaks in the trace: meter polls were queueing behind full switch sweeps, leaving 78-second gaps in the readings — meters now poll on their own uninterrupted cadence
-- Two causes of healthy links vanishing en masse were found and fixed: the both-switches-must-agree rule now applies only when a link is first learned (a link already proven keeps living on one switch's word), and a link missing from a single rebuild survives one cycle before being dropped — absorbing the momentary blank neighbour tables a switch serves while a Wi-Fi access point re-registers
-- False bandwidth spikes (tens of Gbps on a link idling at 22 Mbps) eliminated: a counter that runs backwards now resets its baseline instead of producing a huge phantom delta, readings above the hardware's physical ceiling are discarded, and a switch that has once answered with 64-bit counters is never read via the overflow-prone 32-bit ones again
+- Nemo graphs no longer show gaps — meter polls stopped queueing behind full switch sweeps
+- Healthy links no longer vanish in bulk when a switch briefly serves blank LLDP tables
+- False bandwidth spikes (tens of Gbps on an idle link) eliminated
+- Switch Credentials tab marked Work In Progress while that workflow is reworked
 
 **Performance**
-- Scroll-wheel zoom is much faster and no longer judders on a large workspace: wheel events are batched into a single zoom step, and text re-sharpens once when the zoom settles instead of re-rendering on every notch
+- Scroll-wheel zoom is faster and no longer judders on a large workspace
 
 ---
 
 ## v0.8.7 — 2026-08-26
 
 **Features added**
-- Simple ping devices now draw link lines to the switch port they're plugged into, port number chipped on the line — anchored on the switch's own learned-MAC tables (trunk ports disqualified; the true edge port is identified by carrying the fewest learned MACs), so no LLDP is needed from the device
-- Every device's inspector gains a "Mute link lines" checkbox — hides all lines touching that device (topology and edge alike), purely visual, alerts and telemetry unaffected, saved with the workspace
-- LS10 tiles graph their amps' temperatures on the Temperatures plane in graph mode — one line per amp with an in-tile legend and hover readout, replacing the folded-in rack while the view is active. Amp temperature history persists with the other graph data (3-hour retention), so an accidental quit doesn't lose the rack's thermal picture
-- Help ▸ Export All Logs: the complete console trace and the session's alert history zipped into one file, save panel defaulting to the Desktop. The alert history is also exportable as CSV on its own, from the History box and the full-history window
-- Nemo graph cards can be pinned to stay visible on both the Primary and Secondary network tabs, and gained a live stats readout (per-phase now/min/max) built into the card
-- Device search results are ranked best-match-first (an exact IP beats its longer continuations — typing 192.168.2.1 no longer buries it under 2.115), search highlighting updates live as you type, Escape clears the search box, and amps match by name, model, and IP — lighting just their own row inside the rack
-- Port box editor: shift-click selects a whole run of ports in one go; row and column limits now cap at the device's real port count
+- Simple ping devices draw a link line to their switch port, found from the switch's own MAC tables — no LLDP needed
+- "Mute link lines" checkbox per device — hides its lines, purely visual, saved with the workspace
+- LS10 tiles graph their amps' temperatures on the Temperatures plane, with legend and hover readout; history survives a restart
+- Help ▸ Export All Logs zips the console trace and alert history; alert history also exports as CSV on its own
+- Nemo graph cards pin to both network tabs and show live per-phase now/min/max
+- Device search ranks exact matches first, highlights as you type, clears on Escape, and matches amps by name, model, and IP
+- Port box editor: shift-click selects a run of ports; row and column limits cap at the device's real port count
 
 **Bug fixes**
-- Stale "ghost ports" purged for good: a complete interface probe (every column walked to its end — the sweep now says so explicitly) replaces the stored port list wholesale, so 26-port switches no longer offer 70-port trays inherited from before logical-interface filtering existed
-- SNMP socket pool recycles silently-dead sockets: a pooled socket can die with no local error — sends succeed, replies never arrive — and previously kept its device dark until relaunch, with the victim re-rolling every launch. A proven socket now gets three consecutive timeouts before replacement; one that has never answered gets exactly one
-- SNMP answers are verified to match the question: some switch firmware answers a request for one value with a neighbouring value and no error, which is how a byte counter briefly became a device's name
-- Port box names resolve through the confirmed topology first, then the switch's learned-MAC table, then LLDP — so a neighbour advertising garbage (or nothing) still wears its real tile name, renames appear everywhere immediately, and a redundant pair's IP labels resolve to the correct network leg
-- Topology links require proof: a brand-new link must appear on two consecutive polls, and two Netgear switches must independently confirm each other, before a line is drawn — ends the phantom quadruple-links a rebooting switch's garbage LLDP row could mint
-- The amp "no longer visible on LLDP" alert requires two consecutive missing sweeps — a partial LLDP read drops rows for exactly one sweep and was firing false alerts on healthy amps; the rack cell also holds through the single miss instead of flickering out
-- Devices that report no temperatures by nature (ping devices, Nemos) keep their complete overview card on the Temperatures plane — device type and IP included — instead of an empty thermal slot; the LS10's permanently unfulfilled "Collecting…" badge is gone
-- Amp cells in the name style show just the amp's identity, and all overview port boxes now share one text size instead of each box fitting its own
+- 26-port switches no longer offer 70-port trays — a complete probe replaces the stored port list
+- SNMP sockets that die silently are replaced instead of leaving a device dark until relaunch
+- SNMP answers are checked against the question asked — a byte counter can no longer become a device's name
+- Port box names resolve through the confirmed topology first, so garbage LLDP can't mislabel a port
+- Phantom quadruple links ended: a new link needs two consecutive polls and both switches' agreement
+- "Amp no longer visible on LLDP" needs two missing sweeps — no more false alerts from partial reads
+- Devices that report no temperatures keep their full overview card on the Temperatures plane
+- All overview port boxes share one text size
 
 **Performance**
-- Voltage graphs hold a fixed ±5 V window with 1 V gridlines and a value scale, opening up only when a genuine sag or surge breaks out — normal mains drift reads as the near-flat line it is, and the axis no longer re-scales while a long window fills
-- The Nemo graph card was re-laid to give the plot nearly all the card: timescales into the header, duplicated title and legend rows removed
+- Voltage graphs hold a fixed ±5 V window with 1 V gridlines, opening up only for a genuine sag or surge
+- Nemo graph card re-laid to give the plot nearly all the card
 
 ---
 
 ## v0.8.6 — 2026-08-21
 
 **Bug fixes**
-- Fixed the cause of a rare but serious fault where ICMP kept working but SNMP and HTTP polling went dark app-wide: a device that's genuinely offline can make the network stack refuse to even send the probe, and that was being treated as "this app's own socket is broken," triggering a fallback to launching `/sbin/ping` as a subprocess. A burst of that fallback across many devices at once could fork enough subprocesses to starve every other kind of polling of resources. Offline devices are now recognised correctly and reported as offline directly, with no fallback triggered
-- The remaining legitimate fallback path is now capped to a handful of subprocesses running at once, so it can never itself become the kind of pileup above, whatever the trigger
-- The app now asks for its full allowance of open connections at launch instead of accepting the standard, much lower default — removes a resource ceiling that a busy show (SNMP, HTTP, and ping traffic together) could realistically approach
-- Canvas Nemo power graph box no longer re-scales on nearly every update when set to a longer time window (1h/3h) that hasn't fully filled with data yet — it was picking which points to draw based on the total sample count so far, which grows every few seconds while the window is still filling, so the whole picture reshuffled itself constantly. Point selection is now tied to fixed clock-time slots instead, which don't move once set
+- Fixed a rare fault where ping stayed green but SNMP and HTTP went dark app-wide — offline devices were triggering a subprocess pileup that starved all other polling
+- The remaining ping fallback path is capped so it can never pile up again
+- The app asks for its full allowance of open connections at launch, removing a ceiling a busy show could reach
+- Nemo power graphs no longer reshuffle constantly while a long time window is still filling
 
 ---
 
