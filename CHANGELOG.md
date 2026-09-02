@@ -22,6 +22,7 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 - Port box layouts show before the first poll instead of a "no data" placeholder
 - AVB clock-flow animation follows the actual cabling on every link on both networks, and a tile following the wrong network's clock wears a red WRONG CLOCK NET badge
 - Amp stream faults read plainly ("S1 no reserve") instead of raw protocol codes
+- The ping heartbeat sits at every tile's upper right instead of overlapping an embedded rack's rows
 
 ---
 
