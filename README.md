@@ -255,6 +255,23 @@ The application source is maintained in a private repository; this repository ho
 
 <!-- CHANGELOG:START -->
 
+## v0.8.9 — 2026-09-01
+
+**Features added**
+- View Master: a new sidebar panel that hides or peeks whole kinds of canvas objects — link lines, link labels, flow animation, port boxes, power graphs. Hidden things reopen exactly as they were; hold a dashed button to peek while it's down
+- The inspector gains an NTP row for switches — green OK when the switch's own time client reports synchronised, red NO when not, checked every ten minutes
+- New LS10s arrive with the standard port box ready: three slots, ports 1–3, shown in the tile immediately
+- Amp AVB warnings: an alert fires when a stream or clock-stream leg reports trouble, raised on the affected network's record only and graded warning vs fault
+- Alerts and their recoveries are written into the session log file alongside everything else
+- Snap-to-grid simplified: tiles land on a fixed 20 px grid, boxes on 10 px — the size picker is gone
+- Support contact details moved into a ? button at the sidebar's top, and the ping interval slider is retired (the setting still applies) — the sidebar fits without scrolling
+
+**Bug fixes**
+- Copy, paste, undo, redo, and delete shortcuts work reliably — menu items had frozen disabled, and text fields silently kept keyboard focus
+- Resizing a location box no longer starts a selection marquee
+- Port box layouts show before the first poll instead of a "no data" placeholder
+- AVB clock-flow animation follows the actual cabling on every link on both networks, and a tile following the wrong network's clock wears a red WRONG CLOCK NET badge
+- Amp stream faults read plainly ("S1 no reserve") instead of raw protocol codes
 ## v0.8.8 — 2026-08-29
 
 **Features added**
@@ -295,13 +312,6 @@ The application source is maintained in a private repository; this repository ho
 **Performance**
 - Voltage graphs hold a fixed ±5 V window with 1 V gridlines, opening up only for a genuine sag or surge
 - Nemo graph card re-laid to give the plot nearly all the card
-## v0.8.6 — 2026-08-21
-
-**Bug fixes**
-- Fixed a rare fault where ping stayed green but SNMP and HTTP went dark app-wide — offline devices were triggering a subprocess pileup that starved all other polling
-- The remaining ping fallback path is capped so it can never pile up again
-- The app asks for its full allowance of open connections at launch, removing a ceiling a busy show could reach
-- Nemo power graphs no longer reshuffle constantly while a long time window is still filling
 
 **[Full changelog →](CHANGELOG.md)** — every release since v0.3.0.
 

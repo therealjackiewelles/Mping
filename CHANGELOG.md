@@ -5,6 +5,26 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.8.9 — 2026-09-01
+
+**Features added**
+- View Master: a new sidebar panel that hides or peeks whole kinds of canvas objects — link lines, link labels, flow animation, port boxes, power graphs. Hidden things reopen exactly as they were; hold a dashed button to peek while it's down
+- The inspector gains an NTP row for switches — green OK when the switch's own time client reports synchronised, red NO when not, checked every ten minutes
+- New LS10s arrive with the standard port box ready: three slots, ports 1–3, shown in the tile immediately
+- Amp AVB warnings: an alert fires when a stream or clock-stream leg reports trouble, raised on the affected network's record only and graded warning vs fault
+- Alerts and their recoveries are written into the session log file alongside everything else
+- Snap-to-grid simplified: tiles land on a fixed 20 px grid, boxes on 10 px — the size picker is gone
+- Support contact details moved into a ? button at the sidebar's top, and the ping interval slider is retired (the setting still applies) — the sidebar fits without scrolling
+
+**Bug fixes**
+- Copy, paste, undo, redo, and delete shortcuts work reliably — menu items had frozen disabled, and text fields silently kept keyboard focus
+- Resizing a location box no longer starts a selection marquee
+- Port box layouts show before the first poll instead of a "no data" placeholder
+- AVB clock-flow animation follows the actual cabling on every link on both networks, and a tile following the wrong network's clock wears a red WRONG CLOCK NET badge
+- Amp stream faults read plainly ("S1 no reserve") instead of raw protocol codes
+
+---
+
 ## v0.8.8 — 2026-08-29
 
 **Features added**
