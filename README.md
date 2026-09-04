@@ -255,6 +255,24 @@ The application source is maintained in a private repository; this repository ho
 
 <!-- CHANGELOG:START -->
 
+## v0.8.10 — 2026-09-04
+
+**Features added**
+- Device Manager exports its table as a CSV — every column, in the manager's order, pairs kept together in redundant mode
+- Device Debug amp folders gain a Raw tab showing every polled endpoint verbatim
+
+**Bug fixes**
+- Auto-naming refuses values that aren't names (a MAC, a bridge ID, an IP, a bare number), scrubs any already saved, and a changed name must repeat on two probes before it sticks
+- A powered-down power meter no longer stalls the other meter's graph — connections time out in 5 s and offline meters are skipped
+- A link that fails to match in a single topology rebuild no longer raises a false Link Down
+- Warm-up sweeps wait for a busy switch instead of skipping it
+- The compact sidebar no longer shifts left during replay, and the History header never wraps
+
+**Rig Replay**
+- Scrubbing no longer freezes the app: seeks run in chunks, collapse pings and port states, and rewind restores the nearest keyframe
+- Alerts and temperature samples carry the tape's time; temperature graphs span the tape instead of a few real minutes
+- LA7.16 amp temperatures replay correctly, and older tapes recover them from the summary line
+- The Monitoring switch reads "Replaying" while a tape plays
 ## v0.8.9 — 2026-09-01
 
 **Features added**
@@ -289,30 +307,6 @@ The application source is maintained in a private repository; this repository ho
 
 **Performance**
 - Scroll-wheel zoom is faster and no longer judders on a large workspace
-## v0.8.7 — 2026-08-26
-
-**Features added**
-- Simple ping devices draw a link line to their switch port, found from the switch's own MAC tables — no LLDP needed
-- "Mute link lines" checkbox per device — hides its lines, purely visual, saved with the workspace
-- LS10 tiles graph their amps' temperatures on the Temperatures plane, with legend and hover readout; history survives a restart
-- Help ▸ Export All Logs zips the console trace and alert history; alert history also exports as CSV on its own
-- Nemo graph cards pin to both network tabs and show live per-phase now/min/max
-- Device search ranks exact matches first, highlights as you type, clears on Escape, and matches amps by name, model, and IP
-- Port box editor: shift-click selects a run of ports; row and column limits cap at the device's real port count
-
-**Bug fixes**
-- 26-port switches no longer offer 70-port trays — a complete probe replaces the stored port list
-- SNMP sockets that die silently are replaced instead of leaving a device dark until relaunch
-- SNMP answers are checked against the question asked — a byte counter can no longer become a device's name
-- Port box names resolve through the confirmed topology first, so garbage LLDP can't mislabel a port
-- Phantom quadruple links ended: a new link needs two consecutive polls and both switches' agreement
-- "Amp no longer visible on LLDP" needs two missing sweeps — no more false alerts from partial reads
-- Devices that report no temperatures keep their full overview card on the Temperatures plane
-- All overview port boxes share one text size
-
-**Performance**
-- Voltage graphs hold a fixed ±5 V window with 1 V gridlines, opening up only for a genuine sag or surge
-- Nemo graph card re-laid to give the plot nearly all the card
 
 **[Full changelog →](CHANGELOG.md)** — every release since v0.3.0.
 

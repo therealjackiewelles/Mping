@@ -5,6 +5,27 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.8.10 — 2026-09-04
+
+**Features added**
+- Device Manager exports its table as a CSV — every column, in the manager's order, pairs kept together in redundant mode
+- Device Debug amp folders gain a Raw tab showing every polled endpoint verbatim
+
+**Bug fixes**
+- Auto-naming refuses values that aren't names (a MAC, a bridge ID, an IP, a bare number), scrubs any already saved, and a changed name must repeat on two probes before it sticks
+- A powered-down power meter no longer stalls the other meter's graph — connections time out in 5 s and offline meters are skipped
+- A link that fails to match in a single topology rebuild no longer raises a false Link Down
+- Warm-up sweeps wait for a busy switch instead of skipping it
+- The compact sidebar no longer shifts left during replay, and the History header never wraps
+
+**Rig Replay**
+- Scrubbing no longer freezes the app: seeks run in chunks, collapse pings and port states, and rewind restores the nearest keyframe
+- Alerts and temperature samples carry the tape's time; temperature graphs span the tape instead of a few real minutes
+- LA7.16 amp temperatures replay correctly, and older tapes recover them from the summary line
+- The Monitoring switch reads "Replaying" while a tape plays
+
+---
+
 ## v0.8.9 — 2026-09-01
 
 **Features added**
