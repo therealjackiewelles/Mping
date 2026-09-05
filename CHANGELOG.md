@@ -5,6 +5,17 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.8.11 — 2026-09-05
+
+**Bug fixes**
+- Cmd+S and auto-save no longer fail silently on a workspace outside Documents/Mping — a refused save shows an alert, and a file chosen via Open or Save As stays writable after relaunch
+- Save As proposes the plain workspace name instead of stacking .mpw extensions
+- A port-box name containing " - " (e.g. "North East L1 - 2") is no longer split as if it were an amp channel label
+- The Alerting panel keeps its proportions at every sidebar width — it scales as one picture, capped, and no longer spills past its background
+- The Console window labels rows, the device picker and search with each device's current name, following auto/manual naming
+
+---
+
 ## v0.8.10 — 2026-09-04
 
 **Features added**

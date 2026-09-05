@@ -255,6 +255,14 @@ The application source is maintained in a private repository; this repository ho
 
 <!-- CHANGELOG:START -->
 
+## v0.8.11 — 2026-09-05
+
+**Bug fixes**
+- Cmd+S and auto-save no longer fail silently on a workspace outside Documents/Mping — a refused save shows an alert, and a file chosen via Open or Save As stays writable after relaunch
+- Save As proposes the plain workspace name instead of stacking .mpw extensions
+- A port-box name containing " - " (e.g. "North East L1 - 2") is no longer split as if it were an amp channel label
+- The Alerting panel keeps its proportions at every sidebar width — it scales as one picture, capped, and no longer spills past its background
+- The Console window labels rows, the device picker and search with each device's current name, following auto/manual naming
 ## v0.8.10 — 2026-09-04
 
 **Features added**
@@ -291,22 +299,6 @@ The application source is maintained in a private repository; this repository ho
 - AVB clock-flow animation follows the actual cabling on every link on both networks, and a tile following the wrong network's clock wears a red WRONG CLOCK NET badge
 - Amp stream faults read plainly ("S1 no reserve") instead of raw protocol codes
 - The ping heartbeat sits at every tile's upper right instead of overlapping an embedded rack's rows
-## v0.8.8 — 2026-08-29
-
-**Features added**
-- Console output is written to disk live, per session — nothing is lost to scroll-back or a quit. Newest 14 sessions kept within 4 GB
-- New NTP tab in Preferences (Work In Progress): Mping as the rig's time server and syslog collector, so switch clocks stay right and switch logs land next to ping/SNMP traffic
-- Amps plugged into Netgear switches are discovered and monitored the same way LS10-attached amps are
-- Temperature graphs gained gridlines and a value scale; the hover readout sits beside the tile instead of covering the graph
-
-**Bug fixes**
-- Nemo graphs no longer show gaps — meter polls stopped queueing behind full switch sweeps
-- Healthy links no longer vanish in bulk when a switch briefly serves blank LLDP tables
-- False bandwidth spikes (tens of Gbps on an idle link) eliminated
-- Switch Credentials tab marked Work In Progress while that workflow is reworked
-
-**Performance**
-- Scroll-wheel zoom is faster and no longer judders on a large workspace
 
 **[Full changelog →](CHANGELOG.md)** — every release since v0.3.0.
 
