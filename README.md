@@ -255,6 +255,13 @@ The application source is maintained in a private repository; this repository ho
 
 <!-- CHANGELOG:START -->
 
+## v0.8.14 — 2026-09-09
+
+**Features added**
+- Alerts are Mping's own: macOS notifications removed. The floating alert stack is the banner when Mping is frontmost and the list that waits when it is not; one Dock bounce and one alert sound per wave of alerts instead of one per device
+
+**Bug fixes**
+- Amp readings no longer queue behind the switch polls — the LS10 port-state read stays fresh through an amp pass instead of going stale for ~110 s (#131)
 ## v0.8.13 — 2026-09-09
 
 **Bug fixes**
@@ -275,14 +282,6 @@ The application source is maintained in a private repository; this repository ho
 - Quitting always saves the working state and graph history first
 - Jitter alerts clear only on a sustained run; a re-triggered condition writes a new row
 - Copper-labelled Netgear links no longer draw as fibre
-## v0.8.11 — 2026-09-05
-
-**Bug fixes**
-- Cmd+S and auto-save no longer fail silently on a workspace outside Documents/Mping — a refused save shows an alert, and a file chosen via Open or Save As stays writable after relaunch
-- Save As proposes the plain workspace name instead of stacking .mpw extensions
-- A port-box name containing " - " (e.g. "North East L1 - 2") is no longer split as if it were an amp channel label
-- The Alerting panel keeps its proportions at every sidebar width — it scales as one picture, capped, and no longer spills past its background
-- The Console window labels rows, the device picker and search with each device's current name, following auto/manual naming
 
 **[Full changelog →](CHANGELOG.md)** — every release since v0.3.0.
 

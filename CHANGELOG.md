@@ -5,6 +5,16 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.8.14 — 2026-09-09
+
+**Features added**
+- Alerts are Mping's own: macOS notifications removed. The floating alert stack is the banner when Mping is frontmost and the list that waits when it is not; one Dock bounce and one alert sound per wave of alerts instead of one per device
+
+**Bug fixes**
+- Amp readings no longer queue behind the switch polls — the LS10 port-state read stays fresh through an amp pass instead of going stale for ~110 s (#131)
+
+---
+
 ## v0.8.13 — 2026-09-09
 
 **Bug fixes**
