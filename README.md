@@ -255,6 +255,11 @@ The application source is maintained in a private repository; this repository ho
 
 <!-- CHANGELOG:START -->
 
+## v0.8.16 — 2026-09-09
+
+**Bug fixes**
+- AVB Clock and Errors views: a link's 802.1AS reading now sits at the far end of the link, beside the end device, instead of crowding the switch (#128)
+- Any saved login still keyed to an old build is re-created at launch, so its last keychain dialog never lands mid-show
 ## v0.8.15 — 2026-09-09
 
 **Features added**
@@ -269,10 +274,6 @@ The application source is maintained in a private repository; this repository ho
 
 **Bug fixes**
 - Amp readings no longer queue behind the switch polls — the LS10 port-state read stays fresh through an amp pass instead of going stale for ~110 s (#131)
-## v0.8.13 — 2026-09-09
-
-**Bug fixes**
-- Amp rows show the age of their own last reading — a stalled LS10 port poll no longer turns every amp on the switch brown while the amps are answering (#126)
 
 **[Full changelog →](CHANGELOG.md)** — every release since v0.3.0.
 

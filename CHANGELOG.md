@@ -5,6 +5,14 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.8.16 — 2026-09-09
+
+**Bug fixes**
+- AVB Clock and Errors views: a link's 802.1AS reading now sits at the far end of the link, beside the end device, instead of crowding the switch (#128)
+- Any saved login still keyed to an old build is re-created at launch, so its last keychain dialog never lands mid-show
+
+---
+
 ## v0.8.15 — 2026-09-09
 
 **Features added**
