@@ -255,6 +255,13 @@ The application source is maintained in a private repository; this repository ho
 
 <!-- CHANGELOG:START -->
 
+## v0.8.15 — 2026-09-09
+
+**Features added**
+- AVB window: switch ports and links wear their 802.1AS timing on the Clock face (delay against threshold, ◂GM on the port toward the grandmaster) and their timeout/discard movement on the Errors face, read from the Netgear switches every minute; four gPTP columns in Device Ports (#128)
+
+**Bug fixes**
+- The two keychain dialogs after every update are gone: stored credentials are re-created once under the app's signed identity, then every update reads them silently
 ## v0.8.14 — 2026-09-09
 
 **Features added**
@@ -266,22 +273,6 @@ The application source is maintained in a private repository; this repository ho
 
 **Bug fixes**
 - Amp rows show the age of their own last reading — a stalled LS10 port poll no longer turns every amp on the switch brown while the amps are answering (#126)
-## v0.8.12 — 2026-09-08
-
-**Features added**
-- Updates install themselves: a new version downloads and verifies in the background, then offers Relaunch Now / Later — no more drag-and-drop, and the relaunch reopens the workspace you had open
-- Signed with a Developer ID and notarised, so the Local Network permission and saved passwords survive updates (#91)
-- Shows as "Mping BETA" in Finder, the Dock and the Local Network list until v1.0
-- Alert banners lead with a priority and show while Mping is frontmost; an alert stack panel collects alerts raised in the background
-- Links are classed fibre or copper from the SFP inventory type, so fibre SFPs without DDM data still draw as fibre (#129)
-- Port-box cells show when a reading was last obtained once a switch or amp goes quiet (#126)
-- LS10 sweep logs why each endpoint failed
-- Rig Replay holds the tape packed and streams the parse — faster and far less memory
-
-**Bug fixes**
-- Quitting always saves the working state and graph history first
-- Jitter alerts clear only on a sustained run; a re-triggered condition writes a new row
-- Copper-labelled Netgear links no longer draw as fibre
 
 **[Full changelog →](CHANGELOG.md)** — every release since v0.3.0.
 

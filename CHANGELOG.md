@@ -5,6 +5,16 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.8.15 — 2026-09-09
+
+**Features added**
+- AVB window: switch ports and links wear their 802.1AS timing on the Clock face (delay against threshold, ◂GM on the port toward the grandmaster) and their timeout/discard movement on the Errors face, read from the Netgear switches every minute; four gPTP columns in Device Ports (#128)
+
+**Bug fixes**
+- The two keychain dialogs after every update are gone: stored credentials are re-created once under the app's signed identity, then every update reads them silently
+
+---
+
 ## v0.8.14 — 2026-09-09
 
 **Features added**
