@@ -5,6 +5,25 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.8.12 — 2026-09-08
+
+**Features added**
+- Updates install themselves: a new version downloads and verifies in the background, then offers Relaunch Now / Later — no more drag-and-drop, and the relaunch reopens the workspace you had open
+- Signed with a Developer ID and notarised, so the Local Network permission and saved passwords survive updates (#91)
+- Shows as "Mping BETA" in Finder, the Dock and the Local Network list until v1.0
+- Alert banners lead with a priority and show while Mping is frontmost; an alert stack panel collects alerts raised in the background
+- Links are classed fibre or copper from the SFP inventory type, so fibre SFPs without DDM data still draw as fibre (#129)
+- Port-box cells show when a reading was last obtained once a switch or amp goes quiet (#126)
+- LS10 sweep logs why each endpoint failed
+- Rig Replay holds the tape packed and streams the parse — faster and far less memory
+
+**Bug fixes**
+- Quitting always saves the working state and graph history first
+- Jitter alerts clear only on a sustained run; a re-triggered condition writes a new row
+- Copper-labelled Netgear links no longer draw as fibre
+
+---
+
 ## v0.8.11 — 2026-09-05
 
 **Bug fixes**

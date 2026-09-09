@@ -255,6 +255,22 @@ The application source is maintained in a private repository; this repository ho
 
 <!-- CHANGELOG:START -->
 
+## v0.8.12 — 2026-09-08
+
+**Features added**
+- Updates install themselves: a new version downloads and verifies in the background, then offers Relaunch Now / Later — no more drag-and-drop, and the relaunch reopens the workspace you had open
+- Signed with a Developer ID and notarised, so the Local Network permission and saved passwords survive updates (#91)
+- Shows as "Mping BETA" in Finder, the Dock and the Local Network list until v1.0
+- Alert banners lead with a priority and show while Mping is frontmost; an alert stack panel collects alerts raised in the background
+- Links are classed fibre or copper from the SFP inventory type, so fibre SFPs without DDM data still draw as fibre (#129)
+- Port-box cells show when a reading was last obtained once a switch or amp goes quiet (#126)
+- LS10 sweep logs why each endpoint failed
+- Rig Replay holds the tape packed and streams the parse — faster and far less memory
+
+**Bug fixes**
+- Quitting always saves the working state and graph history first
+- Jitter alerts clear only on a sustained run; a re-triggered condition writes a new row
+- Copper-labelled Netgear links no longer draw as fibre
 ## v0.8.11 — 2026-09-05
 
 **Bug fixes**
@@ -281,24 +297,6 @@ The application source is maintained in a private repository; this repository ho
 - Alerts and temperature samples carry the tape's time; temperature graphs span the tape instead of a few real minutes
 - LA7.16 amp temperatures replay correctly, and older tapes recover them from the summary line
 - The Monitoring switch reads "Replaying" while a tape plays
-## v0.8.9 — 2026-09-01
-
-**Features added**
-- View Master: a new sidebar panel that hides or peeks whole kinds of canvas objects — link lines, link labels, flow animation, port boxes, power graphs. Hidden things reopen exactly as they were; hold a dashed button to peek while it's down
-- The inspector gains an NTP row for switches — green OK when the switch's own time client reports synchronised, red NO when not, checked every ten minutes
-- New LS10s arrive with the standard port box ready: three slots, ports 1–3, shown in the tile immediately
-- Amp AVB warnings: an alert fires when a stream or clock-stream leg reports trouble, raised on the affected network's record only and graded warning vs fault
-- Alerts and their recoveries are written into the session log file alongside everything else
-- Snap-to-grid simplified: tiles land on a fixed 20 px grid, boxes on 10 px — the size picker is gone
-- Support contact details moved into a ? button at the sidebar's top, and the ping interval slider is retired (the setting still applies) — the sidebar fits without scrolling
-
-**Bug fixes**
-- Copy, paste, undo, redo, and delete shortcuts work reliably — menu items had frozen disabled, and text fields silently kept keyboard focus
-- Resizing a location box no longer starts a selection marquee
-- Port box layouts show before the first poll instead of a "no data" placeholder
-- AVB clock-flow animation follows the actual cabling on every link on both networks, and a tile following the wrong network's clock wears a red WRONG CLOCK NET badge
-- Amp stream faults read plainly ("S1 no reserve") instead of raw protocol codes
-- The ping heartbeat sits at every tile's upper right instead of overlapping an embedded rack's rows
 
 **[Full changelog →](CHANGELOG.md)** — every release since v0.3.0.
 
