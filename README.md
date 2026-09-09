@@ -255,6 +255,10 @@ The application source is maintained in a private repository; this repository ho
 
 <!-- CHANGELOG:START -->
 
+## v0.8.13 — 2026-09-09
+
+**Bug fixes**
+- Amp rows show the age of their own last reading — a stalled LS10 port poll no longer turns every amp on the switch brown while the amps are answering (#126)
 ## v0.8.12 — 2026-09-08
 
 **Features added**
@@ -279,24 +283,6 @@ The application source is maintained in a private repository; this repository ho
 - A port-box name containing " - " (e.g. "North East L1 - 2") is no longer split as if it were an amp channel label
 - The Alerting panel keeps its proportions at every sidebar width — it scales as one picture, capped, and no longer spills past its background
 - The Console window labels rows, the device picker and search with each device's current name, following auto/manual naming
-## v0.8.10 — 2026-09-04
-
-**Features added**
-- Device Manager exports its table as a CSV — every column, in the manager's order, pairs kept together in redundant mode
-- Device Debug amp folders gain a Raw tab showing every polled endpoint verbatim
-
-**Bug fixes**
-- Auto-naming refuses values that aren't names (a MAC, a bridge ID, an IP, a bare number), scrubs any already saved, and a changed name must repeat on two probes before it sticks
-- A powered-down power meter no longer stalls the other meter's graph — connections time out in 5 s and offline meters are skipped
-- A link that fails to match in a single topology rebuild no longer raises a false Link Down
-- Warm-up sweeps wait for a busy switch instead of skipping it
-- The compact sidebar no longer shifts left during replay, and the History header never wraps
-
-**Rig Replay**
-- Scrubbing no longer freezes the app: seeks run in chunks, collapse pings and port states, and rewind restores the nearest keyframe
-- Alerts and temperature samples carry the tape's time; temperature graphs span the tape instead of a few real minutes
-- LA7.16 amp temperatures replay correctly, and older tapes recover them from the summary line
-- The Monitoring switch reads "Replaying" while a tape plays
 
 **[Full changelog →](CHANGELOG.md)** — every release since v0.3.0.
 

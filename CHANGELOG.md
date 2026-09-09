@@ -5,6 +5,13 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.8.13 — 2026-09-09
+
+**Bug fixes**
+- Amp rows show the age of their own last reading — a stalled LS10 port poll no longer turns every amp on the switch brown while the amps are answering (#126)
+
+---
+
 ## v0.8.12 — 2026-09-08
 
 **Features added**
