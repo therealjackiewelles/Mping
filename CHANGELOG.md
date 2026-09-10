@@ -5,6 +5,33 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.8.17 — 2026-09-09
+
+**Features added**
+- Fibre labels, the Inspector's SFP rows and a once-per-session console note say "no DDM" for modules that report no light levels, instead of -0.00 dBm readings (#119)
+- Telemetry Polling: a Nemo meters row sets how often the power meters are read (2–60 s); the power graphs keep three hours by time (#120)
+- The Inspector's RTT graph keeps moving through an outage — each missed ping is a red ✕ on the baseline (#125)
+- AVB Clock face: link readings colour by margin — green with 30% in hand, yellow closer, red within 10% — with a Major/Critical alert carrying the values; the "Amps" alert box is now "AVB"
+- View Master: a LINKS chip toggles the 802.1AS readings on links, on by default and remembered in the workspace file
+- Amp alerts name the amp by type and number ("LA12X 189"), and one identity is used everywhere an amp is named
+- AVB plane: a "Fibre tiles" rail on every face picks what the link labels print — peer delay, sync discards or pdelay timeouts — and both left-edge rails carry their name up the side (#118)
+- Alert when a port's pdelay-timeout or sync-timeout count climbs between polls, the marginal-link sign the switch was holding all along (#118)
+- Port boxes: a narrower number column and wider floating boxes leave more room for names; hovering a truncated name slides the row out to its full length
+- Fibre tile text wears a thin dark halo so it stays readable over a white fibre line
+- Port boxes in the name view read an amp as model then number, "LA12X 43", the same words its alerts use
+- Power graph hover readout finds a clear spot around the graph — never over a tile, port box or another graph, always on screen — falling back to the right or left side by window limits, and going solid only when that fallback has to sit on a card (#117)
+- The strip of workspace under the hidden inspector takes right-clicks and scroll-zoom again
+- The pointer says what a click would do: ⌘ or ⇧ over a tile shows a + or − for adding to or removing from the selection, boxes and cards show an open hand and a closed hand while dragging, resize grips show resize arrows, buttons a pointing hand, a selection box a crosshair
+- Right-click on an LS10 no longer offers Open CLI, which an LS10 does not have
+- Flow dashes march on every link again: a link that appeared after the window had once been covered started its animation on the wrong clock and sat still — the LS10 leaf links, typically (#130)
+- Overview flow on links between two LS10s, and any leaf-to-leaf segment: when the switches' own STP data cannot say which end is nearer the root, the direction comes from walking the cable graph out from the root bridge (#130)
+
+**Bug fixes**
+- Fibre uplinks whose SFP has no DDM draw as fibre from the switch's SFP inventory, no longer as copper
+- Port box up-cells and device tiles share one green, a shade lighter than the tile green was
+
+---
+
 ## v0.8.16 — 2026-09-09
 
 **Bug fixes**
