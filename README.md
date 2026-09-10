@@ -255,6 +255,10 @@ The application source is maintained in a private repository; this repository ho
 
 <!-- CHANGELOG:START -->
 
+## v0.8.18 — 2026-09-09
+
+**Bug fixes**
+- A half-read LLDP table (the chassis-ID walk timed out while the other columns answered) no longer makes every LS10 on a switch vanish and fire Link Down: ports whose rows lost their identity keep the last known neighbour, and a missing link has to stay missing across a full LLDP sweep before it alerts (#132)
 ## v0.8.17 — 2026-09-09
 
 **Features added**
@@ -284,13 +288,6 @@ The application source is maintained in a private repository; this repository ho
 **Bug fixes**
 - AVB Clock and Errors views: a link's 802.1AS reading now sits at the far end of the link, beside the end device, instead of crowding the switch (#128)
 - Any saved login still keyed to an old build is re-created at launch, so its last keychain dialog never lands mid-show
-## v0.8.15 — 2026-09-09
-
-**Features added**
-- AVB window: switch ports and links wear their 802.1AS timing on the Clock face (delay against threshold, ◂GM on the port toward the grandmaster) and their timeout/discard movement on the Errors face, read from the Netgear switches every minute; four gPTP columns in Device Ports (#128)
-
-**Bug fixes**
-- The two keychain dialogs after every update are gone: stored credentials are re-created once under the app's signed identity, then every update reads them silently
 
 **[Full changelog →](CHANGELOG.md)** — every release since v0.3.0.
 

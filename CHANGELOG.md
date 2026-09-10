@@ -5,6 +5,13 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.8.18 — 2026-09-09
+
+**Bug fixes**
+- A half-read LLDP table (the chassis-ID walk timed out while the other columns answered) no longer makes every LS10 on a switch vanish and fire Link Down: ports whose rows lost their identity keep the last known neighbour, and a missing link has to stay missing across a full LLDP sweep before it alerts (#132)
+
+---
+
 ## v0.8.17 — 2026-09-09
 
 **Features added**
