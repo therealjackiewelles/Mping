@@ -5,6 +5,14 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.8.19 — 2026-09-11
+
+**Bug fixes**
+- A device added mid-session gets its MAC from the Mac's ARP table on the next lap, so its line to the switch port appears; before, the table was only re-read on change and a settled rig's never changes. The switches' own ARP tables are a second source, the read can no longer deadlock on a large table, and the console says every lap how many entries were read and how many device MACs were learned ("Host ARP")
+- AVB Clock and Errors faces: a switch port whose device does not speak gPTP reads "Not AVB capable" instead of a dash or an ever-climbing lost-responses count in red; a monitored switch or LS10 that drops out of the timing domain reads "AVB lost"
+
+---
+
 ## v0.8.18 — 2026-09-09
 
 **Bug fixes**

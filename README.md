@@ -255,6 +255,11 @@ The application source is maintained in a private repository; this repository ho
 
 <!-- CHANGELOG:START -->
 
+## v0.8.19 — 2026-09-11
+
+**Bug fixes**
+- A device added mid-session gets its MAC from the Mac's ARP table on the next lap, so its line to the switch port appears; before, the table was only re-read on change and a settled rig's never changes. The switches' own ARP tables are a second source, the read can no longer deadlock on a large table, and the console says every lap how many entries were read and how many device MACs were learned ("Host ARP")
+- AVB Clock and Errors faces: a switch port whose device does not speak gPTP reads "Not AVB capable" instead of a dash or an ever-climbing lost-responses count in red; a monitored switch or LS10 that drops out of the timing domain reads "AVB lost"
 ## v0.8.18 — 2026-09-09
 
 **Bug fixes**
@@ -283,11 +288,6 @@ The application source is maintained in a private repository; this repository ho
 **Bug fixes**
 - Fibre uplinks whose SFP has no DDM draw as fibre from the switch's SFP inventory, no longer as copper
 - Port box up-cells and device tiles share one green, a shade lighter than the tile green was
-## v0.8.16 — 2026-09-09
-
-**Bug fixes**
-- AVB Clock and Errors views: a link's 802.1AS reading now sits at the far end of the link, beside the end device, instead of crowding the switch (#128)
-- Any saved login still keyed to an old build is re-created at launch, so its last keychain dialog never lands mid-show
 
 **[Full changelog →](CHANGELOG.md)** — every release since v0.3.0.
 
