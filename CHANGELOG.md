@@ -5,6 +5,24 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.8.20 — 2026-09-12
+
+**Features added**
+- Network… (⇧⌘N), under Settings… in the Mping menu, opens the Network window: the Adapters section lists every adapter by its System Settings name, kind, link state, address and prefix, MAC, MTU, VLAN tag and parent, and how many devices are pinned to it; devices pinned to an adapter or address the Mac no longer has are called out; live updates as cables and interfaces change. The Routes, NTP & Syslog and Redundant Networks panes move here from Preferences, which keeps General (#134)
+
+**Bug fixes**
+- The amp login password moves to the data-protection keychain, keyed to the team rather than to the certificate of the build that saved it, so test builds and installed releases stop taking turns asking to use it; an existing item is moved once at launch
+- The Switch Credentials pane is gone: nothing ever used the login it stored, and reading it was one of the ways the "Mping wants to use your confidential information" keychain dialog appeared
+- Fibre tile faces: the face labelled "Sync discards" was printing the sync timeouts counter and is now called that; Announce timeouts and Discards faces are added so all four gPTP counters can be shown on the links; a counter above zero reads red, not only while it climbs
+- "AVB lost" is reserved for a port whose neighbour is a switch or LS10; an access point or other endpoint on a port reads "Not AVB capable"
+- Floating port boxes print at the same text size as the racks folded into tiles; their extra width goes to the name
+- The L-Acoustics P1 is a processor, not an amp: its rack rows, tooltips and alerts call it a P1 ("P1 250"), the Inspector heading reads "Amps & P1" where one is present, and its AVB Power face shows the P1's own state word instead of a dash
+- The "Excluded from ping" note under an off ping toggle is gone; the switch says it
+- The "SNMP / LLDP" toggle is "SNMP / HTTP", since the LS10s, amps and Nemos are read over HTTP, and it stays on every device's panel, greyed and hatched where it does not apply, instead of disappearing; the automatic name source reads "SNMP/HTTP" too
+- Group Edit wears the same cards as the single-device panel — PING and SNMP toggles, the link-line mute, Auto name, type, zone, community and Ping NIC — each showing what the selected devices share, "Mixed" when they differ, and every change staged until Apply; staged settings survive adding or dropping devices from the selection
+
+---
+
 ## v0.8.19 — 2026-09-11
 
 **Bug fixes**

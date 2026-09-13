@@ -255,6 +255,21 @@ The application source is maintained in a private repository; this repository ho
 
 <!-- CHANGELOG:START -->
 
+## v0.8.20 — 2026-09-12
+
+**Features added**
+- Network… (⇧⌘N), under Settings… in the Mping menu, opens the Network window: the Adapters section lists every adapter by its System Settings name, kind, link state, address and prefix, MAC, MTU, VLAN tag and parent, and how many devices are pinned to it; devices pinned to an adapter or address the Mac no longer has are called out; live updates as cables and interfaces change. The Routes, NTP & Syslog and Redundant Networks panes move here from Preferences, which keeps General (#134)
+
+**Bug fixes**
+- The amp login password moves to the data-protection keychain, keyed to the team rather than to the certificate of the build that saved it, so test builds and installed releases stop taking turns asking to use it; an existing item is moved once at launch
+- The Switch Credentials pane is gone: nothing ever used the login it stored, and reading it was one of the ways the "Mping wants to use your confidential information" keychain dialog appeared
+- Fibre tile faces: the face labelled "Sync discards" was printing the sync timeouts counter and is now called that; Announce timeouts and Discards faces are added so all four gPTP counters can be shown on the links; a counter above zero reads red, not only while it climbs
+- "AVB lost" is reserved for a port whose neighbour is a switch or LS10; an access point or other endpoint on a port reads "Not AVB capable"
+- Floating port boxes print at the same text size as the racks folded into tiles; their extra width goes to the name
+- The L-Acoustics P1 is a processor, not an amp: its rack rows, tooltips and alerts call it a P1 ("P1 250"), the Inspector heading reads "Amps & P1" where one is present, and its AVB Power face shows the P1's own state word instead of a dash
+- The "Excluded from ping" note under an off ping toggle is gone; the switch says it
+- The "SNMP / LLDP" toggle is "SNMP / HTTP", since the LS10s, amps and Nemos are read over HTTP, and it stays on every device's panel, greyed and hatched where it does not apply, instead of disappearing; the automatic name source reads "SNMP/HTTP" too
+- Group Edit wears the same cards as the single-device panel — PING and SNMP toggles, the link-line mute, Auto name, type, zone, community and Ping NIC — each showing what the selected devices share, "Mixed" when they differ, and every change staged until Apply; staged settings survive adding or dropping devices from the selection
 ## v0.8.19 — 2026-09-11
 
 **Bug fixes**
@@ -264,30 +279,6 @@ The application source is maintained in a private repository; this repository ho
 
 **Bug fixes**
 - A half-read LLDP table (the chassis-ID walk timed out while the other columns answered) no longer makes every LS10 on a switch vanish and fire Link Down: ports whose rows lost their identity keep the last known neighbour, and a missing link has to stay missing across a full LLDP sweep before it alerts (#132)
-## v0.8.17 — 2026-09-09
-
-**Features added**
-- Fibre labels, the Inspector's SFP rows and a once-per-session console note say "no DDM" for modules that report no light levels, instead of -0.00 dBm readings (#119)
-- Telemetry Polling: a Nemo meters row sets how often the power meters are read (2–60 s); the power graphs keep three hours by time (#120)
-- The Inspector's RTT graph keeps moving through an outage — each missed ping is a red ✕ on the baseline (#125)
-- AVB Clock face: link readings colour by margin — green with 30% in hand, yellow closer, red within 10% — with a Major/Critical alert carrying the values; the "Amps" alert box is now "AVB"
-- View Master: a LINKS chip toggles the 802.1AS readings on links, on by default and remembered in the workspace file
-- Amp alerts name the amp by type and number ("LA12X 189"), and one identity is used everywhere an amp is named
-- AVB plane: a "Fibre tiles" rail on every face picks what the link labels print — peer delay, sync discards or pdelay timeouts — and both left-edge rails carry their name up the side (#118)
-- Alert when a port's pdelay-timeout or sync-timeout count climbs between polls, the marginal-link sign the switch was holding all along (#118)
-- Port boxes: a narrower number column and wider floating boxes leave more room for names; hovering a truncated name slides the row out to its full length
-- Fibre tile text wears a thin dark halo so it stays readable over a white fibre line
-- Port boxes in the name view read an amp as model then number, "LA12X 43", the same words its alerts use
-- Power graph hover readout finds a clear spot around the graph — never over a tile, port box or another graph, always on screen — falling back to the right or left side by window limits, and going solid only when that fallback has to sit on a card (#117)
-- The strip of workspace under the hidden inspector takes right-clicks and scroll-zoom again
-- The pointer says what a click would do: ⌘ or ⇧ over a tile shows a + or − for adding to or removing from the selection, boxes and cards show an open hand and a closed hand while dragging, resize grips show resize arrows, buttons a pointing hand, a selection box a crosshair
-- Right-click on an LS10 no longer offers Open CLI, which an LS10 does not have
-- Flow dashes march on every link again: a link that appeared after the window had once been covered started its animation on the wrong clock and sat still — the LS10 leaf links, typically (#130)
-- Overview flow on links between two LS10s, and any leaf-to-leaf segment: when the switches' own STP data cannot say which end is nearer the root, the direction comes from walking the cable graph out from the root bridge (#130)
-
-**Bug fixes**
-- Fibre uplinks whose SFP has no DDM draw as fibre from the switch's SFP inventory, no longer as copper
-- Port box up-cells and device tiles share one green, a shade lighter than the tile green was
 
 **[Full changelog →](CHANGELOG.md)** — every release since v0.3.0.
 
