@@ -5,6 +5,16 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.8.21 — 2026-09-15
+
+**Features added**
+- A rack cell whose amp has gone from the switch's LLDP table stays put and turns red with the amp's last-known name, pulsing yellow while its alert is live, instead of vanishing from the rack (#115)
+- Redundant pairs: a primary's rack layout mirrors to its secondary while the secondary is linked; editing the secondary by hand breaks the link, and the port box editor's chain button re-links it and copies the primary's layout over (#106)
+- Typed addresses are checked and normalised: anything that is not a real IPv4 address is refused in the Inspector, the Device Manager and on paste, with the reason shown; a new device starts with an empty address, so a device genuinely at 192.168.1.100 completes setup like any other; with Auto Routing, an address on no subnet this Mac is attached to gets a warning under the field (#105, #103)
+
+**Bug fixes**
+- The menu bar is trimmed: the Mping menu reads Settings… then Network… with no Services, Hide or Show All items; the Edit menu drops macOS's Writing Tools, AutoFill, Dictation and Emoji entries; the View and Window menus are gone
+
 ## v0.8.20 — 2026-09-12
 
 **Features added**

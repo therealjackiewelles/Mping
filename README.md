@@ -255,6 +255,15 @@ The application source is maintained in a private repository; this repository ho
 
 <!-- CHANGELOG:START -->
 
+## v0.8.21 — 2026-09-15
+
+**Features added**
+- A rack cell whose amp has gone from the switch's LLDP table stays put and turns red with the amp's last-known name, pulsing yellow while its alert is live, instead of vanishing from the rack (#115)
+- Redundant pairs: a primary's rack layout mirrors to its secondary while the secondary is linked; editing the secondary by hand breaks the link, and the port box editor's chain button re-links it and copies the primary's layout over (#106)
+- Typed addresses are checked and normalised: anything that is not a real IPv4 address is refused in the Inspector, the Device Manager and on paste, with the reason shown; a new device starts with an empty address, so a device genuinely at 192.168.1.100 completes setup like any other; with Auto Routing, an address on no subnet this Mac is attached to gets a warning under the field (#105, #103)
+
+**Bug fixes**
+- The menu bar is trimmed: the Mping menu reads Settings… then Network… with no Services, Hide or Show All items; the Edit menu drops macOS's Writing Tools, AutoFill, Dictation and Emoji entries; the View and Window menus are gone
 ## v0.8.20 — 2026-09-12
 
 **Features added**
@@ -275,10 +284,6 @@ The application source is maintained in a private repository; this repository ho
 **Bug fixes**
 - A device added mid-session gets its MAC from the Mac's ARP table on the next lap, so its line to the switch port appears; before, the table was only re-read on change and a settled rig's never changes. The switches' own ARP tables are a second source, the read can no longer deadlock on a large table, and the console says every lap how many entries were read and how many device MACs were learned ("Host ARP")
 - AVB Clock and Errors faces: a switch port whose device does not speak gPTP reads "Not AVB capable" instead of a dash or an ever-climbing lost-responses count in red; a monitored switch or LS10 that drops out of the timing domain reads "AVB lost"
-## v0.8.18 — 2026-09-09
-
-**Bug fixes**
-- A half-read LLDP table (the chassis-ID walk timed out while the other columns answered) no longer makes every LS10 on a switch vanish and fire Link Down: ports whose rows lost their identity keep the last known neighbour, and a missing link has to stay missing across a full LLDP sweep before it alerts (#132)
 
 **[Full changelog →](CHANGELOG.md)** — every release since v0.3.0.
 
