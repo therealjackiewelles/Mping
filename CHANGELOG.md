@@ -5,6 +5,15 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.8.23 — 2026-09-17
+
+**Features added**
+- AVB clock master alert: when a leg's agreed grandmaster changes from what the session first saw, and stays changed for two sweeps, one alert names the old and new master (#22)
+- Spanning tree topology changes raise an alert in the Links box, read from the switch's own log within a lap: the port, the neighbour on it and the bridge the change came from; the row clears after two quiet minutes. Only a change on a port that leads to a device in the workspace alerts; a change on a port with nothing monitored on it, on an access point's port (a client roaming), or one merely received from another bridge goes into the history as a note (#21)
+
+**Fixes**
+- The in-app alert banners (top right) appear only while Mping is in the background; in front, the sidebar has them
+
 ## v0.8.22 — 2026-09-17
 
 **Features added**

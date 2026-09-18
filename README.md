@@ -255,6 +255,14 @@ The application source is maintained in a private repository; this repository ho
 
 <!-- CHANGELOG:START -->
 
+## v0.8.23 — 2026-09-17
+
+**Features added**
+- AVB clock master alert: when a leg's agreed grandmaster changes from what the session first saw, and stays changed for two sweeps, one alert names the old and new master (#22)
+- Spanning tree topology changes raise an alert in the Links box, read from the switch's own log within a lap: the port, the neighbour on it and the bridge the change came from; the row clears after two quiet minutes. Only a change on a port that leads to a device in the workspace alerts; a change on a port with nothing monitored on it, on an access point's port (a client roaming), or one merely received from another bridge goes into the history as a note (#21)
+
+**Fixes**
+- The in-app alert banners (top right) appear only while Mping is in the background; in front, the sidebar has them
 ## v0.8.22 — 2026-09-17
 
 **Features added**
@@ -296,21 +304,6 @@ The application source is maintained in a private repository; this repository ho
 
 **Bug fixes**
 - The menu bar is trimmed: the Mping menu reads Settings… then Network… with no Services, Hide or Show All items; the Edit menu drops macOS's Writing Tools, AutoFill, Dictation and Emoji entries; the View and Window menus are gone
-## v0.8.20 — 2026-09-12
-
-**Features added**
-- Network… (⇧⌘N), under Settings… in the Mping menu, opens the Network window: the Adapters section lists every adapter by its System Settings name, kind, link state, address and prefix, MAC, MTU, VLAN tag and parent, and how many devices are pinned to it; devices pinned to an adapter or address the Mac no longer has are called out; live updates as cables and interfaces change. The Routes, NTP & Syslog and Redundant Networks panes move here from Preferences, which keeps General (#134)
-
-**Bug fixes**
-- The amp login password moves to the data-protection keychain, keyed to the team rather than to the certificate of the build that saved it, so test builds and installed releases stop taking turns asking to use it; an existing item is moved once at launch
-- The Switch Credentials pane is gone: nothing ever used the login it stored, and reading it was one of the ways the "Mping wants to use your confidential information" keychain dialog appeared
-- Fibre tile faces: the face labelled "Sync discards" was printing the sync timeouts counter and is now called that; Announce timeouts and Discards faces are added so all four gPTP counters can be shown on the links; a counter above zero reads red, not only while it climbs
-- "AVB lost" is reserved for a port whose neighbour is a switch or LS10; an access point or other endpoint on a port reads "Not AVB capable"
-- Floating port boxes print at the same text size as the racks folded into tiles; their extra width goes to the name
-- The L-Acoustics P1 is a processor, not an amp: its rack rows, tooltips and alerts call it a P1 ("P1 250"), the Inspector heading reads "Amps & P1" where one is present, and its AVB Power face shows the P1's own state word instead of a dash
-- The "Excluded from ping" note under an off ping toggle is gone; the switch says it
-- The "SNMP / LLDP" toggle is "SNMP / HTTP", since the LS10s, amps and Nemos are read over HTTP, and it stays on every device's panel, greyed and hatched where it does not apply, instead of disappearing; the automatic name source reads "SNMP/HTTP" too
-- Group Edit wears the same cards as the single-device panel — PING and SNMP toggles, the link-line mute, Auto name, type, zone, community and Ping NIC — each showing what the selected devices share, "Mixed" when they differ, and every change staged until Apply; staged settings survive adding or dropping devices from the selection
 
 **[Full changelog →](CHANGELOG.md)** — every release since v0.3.0.
 
