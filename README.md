@@ -255,6 +255,38 @@ The application source is maintained in a private repository; this repository ho
 
 <!-- CHANGELOG:START -->
 
+## v0.8.22 — 2026-09-17
+
+**Features added**
+- "Open full log…" under the Switch log rows opens a window with every line held for that switch, newest at the top: time, severity, component and message, with a filter, a Show MVRP chatter toggle and Copy (#139)
+- The switch's own log, read from the switch over SNMP with no syslog host to configure: the Switch log rows at the foot of the Inspector fill from it, with the switch's own timestamps; one small read per lap, lines only when there are new ones; MVRP chatter hidden; its own tier in the Telemetry Polling window (#139)
+- The search field finds MAC addresses, whole or in part ("1b:92", "001b92"): a device's own MAC, an amp's, and any MAC a switch port has learned or heard over LLDP, lighting the tile and the port
+- A CPU graph for each Netgear switch in the Inspector: the switch's own load over a rolling half hour, with min, average, max and memory used; its own Switch CPU tier in the Telemetry Polling window (15 s default)
+- Nemo meter polling runs from half a second to five seconds (was 2 to 60); the power graphs' windows are by time, so a faster meter never shortens them
+- The power graphs' window is a slider, from a rolling minute to three hours with hour marks, on the canvas card and in the Inspector (was four fixed chips)
+- Silence alerts per device: a toggle under Mute link lines in the Inspector and in Group Edit; while on, the device raises no alert, notification or pulse, its rows leave the boxes, and a struck-through bell sits in the tile's lower right; switching it off shows anything still live at once (#137)
+- Netgear switches wear the hops-to-grandmaster chip and the gPTP GM badge in the AVB clock view like the LS10s, and join the wrong-clock-network check: the M4250's steps-removed and grandmaster identity are read beside the timing tables (#116)
+- A privileged helper (MpingHelper) puts the time server's addresses on the NICs and takes them off when Mping quits, so nothing lingers on a Mac that is not running it; approved once in System Settings, no Terminal paste; the app's side is in place and the helper's target is added in Xcode (Docs/PRIVILEGED-HELPER.md) — until then the Terminal flow stands (#136)
+- Power graphs: each phase readout (L1, L2, L3, N) is a button that hides its line and the axis fits the lines left, so a neutral far above the lives no longer flattens them; the readout stays, dimmed, and the hover panel keeps every phase; saved per graph kind with the device (#138)
+- The Inspector gains a Device info section at its foot, just above "Last checked", unboxed: make and model as its heading, firmware and serial, the management and chassis MACs, where a switch takes its time from (with "this Mac" marked) and its own clock against this Mac's, and the last syslog lines it sent here; a plain device shows its learned MAC
+- The NTP & Syslog pane is tidied: one row per side with a state word, Apply under the table, and the status as one short line per thing
+- Right-click a device to copy the MAC address learned for it; the item is greyed until one has been learned, and the greyed Open Web Interface / Open CLI items now stay grey instead of lighting up
+- The NTP & Syslog pane takes a primary and a secondary side, each with its own NIC and address, so the time server can be reached from both switch fabrics; "already carries" is judged per NIC, so an address held by one dongle can still be added to the other; Apply pastes one command for both; the status names each side and refreshes when an adapter changes; the console says which address each NTP client asked (#112)
+
+**Bug fixes**
+- AVB link labels wear their own end's gPTP reading; since 9 Sep each chip had been showing the far end's, so a sync timeout on Delay Node North P27 appeared on the P43 chip at the Roof Centre Node
+- A switch that is not synchronised no longer writes its NUL-padded NTP source name into the console file
+
+**Fixes**
+- The "Mping X is ready" update panel shows what's new: the release notes from the feed, as a list under the version (it said "ready" and nothing else)
+- False Link Down on every copper leg of the Roof (16 Sep 22:28): SNMP replies were crossing between polls sharing a switch's socket, so a sweep read a late port-poll reply as its own, its LLDP walk stopped early and 13 links went "missing". Replies are now matched to their request and exchanges on one switch run one at a time; a sweep whose chassis-ID walk returned nothing keeps the last neighbour table; and a link LLDP has lost while both ports still read Up never alerts
+- The Inspector's Time row fills within a minute of a launch: the NTP status tier's first lap runs at a few seconds per switch, then settles to its interval (was up to ten minutes of "not read yet")
+- The full log window holds every line: the first read takes the switch's whole 200-line buffer and the app keeps up to 2,000 per switch after that; the header says how many are hidden by the MVRP filter
+- gPTP raw dumps are no longer cut at 8,000 characters on the way to the console log, so the hops and grandmaster values reach the file and replay (#116)
+- The Inspector's Switch log rows follow new lines as they arrive (they read the same log the full window reads) and run newest first
+- Exported CSVs (alert history, Device Manager, power history, Export All Logs) open correctly in Excel: they now carry a UTF-8 byte-order mark, so "·", "Ø" and dashes no longer show as "¬∑", "√ò" and "‚Äî"; replay accepts such a file
+- The time server's addresses are NTP only: they no longer appear in the device NIC pickers, and a device still sending from one goes back to Auto Routing (noted in the console)
+- Open Web Interface works on LS10s from the right-click menu (plain HTTP at the root; was greyed out)
 ## v0.8.21 — 2026-09-15
 
 **Features added**
@@ -279,11 +311,6 @@ The application source is maintained in a private repository; this repository ho
 - The "Excluded from ping" note under an off ping toggle is gone; the switch says it
 - The "SNMP / LLDP" toggle is "SNMP / HTTP", since the LS10s, amps and Nemos are read over HTTP, and it stays on every device's panel, greyed and hatched where it does not apply, instead of disappearing; the automatic name source reads "SNMP/HTTP" too
 - Group Edit wears the same cards as the single-device panel — PING and SNMP toggles, the link-line mute, Auto name, type, zone, community and Ping NIC — each showing what the selected devices share, "Mixed" when they differ, and every change staged until Apply; staged settings survive adding or dropping devices from the selection
-## v0.8.19 — 2026-09-11
-
-**Bug fixes**
-- A device added mid-session gets its MAC from the Mac's ARP table on the next lap, so its line to the switch port appears; before, the table was only re-read on change and a settled rig's never changes. The switches' own ARP tables are a second source, the read can no longer deadlock on a large table, and the console says every lap how many entries were read and how many device MACs were learned ("Host ARP")
-- AVB Clock and Errors faces: a switch port whose device does not speak gPTP reads "Not AVB capable" instead of a dash or an ever-climbing lost-responses count in red; a monitored switch or LS10 that drops out of the timing domain reads "AVB lost"
 
 **[Full changelog →](CHANGELOG.md)** — every release since v0.3.0.
 
