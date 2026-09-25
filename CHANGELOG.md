@@ -5,6 +5,39 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.8.24 — 2026-09-25
+
+**Features added**
+- AVB Streams view: the switches say who is sending streams — each Netgear's MSRP reservation table names every stream and its talker's MAC — and the switches' address tables say which port each talker is on, so on the Streams view a port-box cell whose device is sending streams turns gold and reads "name · n streams"; its own tier (30 s) in the Telemetry Polling window
+- Holding Option shows MAC addresses in the port boxes too, as it already did on the tiles: the neighbour's MAC on a switch port, the amp's on an amp row
+- MAC search accepts every form a pasted address can take — dots and spaces between the pairs, a trailing newline — not only colons and dashes
+- An application log, beside the console log: one line per thing that happens to the app — launch (version, macOS, Mac, each launch step's time), sleep and wake, front and back, thermal and low-power changes, a five-minute heartbeat (the app's own CPU, memory, threads, open descriptors, devices online/offline), the main thread stalling, the quit path; a run that dies is noticed at the next launch (a history note names its log), macOS's crash reports are collected, and all of it goes into Export All Logs (#143, first cut)
+- Help ▸ Export All Logs… now includes every Nemo meter's full power history too: one CSV per meter in a "Power Graphs" folder, every reading held, not just whatever window a graph happened to be showing (#141 follow-up)
+- Help ▸ Export All Logs… now includes every Netgear switch's own log: one CSV per switch in a "Switch Logs" folder (every line held, MVRP chatter marked rather than dropped), plus one file combining all of them sorted by when Mping read each line — the switches' own clocks can be hours apart on this rig (#141)
+- One address, one adapter, one device: typing an address another device already has through the same NIC turns the IP and Ping NIC boxes red with the other device's name, and the change is refused — in the Inspector, the Device Manager, Group Edit and Network ▸ Adapters; an address shared across two NICs is allowed but never gets a pinned route; a double that gets in anyway (a pasted copy, an old showfile) is greyed out on the canvas, reads "Duplicate IP", and is neither pinged nor polled until its address or NIC changes
+- Network ▸ Adapters starts with every adapter collapsed (click anywhere on a header to open it), stripes the device rows, shows VLANs by their name and tag, marks the time server's adapters with an NTP Server badge, hides unused adapters with nothing plugged in, and re-reads the Mac's adapters every two seconds while the window is open
+- Network ▸ Adapters is laid out by adapter: each has a header with its name, address, mask and MAC, and beneath it a table of the devices using it with a per-device adapter picker; the head of that column moves the whole table to another adapter (Move all to…, then Apply); adapters only the showfile knows get the same block in red, and devices on Auto have one too
+- A showfile from a computer with different network adapters is handled: nothing is added to the Mac for adapters it doesn't have, the opening splash shows red crosses, a box says the adapters don't match (the time server only if one is set up) with a button into Network ▸ Adapters, and there each missing adapter's devices move onto one of this Mac's adapters in one step
+- The opening splash names the workspace that is opening and ticks off what Mping does to get ready: workspace loaded, host routes added, the time server's address put on, monitoring started; it holds until the last tick shows
+- A closing sequence mirrors the opening: "Closing application", the M un-drawing, and three lines ticking off as Mping saves the workspace, removes the host routes it pinned and takes the time server's address off the rig adapters
+- With the helper approved, the host routes the rig needs (only addresses two adapters could both reach) go on at launch and come off at quit, and the helper clears them if the app dies
+- First launch asks once for the permission that lets Mping manage the time server's address: Allow opens the one switch in System Settings, the panel watches for it and closes itself, and it never asks again
+- The privileged helper is now built into the app: approved once in System Settings, it puts the time server's address on the rig NICs when Mping starts and takes it off when Mping quits, so the switches keep time without a Terminal command after every reboot (#136)
+
+**Changes**
+- The workspace background image is removed (Workspace ▸ Background Image); a showfile that carries one still opens, and the image leaves the file at its next save (#81)
+- The Zone field is gone from every device: no field in the Inspector or Group Edit, no colour strip on the tile; old showfiles still open
+- The LS10 Inspector no longer shows a Temperature card: an LS10 reports no temperature of its own (amp temperatures are unchanged)
+- The Network window's sections each open with a header for legends and notes; Adapters shows the outline legend (green up with an address, red no address or no connection, dashed virtual) and the row of summary tags is gone
+
+**Fixes**
+- The helper no longer retries the refused system network-database write every 30 s: it remembers the refusal, uses kernel routes from then on, and a re-add keeps the whole pin list (helper 4)
+- Mping no longer crashes when a network adapter drops off the Mac (a failing USB hub, an unplugged dongle): a failed SNMP socket was closed twice, and the second close could land on another connection's descriptor and kill the app; the bug dates from 7 Aug
+- Unplugging and replugging the network adapters no longer kills one side of the switch management network: the routes Mping pinned were the wrong kind, and on whichever adapter came up first every packet to its switches went nowhere (#136)
+- The time server's address goes back on by itself within half a minute of an adapter being replugged or the Mac waking; before, it stayed off until the next launch and the switches lost their time server
+- A switch whose clock matches the Mac no longer reads "14400.1 s behind this Mac" while it is re-locking to the time server, and its Time row says it is asking this Mac and when it was last heard; a switch reading "not synchronised" is re-read every ten seconds, not every ten minutes, until it locks
+- The NTP status tier no longer starves: finding its switch busy cost it a full minute each time, and after a launch it could go minutes without one read; a slow tier now comes back for the same switch in three seconds
+
 ## v0.8.23 — 2026-09-17
 
 **Features added**
