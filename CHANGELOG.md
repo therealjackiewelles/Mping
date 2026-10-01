@@ -5,6 +5,21 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.8.26 — 2026-09-30
+
+**Features added**
+- Jumbo frames: Edit… on a virtual interface can fix a size above 1500 where the adapter can carry it; Mping holds it, tests it with a large packet on that leg, and says so if the leg isn't carrying it
+- The Network window keeps each section's long explanations behind a "?" at the right-hand end of its heading
+
+**Changes**
+- A new virtual interface is made at 1496 with no frame-size choice; Edit… keeps it, and "leave as found" now really leaves the interface alone
+- The Network ▸ Virtual Interfaces description is one line, and its status reads "adopted from System Settings" or "adopted from Mping"
+- A Netgear switch's Inspector shows the hotter of its two temperature sensors, the same number as its tile
+- The About card (click the Mping logo) now carries the credits: created by Morgan Beecher, and the ideators
+
+**Fixes**
+- The helper's launch description is now in the form Apple documents — on one Mac the helper never started, so routes, the time server address and virtual interfaces did nothing
+
 ## v0.8.25 — 2026-09-28
 
 **Features added**

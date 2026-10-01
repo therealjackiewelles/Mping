@@ -255,6 +255,20 @@ The application source is maintained in a private repository; this repository ho
 
 <!-- CHANGELOG:START -->
 
+## v0.8.26 — 2026-09-30
+
+**Features added**
+- Jumbo frames: Edit… on a virtual interface can fix a size above 1500 where the adapter can carry it; Mping holds it, tests it with a large packet on that leg, and says so if the leg isn't carrying it
+- The Network window keeps each section's long explanations behind a "?" at the right-hand end of its heading
+
+**Changes**
+- A new virtual interface is made at 1496 with no frame-size choice; Edit… keeps it, and "leave as found" now really leaves the interface alone
+- The Network ▸ Virtual Interfaces description is one line, and its status reads "adopted from System Settings" or "adopted from Mping"
+- A Netgear switch's Inspector shows the hotter of its two temperature sensors, the same number as its tile
+- The About card (click the Mping logo) now carries the credits: created by Morgan Beecher, and the ideators
+
+**Fixes**
+- The helper's launch description is now in the form Apple documents — on one Mac the helper never started, so routes, the time server address and virtual interfaces did nothing
 ## v0.8.25 — 2026-09-28
 
 **Features added**
@@ -310,14 +324,6 @@ The application source is maintained in a private repository; this repository ho
 - The time server's address goes back on by itself within half a minute of an adapter being replugged or the Mac waking; before, it stayed off until the next launch and the switches lost their time server
 - A switch whose clock matches the Mac no longer reads "14400.1 s behind this Mac" while it is re-locking to the time server, and its Time row says it is asking this Mac and when it was last heard; a switch reading "not synchronised" is re-read every ten seconds, not every ten minutes, until it locks
 - The NTP status tier no longer starves: finding its switch busy cost it a full minute each time, and after a launch it could go minutes without one read; a slow tier now comes back for the same switch in three seconds
-## v0.8.23 — 2026-09-17
-
-**Features added**
-- AVB clock master alert: when a leg's agreed grandmaster changes from what the session first saw, and stays changed for two sweeps, one alert names the old and new master (#22)
-- Spanning tree topology changes raise an alert in the Links box, read from the switch's own log within a lap: the port, the neighbour on it and the bridge the change came from; the row clears after two quiet minutes. Only a change on a port that leads to a device in the workspace alerts; a change on a port with nothing monitored on it, on an access point's port (a client roaming), or one merely received from another bridge goes into the history as a note (#21)
-
-**Fixes**
-- The in-app alert banners (top right) appear only while Mping is in the background; in front, the sidebar has them
 
 **[Full changelog →](CHANGELOG.md)** — every release since v0.3.0.
 
