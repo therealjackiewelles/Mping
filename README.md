@@ -255,6 +255,27 @@ The application source is maintained in a private repository; this repository ho
 
 <!-- CHANGELOG:START -->
 
+## v0.8.27 — 2026-10-04
+
+**Performance**
+- Panning, zooming and switching views are smoother: the map is one canvas for all three views and switches without a fade, and its background redraw waits until you let go
+- Sitting idle uses less CPU: port-box labels are rebuilt only when something they show has changed, not on every ping lap and every poll result
+
+**Fixes**
+- Holding Option over a Netgear switch shows its chassis MAC, the one on its label, instead of its management MAC; a MAC search finds either
+- Searching for any of a Netgear switch's own MAC addresses now lights the switch itself, not just the switches that learned that address
+- Searching for a whole MAC flashes a gold border round the exact device that owns it, a tile or its cell in a port box; the results list shows only that device, and nothing if it is not in the workspace
+- AVB: the "Pdelay timeouts" face and the counter alert read the wrong column of the switch and always showed 0; they now show the pdelay timeouts as the switch's own 802.1AS page does, and the alert fires on them
+- Older console records are kept up to a 4 GB budget (up to 40 runs) and the newest earlier one is never deleted, so a burst of relaunches no longer pushes a show day's records out; each launch notes what it removed in the app log
+- The Console window lets go of its rows when it is closed instead of re-filtering them in the background
+
+**Features added**
+- The console record warns below 5 GB of free disk, stops growing below 1 GB (the Console window keeps working) and resumes above 2 GB, all noted in the app log; a failed write or a record file that would not open is reported instead of silently dropping rows, and the heartbeat line shows free disk space
+- The spacebar flips the map between the Primary and Secondary networks, whichever is up; the keys 1, 2 and 3 switch it to Overview, Temperatures and AVB
+- The AVB "FIBRE TILES" rail is always on the left edge, even with the View Master's gPTP-on-links chip off; choosing a face (or pressing Shift+Tab) switches the readings back on
+- Tab steps down the left rail (port-box labels on the Overview; Power, Streams, Clock and the rest on AVB); Shift+Tab steps through the AVB fibre tile faces
+- Esc in the search box clears it and leaves the box, so the map keys work again at once
+- AVB link faces: a new "Announce discards" face and a "Pdelay lost" face (a port dropping out of the clock), in the order of the switch's own statistics page
 ## v0.8.26 — 2026-09-30
 
 **Features added**
@@ -292,38 +313,6 @@ The application source is maintained in a private repository; this repository ho
 - The app reads the helper's version before using a new verb, so a helper kept alive by another copy of Mping cannot take the whole helper out of service
 - Port boxes no longer flicker stale on every switch when the LS10s' port-state call stops answering (25 Sep: all 29 primary-leg units at once): the Netgears and the LS10s now take turns in separate rotations, the LS10s' HTTP reads queue on their own with the fast port-state read in its own lane, and a unit whose port-state call keeps timing out is left alone for 30 s, doubling to two minutes, re-tried off the rotation so its timeout costs the other units nothing — the sweep stops asking it for ports too and keeps the list it has, and while it is held a port with an LLDP neighbour reads as up, so the amp rows stay live instead of red — with a console line each way
 - The LS10 log no longer says "connection refused — port 80 closed" for a connection that was blocked or unreachable; it says so
-## v0.8.24 — 2026-09-25
-
-**Features added**
-- AVB Streams view: the switches say who is sending streams — each Netgear's MSRP reservation table names every stream and its talker's MAC — and the switches' address tables say which port each talker is on, so on the Streams view a port-box cell whose device is sending streams turns gold and reads "name · n streams"; its own tier (30 s) in the Telemetry Polling window
-- Holding Option shows MAC addresses in the port boxes too, as it already did on the tiles: the neighbour's MAC on a switch port, the amp's on an amp row
-- MAC search accepts every form a pasted address can take — dots and spaces between the pairs, a trailing newline — not only colons and dashes
-- An application log, beside the console log: one line per thing that happens to the app — launch (version, macOS, Mac, each launch step's time), sleep and wake, front and back, thermal and low-power changes, a five-minute heartbeat (the app's own CPU, memory, threads, open descriptors, devices online/offline), the main thread stalling, the quit path; a run that dies is noticed at the next launch (a history note names its log), macOS's crash reports are collected, and all of it goes into Export All Logs (#143, first cut)
-- Help ▸ Export All Logs… now includes every Nemo meter's full power history too: one CSV per meter in a "Power Graphs" folder, every reading held, not just whatever window a graph happened to be showing (#141 follow-up)
-- Help ▸ Export All Logs… now includes every Netgear switch's own log: one CSV per switch in a "Switch Logs" folder (every line held, MVRP chatter marked rather than dropped), plus one file combining all of them sorted by when Mping read each line — the switches' own clocks can be hours apart on this rig (#141)
-- One address, one adapter, one device: typing an address another device already has through the same NIC turns the IP and Ping NIC boxes red with the other device's name, and the change is refused — in the Inspector, the Device Manager, Group Edit and Network ▸ Adapters; an address shared across two NICs is allowed but never gets a pinned route; a double that gets in anyway (a pasted copy, an old showfile) is greyed out on the canvas, reads "Duplicate IP", and is neither pinged nor polled until its address or NIC changes
-- Network ▸ Adapters starts with every adapter collapsed (click anywhere on a header to open it), stripes the device rows, shows VLANs by their name and tag, marks the time server's adapters with an NTP Server badge, hides unused adapters with nothing plugged in, and re-reads the Mac's adapters every two seconds while the window is open
-- Network ▸ Adapters is laid out by adapter: each has a header with its name, address, mask and MAC, and beneath it a table of the devices using it with a per-device adapter picker; the head of that column moves the whole table to another adapter (Move all to…, then Apply); adapters only the showfile knows get the same block in red, and devices on Auto have one too
-- A showfile from a computer with different network adapters is handled: nothing is added to the Mac for adapters it doesn't have, the opening splash shows red crosses, a box says the adapters don't match (the time server only if one is set up) with a button into Network ▸ Adapters, and there each missing adapter's devices move onto one of this Mac's adapters in one step
-- The opening splash names the workspace that is opening and ticks off what Mping does to get ready: workspace loaded, host routes added, the time server's address put on, monitoring started; it holds until the last tick shows
-- A closing sequence mirrors the opening: "Closing application", the M un-drawing, and three lines ticking off as Mping saves the workspace, removes the host routes it pinned and takes the time server's address off the rig adapters
-- With the helper approved, the host routes the rig needs (only addresses two adapters could both reach) go on at launch and come off at quit, and the helper clears them if the app dies
-- First launch asks once for the permission that lets Mping manage the time server's address: Allow opens the one switch in System Settings, the panel watches for it and closes itself, and it never asks again
-- The privileged helper is now built into the app: approved once in System Settings, it puts the time server's address on the rig NICs when Mping starts and takes it off when Mping quits, so the switches keep time without a Terminal command after every reboot (#136)
-
-**Changes**
-- The workspace background image is removed (Workspace ▸ Background Image); a showfile that carries one still opens, and the image leaves the file at its next save (#81)
-- The Zone field is gone from every device: no field in the Inspector or Group Edit, no colour strip on the tile; old showfiles still open
-- The LS10 Inspector no longer shows a Temperature card: an LS10 reports no temperature of its own (amp temperatures are unchanged)
-- The Network window's sections each open with a header for legends and notes; Adapters shows the outline legend (green up with an address, red no address or no connection, dashed virtual) and the row of summary tags is gone
-
-**Fixes**
-- The helper no longer retries the refused system network-database write every 30 s: it remembers the refusal, uses kernel routes from then on, and a re-add keeps the whole pin list (helper 4)
-- Mping no longer crashes when a network adapter drops off the Mac (a failing USB hub, an unplugged dongle): a failed SNMP socket was closed twice, and the second close could land on another connection's descriptor and kill the app; the bug dates from 7 Aug
-- Unplugging and replugging the network adapters no longer kills one side of the switch management network: the routes Mping pinned were the wrong kind, and on whichever adapter came up first every packet to its switches went nowhere (#136)
-- The time server's address goes back on by itself within half a minute of an adapter being replugged or the Mac waking; before, it stayed off until the next launch and the switches lost their time server
-- A switch whose clock matches the Mac no longer reads "14400.1 s behind this Mac" while it is re-locking to the time server, and its Time row says it is asking this Mac and when it was last heard; a switch reading "not synchronised" is re-read every ten seconds, not every ten minutes, until it locks
-- The NTP status tier no longer starves: finding its switch busy cost it a full minute each time, and after a launch it could go minutes without one read; a slow tier now comes back for the same switch in three seconds
 
 **[Full changelog →](CHANGELOG.md)** — every release since v0.3.0.
 

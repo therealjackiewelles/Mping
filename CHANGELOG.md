@@ -5,6 +5,28 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.8.27 — 2026-10-04
+
+**Performance**
+- Panning, zooming and switching views are smoother: the map is one canvas for all three views and switches without a fade, and its background redraw waits until you let go
+- Sitting idle uses less CPU: port-box labels are rebuilt only when something they show has changed, not on every ping lap and every poll result
+
+**Fixes**
+- Holding Option over a Netgear switch shows its chassis MAC, the one on its label, instead of its management MAC; a MAC search finds either
+- Searching for any of a Netgear switch's own MAC addresses now lights the switch itself, not just the switches that learned that address
+- Searching for a whole MAC flashes a gold border round the exact device that owns it, a tile or its cell in a port box; the results list shows only that device, and nothing if it is not in the workspace
+- AVB: the "Pdelay timeouts" face and the counter alert read the wrong column of the switch and always showed 0; they now show the pdelay timeouts as the switch's own 802.1AS page does, and the alert fires on them
+- Older console records are kept up to a 4 GB budget (up to 40 runs) and the newest earlier one is never deleted, so a burst of relaunches no longer pushes a show day's records out; each launch notes what it removed in the app log
+- The Console window lets go of its rows when it is closed instead of re-filtering them in the background
+
+**Features added**
+- The console record warns below 5 GB of free disk, stops growing below 1 GB (the Console window keeps working) and resumes above 2 GB, all noted in the app log; a failed write or a record file that would not open is reported instead of silently dropping rows, and the heartbeat line shows free disk space
+- The spacebar flips the map between the Primary and Secondary networks, whichever is up; the keys 1, 2 and 3 switch it to Overview, Temperatures and AVB
+- The AVB "FIBRE TILES" rail is always on the left edge, even with the View Master's gPTP-on-links chip off; choosing a face (or pressing Shift+Tab) switches the readings back on
+- Tab steps down the left rail (port-box labels on the Overview; Power, Streams, Clock and the rest on AVB); Shift+Tab steps through the AVB fibre tile faces
+- Esc in the search box clears it and leaves the box, so the map keys work again at once
+- AVB link faces: a new "Announce discards" face and a "Pdelay lost" face (a port dropping out of the clock), in the order of the switch's own statistics page
+
 ## v0.8.26 — 2026-09-30
 
 **Features added**
