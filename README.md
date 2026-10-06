@@ -255,6 +255,28 @@ The application source is maintained in a private repository; this repository ho
 
 <!-- CHANGELOG:START -->
 
+## v0.8.28 — 2026-10-06
+
+**Fixes**
+- A planning or sandbox copy of Mping no longer reaches the privileged helper: it cannot add routes or set a network card's frame size on this Mac
+- When Mping cannot create or write the Mping folder in Documents, it now says so on the console instead of quietly using Application Support
+- Clicking a raw-dump row in the Console window shows the whole dump after the first two seconds again, and says so when the dump never reached the file
+- A malformed SNMP reply with an impossible length field no longer ends the app: it is skipped like any other bad reply
+- Replay plays back MSRP stream reservations from a tape, so the Streams view's gold cells follow it
+
+**Showfile**
+- The time server (NTP & Syslog: the switch, each side's address and NIC) is saved in the showfile and applied when a file opens; a file with no time-server settings (one made before this change) opens with the time server off, nothing on the Mac remembers one, and the Example Workspace carries "off", so it never asks for a rig's adapters
+
+**Example Workspace**
+- The opening splash reads "loaded 16 dummy devices" for the Example Workspace instead of "0 devices"
+- Example Workspace: two LS10 pairs with amps and a P1 behind Stage Left, two Nemo 96HD meters with three hours of mains readings, gPTP readings on every link, a gold talker cell, and dotted lines from the access points and meters to their switch ports
+- MPING_DEMO_FAULT=1 stages practice faults in the Example Workspace through the real alert code; MPING_FRESH_EXAMPLE=1 rewrites Example Workspace.mpw from the current demo without changing what opens
+- Power-meter, switch and amp temperature histories add each reading in place instead of copying the whole history first (halves the meter recorder's cost when no graph holds the history; unchanged while a graph is on screen)
+- Opening a showfile no longer brings back the previous show's fibre alerts: loading the new file's alert limits re-checked the old show's links, raising stale "x dB" / "No Link" rows (with a sound) in the file just opened
+- The alert stack and the Inspector's per-device alerts draw a clock alert's legs as the red P / blue S chips the alert lists use, instead of printing ⟦P⟧ ⟦S⟧; the console's RESOLVED line reads plain like its ALERT line
+- The Example Workspace draws its links again: a new link waits for a second sighting, which a demo that is never polled never gets
+- A dotted line's port number sits just outside the switch tile instead of hidden under it
+- The Inspector's AVB card counts hops the way the tile does: the clock master reads "(this device)", and a "2 hops" tile no longer says "3 hops away"
 ## v0.8.27 — 2026-10-04
 
 **Performance**
@@ -290,29 +312,6 @@ The application source is maintained in a private repository; this repository ho
 
 **Fixes**
 - The helper's launch description is now in the form Apple documents — on one Mac the helper never started, so routes, the time server address and virtual interfaces did nothing
-## v0.8.25 — 2026-09-28
-
-**Features added**
-- A full user manual (PDF), plain-language and versioned with the app — every screen and device type, attached to this release as Mping-User-Manual.pdf; screenshots are still placeholders and it isn't linked from inside the app yet
-- Fix the Network window (issue 148): the mismatch panel's button now opens one list of everything this Mac lacks for the showfile — named virtual interfaces and devices pinned to a missing adapter — with Point at to move a row onto an adapter that already fits and Use the Mac's address for a VLAN whose address differs; nothing is built from it yet
-- Showfile-owned virtual interfaces, second half (issue 147): an interface the showfile describes and this Mac lacks is made by Mping through the helper when the file opens — as vlan100 or above, with the file's address and a safe 1496 frame size — and removed when Mping quits (a checkbox in Network ▸ Virtual Interfaces keeps them up for other software; a crash never removes anything); switching showfiles takes down only what the old file built and the new one does not need, then builds the new file's; one that macOS removes on a dongle replug or a Network-settings Apply is made again within seconds; the section gains Add Virtual Interface…, Edit…, Re-make now and Remove from showfile…, with a live line saying what Mping will do with the description on this Mac
-- Showfile-owned virtual interfaces, first half (issue 147): a showfile now describes each VLAN interface it needs — name, dongle by hardware address, tag, address, frame-size rule — and devices point at that description instead of a bare "vlan1"; on open Mping adopts a matching VLAN already on the Mac (never touching it) and says so on the splash and in Network ▸ Virtual Interfaces; an old showfile has its descriptions read off this Mac's live VLANs on open and keeps them at its next save; the NIC pickers list the showfile's virtual interfaces by name; a live VLAN the showfile does not use can be added to it in one click
-- Groundwork for showfile-owned virtual interfaces (issue 147): the helper can make and remove temporary VLAN interfaces — vlan100 and above only, never one System Settings defines, never a second tag on a dongle, never a second holder of an address, and a crash never removes one — and the app reads any VLAN's tag and parent from the kernel, so an interface Mping made shows its tag in the Network window and NIC pickers and gets the frame-size check; MPING_VLAN_SELFTEST=en9 proves it on an idle dongle
-- Adapter frame size, checked and kept right by the helper: at launch (an "Adapter frame size" line on the splash), after a replug and every half minute, a full-size don't-fragment ping goes to a device on each VLAN adapter; where a 1500-byte frame dies and a 1496-byte one passes, the adapter's MTU is trimmed to 1496 and put back if anything resets it, with a console line and an app-log line each time, and the Network window says so on the adapter — the 25 Sep afternoon of "the LS10s' port tables and the amps' vitals vanished on one leg" was this, an MTU a Settings Apply had put back to 1500
-
-**Changes**
-- A device whose adapter is not on this Mac now waits instead of reading offline: its tile says "Waiting for adapter", it is left out of every poll, and one alert per interface replaces dozens of device-offline alerts and the /sbin/ping spawn storm a pulled dongle used to cause; the ping engine itself now reports a missing adapter as "no information" rather than falling back to /sbin/ping (MPING_NO_HOLD=1 turns the hold off only, so those devices are still pinged and read "no information"; the /sbin/ping fallback is gone either way)
-- Opening another showfile asks Save / Don't Save / Cancel when the current one has unsaved changes, instead of dropping them silently; Open Recent now runs the adapter check and re-pins the routes like Open… does, and changing one device's adapter re-pins its route at once
-- The AVB Power face says one of three things for an amp — "online", "standby", or "fault" with what the fault is ("fault — SMPS off", "fault — 15V ch3", the amp's own error word) — instead of "ok" and a bare "FAULT"
-- Amp alerts lead with the unit — "amp 42", or "P1 250" for a processor — with its port and parent LS10 beside it ("P9 · E L1-2 PRI"), instead of the model and number; the History sidebar shows "amp 42 · E L1-2 PRI"
-- The clock-stream alert now watches the present, not the amp's memory: a leg that is not locked, an error word, or a fault counter climbing raises it; the amp's "connected / sync" report word — which records a past hiccup and re-appeared on every launch for amps that were locked and passing audio — no longer does. The row reads the two legs side by side with the tiles' red P / blue S chips: "Clock P Locked, S Waiting mclk". The alert table's Time column no longer clips the first digit
-
-**Fixes**
-- Route pins now follow the showfile: a pin no longer wanted on an adapter is removed when its set is re-sent (kernel mode used to only add), and a pin that moves from one adapter to another is never deleted from the old one after it has moved
-- Switching NTP & Syslog off and on no longer stops the half-minute checks that put the time-server address and the 1496 frame size back
-- The app reads the helper's version before using a new verb, so a helper kept alive by another copy of Mping cannot take the whole helper out of service
-- Port boxes no longer flicker stale on every switch when the LS10s' port-state call stops answering (25 Sep: all 29 primary-leg units at once): the Netgears and the LS10s now take turns in separate rotations, the LS10s' HTTP reads queue on their own with the fast port-state read in its own lane, and a unit whose port-state call keeps timing out is left alone for 30 s, doubling to two minutes, re-tried off the rotation so its timeout costs the other units nothing — the sweep stops asking it for ports too and keeps the list it has, and while it is held a port with an LLDP neighbour reads as up, so the amp rows stay live instead of red — with a console line each way
-- The LS10 log no longer says "connection refused — port 80 closed" for a connection that was blocked or unreachable; it says so
 
 **[Full changelog →](CHANGELOG.md)** — every release since v0.3.0.
 

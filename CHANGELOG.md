@@ -5,6 +5,29 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.8.28 — 2026-10-06
+
+**Fixes**
+- A planning or sandbox copy of Mping no longer reaches the privileged helper: it cannot add routes or set a network card's frame size on this Mac
+- When Mping cannot create or write the Mping folder in Documents, it now says so on the console instead of quietly using Application Support
+- Clicking a raw-dump row in the Console window shows the whole dump after the first two seconds again, and says so when the dump never reached the file
+- A malformed SNMP reply with an impossible length field no longer ends the app: it is skipped like any other bad reply
+- Replay plays back MSRP stream reservations from a tape, so the Streams view's gold cells follow it
+
+**Showfile**
+- The time server (NTP & Syslog: the switch, each side's address and NIC) is saved in the showfile and applied when a file opens; a file with no time-server settings (one made before this change) opens with the time server off, nothing on the Mac remembers one, and the Example Workspace carries "off", so it never asks for a rig's adapters
+
+**Example Workspace**
+- The opening splash reads "loaded 16 dummy devices" for the Example Workspace instead of "0 devices"
+- Example Workspace: two LS10 pairs with amps and a P1 behind Stage Left, two Nemo 96HD meters with three hours of mains readings, gPTP readings on every link, a gold talker cell, and dotted lines from the access points and meters to their switch ports
+- MPING_DEMO_FAULT=1 stages practice faults in the Example Workspace through the real alert code; MPING_FRESH_EXAMPLE=1 rewrites Example Workspace.mpw from the current demo without changing what opens
+- Power-meter, switch and amp temperature histories add each reading in place instead of copying the whole history first (halves the meter recorder's cost when no graph holds the history; unchanged while a graph is on screen)
+- Opening a showfile no longer brings back the previous show's fibre alerts: loading the new file's alert limits re-checked the old show's links, raising stale "x dB" / "No Link" rows (with a sound) in the file just opened
+- The alert stack and the Inspector's per-device alerts draw a clock alert's legs as the red P / blue S chips the alert lists use, instead of printing ⟦P⟧ ⟦S⟧; the console's RESOLVED line reads plain like its ALERT line
+- The Example Workspace draws its links again: a new link waits for a second sighting, which a demo that is never polled never gets
+- A dotted line's port number sits just outside the switch tile instead of hidden under it
+- The Inspector's AVB card counts hops the way the tile does: the clock master reads "(this device)", and a "2 hops" tile no longer says "3 hops away"
+
 ## v0.8.27 — 2026-10-04
 
 **Performance**
