@@ -255,6 +255,11 @@ The application source is maintained in a private repository; this repository ho
 
 <!-- CHANGELOG:START -->
 
+## v0.8.29 — 2026-10-06
+
+**Fixes**
+- The frame-size check no longer sends test pings to a device Mping is holding out of polling
+- Two overlapping route requests to the helper can no longer leave a stale route pin: each request now waits for the one before it
 ## v0.8.28 — 2026-10-06
 
 **Fixes**
@@ -298,20 +303,6 @@ The application source is maintained in a private repository; this repository ho
 - Tab steps down the left rail (port-box labels on the Overview; Power, Streams, Clock and the rest on AVB); Shift+Tab steps through the AVB fibre tile faces
 - Esc in the search box clears it and leaves the box, so the map keys work again at once
 - AVB link faces: a new "Announce discards" face and a "Pdelay lost" face (a port dropping out of the clock), in the order of the switch's own statistics page
-## v0.8.26 — 2026-09-30
-
-**Features added**
-- Jumbo frames: Edit… on a virtual interface can fix a size above 1500 where the adapter can carry it; Mping holds it, tests it with a large packet on that leg, and says so if the leg isn't carrying it
-- The Network window keeps each section's long explanations behind a "?" at the right-hand end of its heading
-
-**Changes**
-- A new virtual interface is made at 1496 with no frame-size choice; Edit… keeps it, and "leave as found" now really leaves the interface alone
-- The Network ▸ Virtual Interfaces description is one line, and its status reads "adopted from System Settings" or "adopted from Mping"
-- A Netgear switch's Inspector shows the hotter of its two temperature sensors, the same number as its tile
-- The About card (click the Mping logo) now carries the credits: created by Morgan Beecher, and the ideators
-
-**Fixes**
-- The helper's launch description is now in the form Apple documents — on one Mac the helper never started, so routes, the time server address and virtual interfaces did nothing
 
 **[Full changelog →](CHANGELOG.md)** — every release since v0.3.0.
 

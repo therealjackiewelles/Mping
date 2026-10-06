@@ -5,6 +5,12 @@ Versioning: `v0.x.0` = feature milestone · `v0.x.y` = bug fix · `v1.0.0` = fir
 
 ---
 
+## v0.8.29 — 2026-10-06
+
+**Fixes**
+- The frame-size check no longer sends test pings to a device Mping is holding out of polling
+- Two overlapping route requests to the helper can no longer leave a stale route pin: each request now waits for the one before it
+
 ## v0.8.28 — 2026-10-06
 
 **Fixes**
