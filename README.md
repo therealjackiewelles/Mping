@@ -255,6 +255,25 @@ The application source is maintained in a private repository; this repository ho
 
 <!-- CHANGELOG:START -->
 
+## v0.8.30 — 2026-10-10
+
+**Network window**
+- NTP & Syslog: when a time server is switched on, applied, or brought in by a showfile, every switch's clock is read at once (and re-read every ten seconds until it locks on) instead of waiting for the next slow lap
+- NTP & Syslog: a remove button beside each side's address takes that side off — the address comes off the adapter through the helper, the time server restarts without it, and the showfile follows
+
+**Fixes**
+- Pasting or duplicating one half of a redundant pair now makes a plain device, and pasting both halves makes a new pair linked to each other (a copy used to keep the original's partner link) — https://github.com/therealjackiewelles/Mping/issues/154
+- Deleting either half of a redundant pair now asks first and deletes both (before, a secondary could be deleted on its own, leaving its primary standalone, and cut and the right-click menu deleted without asking)
+- The amp stream alert now reads "Primary audio feed dropped — stream 1 waiting for the media clock · 0 of 1 locked" (was "Streams unlocked — P 0/1"): the network, the stream, and whether it is unlocked, disconnected or waiting for the media clock
+- Amp AVB fault rows (stream and clock-stream errors, a clock leg not locked, fault counters climbing) show on the first reading that sees them (they waited for two), so a brief drop is no longer forgiven; a reading that carried no AVB data never clears one
+- An amp losing a stream or showing a fault on one network now alerts on that network's switch only — raised there by whichever switch's poll caught it, since the two poll the amp in turn and a brief drop may land in either (both switches used to report everything)
+- Acknowledging alerts updates the screen at once instead of on the next redraw tick (up to a quarter of a second later)
+- After an update changes the privileged helper, Mping now waits as long as macOS takes to switch it back on (checking every second for a minute, then every half minute), remembers it once it is on, and puts the time-server address, interfaces and routes on at that moment — launches no longer repeat the re-registration, and a declined setup panel no longer leaves the helper unused for the whole run
+- The link map rebuild (which switch is cabled to which, after every LLDP sweep) does about half the work it did: the name-matching data is built once per rebuild instead of once per link, so the rebuild costs less CPU, especially while the window is hidden
+- Links between switches are matched by hardware address alone: a neighbour that reports an address no device on the map has is no longer matched by its name (names still decide the rare row that reports no address). The rebuild also matches each switch's table once instead of twice and builds link ids without a text round trip, so it costs under a third of what it did
+- A ping-only device that sits alone on a switch port now shows that port's traffic on its link line to the switch, in the same two-arrow form as the switch-to-switch labels (a port shared with other devices, such as an access point, a port with no traffic, and ports on LS10 switches show nothing)
+- Devices stacked under (or over) their switch no longer have their link lines run behind the tiles above them: the stack gets one shared rail beside it with a short stub into each tile, and the port chip and traffic figures sit on the stub in clear space (a lone device with a clear line keeps its straight line)
+- The marching dashes on the link lines no longer sit still on a Primary or Secondary tab that has been out of view: they began late by as long as the tab had been hidden (up to an hour on a Secondary left alone), and the lines whose direction did not change when the view switched between spanning tree and clock never started
 ## v0.8.29 — 2026-10-06
 
 **Fixes**
@@ -282,27 +301,6 @@ The application source is maintained in a private repository; this repository ho
 - The Example Workspace draws its links again: a new link waits for a second sighting, which a demo that is never polled never gets
 - A dotted line's port number sits just outside the switch tile instead of hidden under it
 - The Inspector's AVB card counts hops the way the tile does: the clock master reads "(this device)", and a "2 hops" tile no longer says "3 hops away"
-## v0.8.27 — 2026-10-04
-
-**Performance**
-- Panning, zooming and switching views are smoother: the map is one canvas for all three views and switches without a fade, and its background redraw waits until you let go
-- Sitting idle uses less CPU: port-box labels are rebuilt only when something they show has changed, not on every ping lap and every poll result
-
-**Fixes**
-- Holding Option over a Netgear switch shows its chassis MAC, the one on its label, instead of its management MAC; a MAC search finds either
-- Searching for any of a Netgear switch's own MAC addresses now lights the switch itself, not just the switches that learned that address
-- Searching for a whole MAC flashes a gold border round the exact device that owns it, a tile or its cell in a port box; the results list shows only that device, and nothing if it is not in the workspace
-- AVB: the "Pdelay timeouts" face and the counter alert read the wrong column of the switch and always showed 0; they now show the pdelay timeouts as the switch's own 802.1AS page does, and the alert fires on them
-- Older console records are kept up to a 4 GB budget (up to 40 runs) and the newest earlier one is never deleted, so a burst of relaunches no longer pushes a show day's records out; each launch notes what it removed in the app log
-- The Console window lets go of its rows when it is closed instead of re-filtering them in the background
-
-**Features added**
-- The console record warns below 5 GB of free disk, stops growing below 1 GB (the Console window keeps working) and resumes above 2 GB, all noted in the app log; a failed write or a record file that would not open is reported instead of silently dropping rows, and the heartbeat line shows free disk space
-- The spacebar flips the map between the Primary and Secondary networks, whichever is up; the keys 1, 2 and 3 switch it to Overview, Temperatures and AVB
-- The AVB "FIBRE TILES" rail is always on the left edge, even with the View Master's gPTP-on-links chip off; choosing a face (or pressing Shift+Tab) switches the readings back on
-- Tab steps down the left rail (port-box labels on the Overview; Power, Streams, Clock and the rest on AVB); Shift+Tab steps through the AVB fibre tile faces
-- Esc in the search box clears it and leaves the box, so the map keys work again at once
-- AVB link faces: a new "Announce discards" face and a "Pdelay lost" face (a port dropping out of the clock), in the order of the switch's own statistics page
 
 **[Full changelog →](CHANGELOG.md)** — every release since v0.3.0.
 
