@@ -255,6 +255,38 @@ The application source is maintained in a private repository; this repository ho
 
 <!-- CHANGELOG:START -->
 
+## v0.8.31 — 2026-10-21
+
+**Map**
+- A tile or location box can no longer be dragged off the edge of the map, where it could not be clicked, selected or dragged back; a group dragged together stops as one at the edge, and a showfile with an item beyond the edge brings it back when opened — https://github.com/therealjackiewelles/Mping/issues/163
+
+**Pop-up windows**
+- Pop-up windows (Settings, Network, Fix the Network, the Port Status Box Editor, switch logs, About and the debug windows) stay above the main window while Mping is in front, and cannot be minimised — https://github.com/therealjackiewelles/Mping/issues/159
+- Escape closes the front-most pop-up whether or not it has focus; in a text field inside a pop-up the first Escape only leaves the field, and a sheet or help bubble on top keeps its own Escape — https://github.com/therealjackiewelles/Mping/issues/162
+- With no pop-up open, Escape clears the search whether or not the search box has focus (a text field being edited elsewhere keeps its own Escape)
+- Closing Settings with a changed amplifier username or password asks Apply / Don't Apply / Cancel instead of applying silently, on the close button, Escape, Quit and the update's Relaunch
+- Settings is now Mping's own window (⌘, as before)
+- The virtual-interface editor and Add Devices ask before Cancel or Escape throws away changes, and a Quit or the update's Relaunch also waits on the virtual-interface editor
+- A closed Port Status Box Editor is now let go instead of being kept alive; one left open still costs more the longer it stays open (that issue stays open) — https://github.com/therealjackiewelles/Mping/issues/160
+
+**Link lines**
+- Link lines from a switch to its ping-only devices and Nemo meters are routed round other tiles instead of behind them; a device boxed in on all four sides keeps its straight line — https://github.com/therealjackiewelles/Mping/issues/158
+- Link lines of different switches are kept off each other's stretches instead of lying on top of each other (they may still cross)
+- A link line from a ping device or Nemo meter no longer runs along or hidden under a link between switches, and leaves a busy switch between two links instead of across one; it may still cross one where there is no way round
+- Port boxes can sit closer to a ping-only device: the clear space around each tile now uses its real height, not the taller switch height
+- When the adapter that reaches a switch is unplugged, every amplifier row behind it goes stale at once (grey, with the time last read) instead of staying green for about four minutes
+- When a switch is confirmed offline, its amplifiers are pinged at once and the ones that do not answer go stale within seconds (grey, with the time last read) instead of staying green for about four minutes; no alert is raised for it
+- With the adapters unplugged (or a switch silent for 90 seconds), the link lines of the switches that can no longer be read turn red like a link that is down, with no moving dashes, traffic figures or stale readings, instead of looking live (no Link Down alert is raised for them)
+- Link lines are drawn twice as thick, in a stronger colour, with longer dashes
+- Traffic figures on a link line can sit beside a vertical stretch, with up and down arrows, when no horizontal stretch has room
+
+**Network window**
+- Adapters is now split into Physical Interfaces and, at the bottom, Virtual Interfaces; the separate Virtual Interfaces section is gone and everything it held (the showfile's VLAN cards, Add Virtual Interface, the other VLANs on this Mac, remove-at-quit) is in that bottom part; each virtual interface is one card, with the devices set to it behind Show devices
+
+**Under the hood**
+- The About window and the console's launch row name the shared core by build number and date only
+- The application log notes a Quit held for unapplied changes, and each Escape that closes a pop-up or is passed on, with the reason
+- Unused files were removed from the app
 ## v0.8.30 — 2026-10-10
 
 **Network window**
@@ -279,28 +311,6 @@ The application source is maintained in a private repository; this repository ho
 **Fixes**
 - The frame-size check no longer sends test pings to a device Mping is holding out of polling
 - Two overlapping route requests to the helper can no longer leave a stale route pin: each request now waits for the one before it
-## v0.8.28 — 2026-10-06
-
-**Fixes**
-- A planning or sandbox copy of Mping no longer reaches the privileged helper: it cannot add routes or set a network card's frame size on this Mac
-- When Mping cannot create or write the Mping folder in Documents, it now says so on the console instead of quietly using Application Support
-- Clicking a raw-dump row in the Console window shows the whole dump after the first two seconds again, and says so when the dump never reached the file
-- A malformed SNMP reply with an impossible length field no longer ends the app: it is skipped like any other bad reply
-- Replay plays back MSRP stream reservations from a tape, so the Streams view's gold cells follow it
-
-**Showfile**
-- The time server (NTP & Syslog: the switch, each side's address and NIC) is saved in the showfile and applied when a file opens; a file with no time-server settings (one made before this change) opens with the time server off, nothing on the Mac remembers one, and the Example Workspace carries "off", so it never asks for a rig's adapters
-
-**Example Workspace**
-- The opening splash reads "loaded 16 dummy devices" for the Example Workspace instead of "0 devices"
-- Example Workspace: two LS10 pairs with amps and a P1 behind Stage Left, two Nemo 96HD meters with three hours of mains readings, gPTP readings on every link, a gold talker cell, and dotted lines from the access points and meters to their switch ports
-- MPING_DEMO_FAULT=1 stages practice faults in the Example Workspace through the real alert code; MPING_FRESH_EXAMPLE=1 rewrites Example Workspace.mpw from the current demo without changing what opens
-- Power-meter, switch and amp temperature histories add each reading in place instead of copying the whole history first (halves the meter recorder's cost when no graph holds the history; unchanged while a graph is on screen)
-- Opening a showfile no longer brings back the previous show's fibre alerts: loading the new file's alert limits re-checked the old show's links, raising stale "x dB" / "No Link" rows (with a sound) in the file just opened
-- The alert stack and the Inspector's per-device alerts draw a clock alert's legs as the red P / blue S chips the alert lists use, instead of printing ⟦P⟧ ⟦S⟧; the console's RESOLVED line reads plain like its ALERT line
-- The Example Workspace draws its links again: a new link waits for a second sighting, which a demo that is never polled never gets
-- A dotted line's port number sits just outside the switch tile instead of hidden under it
-- The Inspector's AVB card counts hops the way the tile does: the clock master reads "(this device)", and a "2 hops" tile no longer says "3 hops away"
 
 **[Full changelog →](CHANGELOG.md)** — every release since v0.3.0.
 
