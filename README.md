@@ -255,6 +255,27 @@ The application source is maintained in a private repository; this repository ho
 
 <!-- CHANGELOG:START -->
 
+## v0.8.32 — 2026-10-23
+
+**Enhancements**
+- View Master buttons light green while the item is shown and go dark when it is hidden, and hiding link lines hides their labels too
+- Device groups: make up to nine in the sidebar's Groups section, each with a name and its own one of nine colours (1 brown to 9 white, one group per colour), and tick devices into them in the Inspector (several groups per device); the colours run as a strip down the left edge of the tile, and the View Master can hide a group's tiles and link lines without touching its monitoring or alerts — https://github.com/therealjackiewelles/Mping/issues/164
+- When a switch or device goes offline, or a link between switches goes down, the switches around it are asked for their spanning-tree and port states straight away (once per switch per ten seconds, two-second timeout) and the map is redrawn, instead of waiting for their next turn — https://github.com/therealjackiewelles/Mping/issues/58
+- Showfiles (.mpw) carry Mping's icon in the Finder, and a double-click, a drop on the Dock icon or Open With opens one in Mping, asking first if the current showfile has unsaved changes — https://github.com/therealjackiewelles/Mping/issues/165
+- An amplifier or LS10 that refuses the HTTP login is left alone for 30 seconds, then asked once more, doubling to ten minutes, instead of being asked again by every poll; a changed user name or password ends the wait at once
+
+**Bug fixes**
+- Rig Replay and the golden replay no longer send identity requests or vitals reads to live amplifiers while a tape plays; amp cells come from the tape only, so a replay gives the same result on or off the rig — https://github.com/therealjackiewelles/Mping/issues/156
+- A launch that cannot restore the last session no longer writes the example over the working state: it says why, opens the last saved showfile or the example, keeps the file (and a copy from before the launch) until you change something, and logs the reason — https://github.com/therealjackiewelles/Mping/issues/157
+- Cut of one half of a redundant pair puts both halves on the clipboard, so Paste makes a new pair instead of a lone half — https://github.com/therealjackiewelles/Mping/issues/154
+- Deleting or cutting a selection that holds both halves of a redundant pair asks first, as deleting one half does — https://github.com/therealjackiewelles/Mping/issues/154
+- Help › Export All Logs no longer freezes monitoring while the zip is made: the copy and zip of the session's console file (up to 1.4 GB) run in the background, with a console row when the file is ready; the save dialog was never the cause — https://github.com/therealjackiewelles/Mping/issues/144
+- With its dongle unplugged, a showfile's virtual interface was listed twice in the Network window (its description, and the Mac's own interface for the same VLAN as a second card); it is one card again
+- A saved amplifier password the keychain cannot read (locked, or from another Mac) is no longer replaced by the factory password: no login is sent, the console and Settings say so, and entering the password again repairs it, and Settings says so if the keychain will not keep the new one
+- A refused amplifier login reads HTTP 401 in the console (it read "cancelled"); a changed password is now noticed without restarting Mping
+
+**Other**
+- The planning window is gone: File › New Workspace asks to save, then clears the one window to an empty map, and a showfile always opens in that one window — https://github.com/therealjackiewelles/Mping/issues/166
 ## v0.8.31 — 2026-10-21
 
 **Map**
@@ -306,11 +327,6 @@ The application source is maintained in a private repository; this repository ho
 - A ping-only device that sits alone on a switch port now shows that port's traffic on its link line to the switch, in the same two-arrow form as the switch-to-switch labels (a port shared with other devices, such as an access point, a port with no traffic, and ports on LS10 switches show nothing)
 - Devices stacked under (or over) their switch no longer have their link lines run behind the tiles above them: the stack gets one shared rail beside it with a short stub into each tile, and the port chip and traffic figures sit on the stub in clear space (a lone device with a clear line keeps its straight line)
 - The marching dashes on the link lines no longer sit still on a Primary or Secondary tab that has been out of view: they began late by as long as the tab had been hidden (up to an hour on a Secondary left alone), and the lines whose direction did not change when the view switched between spanning tree and clock never started
-## v0.8.29 — 2026-10-06
-
-**Fixes**
-- The frame-size check no longer sends test pings to a device Mping is holding out of polling
-- Two overlapping route requests to the helper can no longer leave a stale route pin: each request now waits for the one before it
 
 **[Full changelog →](CHANGELOG.md)** — every release since v0.3.0.
 
