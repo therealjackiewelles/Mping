@@ -255,6 +255,28 @@ The application source is maintained in a private repository; this repository ho
 
 <!-- CHANGELOG:START -->
 
+## v0.8.33 — 2026-10-26
+
+**Enhancements**
+- A device left on Auto with no name of its own (a ping device) takes the unit's name from the switch port it sits on, matched by IP address, for the units amp monitoring verifies (for example "P1 250" instead of "New Device"); a name you typed is never changed, and it follows the unit if it is renamed
+- A device that has never answered since Mping started now raises its Offline alert once the adapter it is pinned to is online (up, with a link and its address), about 15 seconds after start-up for an adapter that was already online and a minute for one that comes online while Mping is running, so gear not yet switched on at the morning's start-up is flagged; while the adapter is away or has no link, it stays quiet as before, and a device that answered earlier still alerts the moment it stops
+- New Settings option "Two-finger scroll pans the map, pinch zooms" (off by default): two fingers on a trackpad pan the map at half the speed of the fingers, in the direction the Mac's Natural scrolling setting gives, pinching zooms, and ⌘-scroll zooms; a mouse wheel always zooms
+- Every box where an IP address is typed (a device's IP in the Inspector, the Device Manager column, a virtual network's address, the NTP address) now only takes digits and dots in the shape ###.###.###.###: anything else does not appear, a number over 255 is refused, and the dot is added after each finished number (a typed dot is taken where it makes sense); pasting still works
+- A showfile now keeps the names you gave its network adapters in System Settings, so the adapter alerts, the "adapters don't match" panel and the Network reconciliation window say "Switch Management SEC" instead of en7, even on a computer that has never had that adapter (and on Windows)
+- Cmd+A on the map selects every device (a hidden group is left out); in a text box it still selects the text
+- The meter's side button now reads "Show/Hide meter graphs" instead of "Show/Hide port status box"
+- The launch splash: the lines that start the M now begin solid green and dashed like a link line (fully opaque, already two or three dashes long) and turn into the solid white M, instead of fading in and then through white-grey and plain green
+- A new LS10's port box shows ports 8, 9 and 10 (not 1 to 3), and the Port Status Box Editor offers all ten of an LS10's ports from the start, before the first poll
+
+**Bug fixes**
+- Telemetry Polling: Reset Defaults now also resets Fan speed (30 s) and Spanning tree (20 s); it left those two as they were
+- Rig Replay: a Netgear switch's Temperatures graph now draws during a replay (the window followed the wall clock, so the tape's samples sat off the left edge and the plot was blank)
+- An offline ping-only tile's chip reads "Last Seen 21:04:12" in full, and the address beside it is left out while it does (there is no room for both); it read "Last Seen…" with the time cut off
+- The thermometer dot on the Temperatures plane (Details view) sits in the same corner spot as the ping dot on the other faces; it sat 11 pt in and down
+- Cmd+A selects all the text in a text field again (the Edit menu had lost Select All)
+- The adapter alerts are one short line each, in the name System Settings gives the adapter ("Switch Management SEC", not en7): "Adapter not found on this computer", "No Link/Cable Unplugged" or "No valid IP address", once per adapter and once per virtual network in use; they are History rows only (no Offline tag, no sound or banner), glowing red while true and yellow once cleared but unacknowledged
+- The ping dot on each tile is now exactly centred in the dark disc behind it; it sat a fraction of a point low and to the right
+- Rig Replay: a backward seek, a rewind or leaving the replay no longer leaves the Streams view's gold cells from the position you came from; they follow the tape — https://github.com/therealjackiewelles/Mping/issues/146
 ## v0.8.32 — 2026-10-23
 
 **Enhancements**
@@ -308,25 +330,6 @@ The application source is maintained in a private repository; this repository ho
 - The About window and the console's launch row name the shared core by build number and date only
 - The application log notes a Quit held for unapplied changes, and each Escape that closes a pop-up or is passed on, with the reason
 - Unused files were removed from the app
-## v0.8.30 — 2026-10-10
-
-**Network window**
-- NTP & Syslog: when a time server is switched on, applied, or brought in by a showfile, every switch's clock is read at once (and re-read every ten seconds until it locks on) instead of waiting for the next slow lap
-- NTP & Syslog: a remove button beside each side's address takes that side off — the address comes off the adapter through the helper, the time server restarts without it, and the showfile follows
-
-**Fixes**
-- Pasting or duplicating one half of a redundant pair now makes a plain device, and pasting both halves makes a new pair linked to each other (a copy used to keep the original's partner link) — https://github.com/therealjackiewelles/Mping/issues/154
-- Deleting either half of a redundant pair now asks first and deletes both (before, a secondary could be deleted on its own, leaving its primary standalone, and cut and the right-click menu deleted without asking)
-- The amp stream alert now reads "Primary audio feed dropped — stream 1 waiting for the media clock · 0 of 1 locked" (was "Streams unlocked — P 0/1"): the network, the stream, and whether it is unlocked, disconnected or waiting for the media clock
-- Amp AVB fault rows (stream and clock-stream errors, a clock leg not locked, fault counters climbing) show on the first reading that sees them (they waited for two), so a brief drop is no longer forgiven; a reading that carried no AVB data never clears one
-- An amp losing a stream or showing a fault on one network now alerts on that network's switch only — raised there by whichever switch's poll caught it, since the two poll the amp in turn and a brief drop may land in either (both switches used to report everything)
-- Acknowledging alerts updates the screen at once instead of on the next redraw tick (up to a quarter of a second later)
-- After an update changes the privileged helper, Mping now waits as long as macOS takes to switch it back on (checking every second for a minute, then every half minute), remembers it once it is on, and puts the time-server address, interfaces and routes on at that moment — launches no longer repeat the re-registration, and a declined setup panel no longer leaves the helper unused for the whole run
-- The link map rebuild (which switch is cabled to which, after every LLDP sweep) does about half the work it did: the name-matching data is built once per rebuild instead of once per link, so the rebuild costs less CPU, especially while the window is hidden
-- Links between switches are matched by hardware address alone: a neighbour that reports an address no device on the map has is no longer matched by its name (names still decide the rare row that reports no address). The rebuild also matches each switch's table once instead of twice and builds link ids without a text round trip, so it costs under a third of what it did
-- A ping-only device that sits alone on a switch port now shows that port's traffic on its link line to the switch, in the same two-arrow form as the switch-to-switch labels (a port shared with other devices, such as an access point, a port with no traffic, and ports on LS10 switches show nothing)
-- Devices stacked under (or over) their switch no longer have their link lines run behind the tiles above them: the stack gets one shared rail beside it with a short stub into each tile, and the port chip and traffic figures sit on the stub in clear space (a lone device with a clear line keeps its straight line)
-- The marching dashes on the link lines no longer sit still on a Primary or Secondary tab that has been out of view: they began late by as long as the tab had been hidden (up to an hour on a Secondary left alone), and the lines whose direction did not change when the view switched between spanning tree and clock never started
 
 **[Full changelog →](CHANGELOG.md)** — every release since v0.3.0.
 

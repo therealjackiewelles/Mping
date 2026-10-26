@@ -6,6 +6,31 @@ Each release's notes are grouped under three headings, in this order: **Enhancem
 
 ---
 
+## Unreleased
+
+## v0.8.33 — 2026-10-26
+
+**Enhancements**
+- A device left on Auto with no name of its own (a ping device) takes the unit's name from the switch port it sits on, matched by IP address, for the units amp monitoring verifies (for example "P1 250" instead of "New Device"); a name you typed is never changed, and it follows the unit if it is renamed
+- A device that has never answered since Mping started now raises its Offline alert once the adapter it is pinned to is online (up, with a link and its address), about 15 seconds after start-up for an adapter that was already online and a minute for one that comes online while Mping is running, so gear not yet switched on at the morning's start-up is flagged; while the adapter is away or has no link, it stays quiet as before, and a device that answered earlier still alerts the moment it stops
+- New Settings option "Two-finger scroll pans the map, pinch zooms" (off by default): two fingers on a trackpad pan the map at half the speed of the fingers, in the direction the Mac's Natural scrolling setting gives, pinching zooms, and ⌘-scroll zooms; a mouse wheel always zooms
+- Every box where an IP address is typed (a device's IP in the Inspector, the Device Manager column, a virtual network's address, the NTP address) now only takes digits and dots in the shape ###.###.###.###: anything else does not appear, a number over 255 is refused, and the dot is added after each finished number (a typed dot is taken where it makes sense); pasting still works
+- A showfile now keeps the names you gave its network adapters in System Settings, so the adapter alerts, the "adapters don't match" panel and the Network reconciliation window say "Switch Management SEC" instead of en7, even on a computer that has never had that adapter (and on Windows)
+- Cmd+A on the map selects every device (a hidden group is left out); in a text box it still selects the text
+- The meter's side button now reads "Show/Hide meter graphs" instead of "Show/Hide port status box"
+- The launch splash: the lines that start the M now begin solid green and dashed like a link line (fully opaque, already two or three dashes long) and turn into the solid white M, instead of fading in and then through white-grey and plain green
+- A new LS10's port box shows ports 8, 9 and 10 (not 1 to 3), and the Port Status Box Editor offers all ten of an LS10's ports from the start, before the first poll
+
+**Bug fixes**
+- Telemetry Polling: Reset Defaults now also resets Fan speed (30 s) and Spanning tree (20 s); it left those two as they were
+- Rig Replay: a Netgear switch's Temperatures graph now draws during a replay (the window followed the wall clock, so the tape's samples sat off the left edge and the plot was blank)
+- An offline ping-only tile's chip reads "Last Seen 21:04:12" in full, and the address beside it is left out while it does (there is no room for both); it read "Last Seen…" with the time cut off
+- The thermometer dot on the Temperatures plane (Details view) sits in the same corner spot as the ping dot on the other faces; it sat 11 pt in and down
+- Cmd+A selects all the text in a text field again (the Edit menu had lost Select All)
+- The adapter alerts are one short line each, in the name System Settings gives the adapter ("Switch Management SEC", not en7): "Adapter not found on this computer", "No Link/Cable Unplugged" or "No valid IP address", once per adapter and once per virtual network in use; they are History rows only (no Offline tag, no sound or banner), glowing red while true and yellow once cleared but unacknowledged
+- The ping dot on each tile is now exactly centred in the dark disc behind it; it sat a fraction of a point low and to the right
+- Rig Replay: a backward seek, a rewind or leaving the replay no longer leaves the Streams view's gold cells from the position you came from; they follow the tape — https://github.com/therealjackiewelles/Mping/issues/146
+
 ## v0.8.32 — 2026-10-23
 
 **Enhancements**
