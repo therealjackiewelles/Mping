@@ -255,6 +255,80 @@ The application source is maintained in a private repository; this repository ho
 
 <!-- CHANGELOG:START -->
 
+## v0.9.0 — 2026-11-21
+
+**Enhancements**
+- The Devices menu is now Config, and Network… and Preferences… (the window named Settings until now) have moved into it from the application menu, so both can be reached from the menus at the top of the sidebar
+- The Network window's NTP & Syslog section is open to everyone: the WORK IN PROGRESS stamp and its hidden key are gone
+- The Example Workspace's switches report their time, so the Inspector's Time and Switch clock rows show a rig following this Mac's time server
+- The Port Status Box Editor is drawn with Mping's own choosers, steppers and buttons instead of the system's (a stepper repeats while held), and "Cell labels" no longer wraps onto three lines — https://github.com/therealjackiewelles/Mping/issues/190
+- Rig Replay shows a loading bar with the file's name while a recording is read, reads it in the background so the app stays responsive, and keeps Open, the speeds and Start fixed at the top of its window — https://github.com/therealjackiewelles/Mping/issues/220
+- The ping ripple is drawn over a port box that sits across a tile's status dot, as the Windows version does, and is held at about 60 pictures a second on faster screens — https://github.com/therealjackiewelles/Mping/issues/210
+- File ▸ New Workspace closes every pop-up window (Network, Settings and the rest) before it opens Add Devices, so nothing is left showing the old workspace and the sheet is never hidden behind one; a pop-up with changes not yet applied asks first — https://github.com/therealjackiewelles/Mping/issues/203
+- Add Devices… is ⌘D; it had shared ⌥⌘D with Device Debug, which keeps it. Add Device (one device) has no key now
+- A build that is not a release wears the Mping icon with an amber wrench, in the Dock, the app switcher, the sidebar header, the About card and the update and helper cards, so a test copy cannot be mistaken for a release; only the release script asks for the plain icon — https://github.com/therealjackiewelles/Mping/issues/206
+- Network window: a virtual interface's card is laid out exactly as a physical adapter's block, the fold arrow at the left, its devices in a table under the header, no "Show devices" line (the same as the Windows build; issue 178)
+- The View Master's adapter bandwidth chip's tooltip is just the key, (P)
+- Dragging a tile is smooth and starts at once: the map's four-times-a-second refresh waits until the drag ends (as it already did for pan and zoom), picking a tile up no longer rebuilds the whole map before the first frame moves (it took up to half a second on a big show map), and each drag frame moves only the tile, its boxes and its lines instead of re-laying-out every tile on the map, and the drop pushes clear only the port boxes the moved tiles can have touched, in one redraw. Dragging no longer changes the selection: an unselected tile moves on its own and stays unselected, a selected tile takes the whole selection with it — https://github.com/therealjackiewelles/Mping/issues/196
+- A tile dropped on a tile that stayed put glides to the nearest clear space (a quarter of a second, on the app's own animation clock, the lines and boxes gliding with it) and is put down there; a group moves together and keeps its shape; with Snap to Grid on it lands on the grid; only when nothing clear is within reach does it glide back to where the drag began (tiles may touch edge to edge; a redundant pair still sits together) — https://github.com/therealjackiewelles/Mping/issues/198, https://github.com/therealjackiewelles/Mping/issues/191
+- Snap to Grid is on from the first launch and remembered in Mping's own preferences, not in the showfile, so it stays as you left it across every workspace and launch (it was on or off per file, and a new file started with it off) — https://github.com/therealjackiewelles/Mping/issues/192
+- With Snap to Grid on, tiles land on a 10 point step instead of 20, so tiles bunched as close as the grid allows have the same 6 point gap across, down and next to a ping-only tile — https://github.com/therealjackiewelles/Mping/issues/193
+- The Inspector's device pane is tighter from top to bottom: 10 between sections instead of 16, the two checkboxes grouped, the Ping / SNMP cards and the Groups card with less padding, so more fits on a 14" screen
+- The ping-only tile's chip ("2.5 ms", "Waiting") is a size smaller, matching the switch tiles' badge text (9 pt, 2 of padding) and sits a little lower, clear of the name; the same as the Windows version
+- After a crash, a force quit or the Mac shutting down with unsaved changes, the next launch asks "Recover unsaved changes to X?" with Recover and Open Saved; Mping keeps a running save of the open showfile after every change, and only asks when that running save really differs from the showfile on disk (the running save is never shown as a file)
+- Quitting with unsaved changes now asks "Save changes to X before quitting?" with Save, Don't Save and Cancel; Don't Save lets the changes go, so the next launch opens the showfile as last saved, and Cancel keeps Mping running (before, the changes were carried over to the next launch as if saved)
+- The View Master's OVERLAYS row has a Link legend chip that hides the LINK TYPES legend at the bottom left of the Overview; on by default, remembered with the other View Master switches (the Windows version has the same chip)
+- The adapters-don't-match card, the helper's first-launch card and the "update is ready" card sit in the exact middle of the Mping window (across and down) and follow it when it moves or is resized, until you drag a card aside yourself; the adapters card no longer sits 170 points low (it only drops beneath the helper's card while that card is showing) — https://github.com/therealjackiewelles/Mping/issues/188
+- Address fields in Settings and the Network window draw in JetBrains Mono, as the Windows version's do (the field was marked monospaced but nothing read the mark)
+- Hovering a device tile now reads its name and status in full words ("Delay Node · Waiting for adapter", "FOH Switch · Online - SNMP OK") instead of the ping word, the round trip and the temperature; the same words as the Windows version
+- P on the map shows or hides the adapter bandwidth cards (the same switch as the View Master's OVERLAYS chip); like Space and 1/2/3 it does nothing while typing in a field
+- The Device Manager's Paste from Spreadsheet buttons are gone: Cmd-V pastes a copied spreadsheet block into whichever table you clicked, from the selected row, so the buttons had nothing left to do
+- The Device Manager no longer has the URL Prefix and URL Suffix columns
+- Device names are at most 15 characters, so a tile's title fits at full size at the zoom an operator works at: the Inspector's Name field and the Device Manager's name column stop there, and a name Auto Detect finds or a switch lends is cut to fit; names already longer in a saved showfile are left as they are. The Example Workspace's names are shortened to fit (SL Switch A, SR LS10 B, SL Power Meter...)
+- Every window is drawn in Nunito and JetBrains Mono, the two open-licence fonts the Windows version uses, in place of Apple's SF Rounded and SF Mono, so both platforms show the same letters (the system menu bar, right-click menus and system dialogs keep the Mac's own font); the tile's title is now semibold
+- Auto Detect's list names the model of each L-Acoustics unit it cannot add (LA12X, LA7.16, P1...) in the Type column instead of calling every one an "Amplifier" — https://github.com/therealjackiewelles/Mping/issues/182
+- Each adapter the workspace uses has its live bandwidth in the top right of the map (its name, a rolling minute of traffic as a trace, and the In and Out rates, read every half second, on one fixed scale of 0 to 5 Mbps that grows for all of them together if any goes above it), always shown; the View Master has an OVERLAYS chip for it and Settings > Workspace turns it off
+- The window buttons are now one Mping-style capsule of close, minimise and expand pads (they light red, amber and green under the pointer), and File, Edit, Devices, Debugging and Help sit under them at the top of the sidebar, matching the Windows version; the system menu bar is still there
+- The sidebar can be dragged no wider than where the Alerting box stops growing (327 points, the box growing to one and a half times; was 420), and the pop-up alert card no longer says "returns to Mping to clear"
+- Add Devices is rebuilt: four device tiles with new icons (Ping only, Netgear switch, LS10, Nemo 96HD) show the count of each, and Auto Detect lists what it finds in one card per adapter (Use, IP, Type, LLDP name, Redundant) with matching redundant devices in their own scrolling bottom half of each card, lined up with their partners in the other card and marked with a coloured letter (matched by name, or guessed from the same position in neighbouring subnets such as 192.168.1.101 and 192.168.2.101 for switches, LS10s and meters; untick a pair to send both devices back to the plain list, or link two devices by hand with the link button); amplifiers are listed greyed out and cannot be ticked; the window is sized once for the number of adapters (three fit this Mac's screen exactly; more scroll sideways under an always-showing scroll bar) and does not change during a search
+- Auto Detect never searches Wi-Fi, only wired adapters, and ping devices it finds start unticked (switches, LS10s and meters start ticked)
+- The Network window's Routes page now lists the routes Mping is holding (added at launch, put back if the Mac drops them, removed at quit) instead of the Apply / Remove Routes Terminal buttons and their warning, which are gone; with devices' adapters missing it says so rather than "No devices have an explicit NIC"
+- The Network window and its NTP & Syslog, Routes and Redundant Networks panes are redrawn in Mping's own style (tab list, dropdowns, row menu, colour sliders, in-window questions) in place of the system controls, so the Windows version can match shape for shape
+- A launch whose last session was an unsaved new workspace starts a new workspace, without the "last session could not be restored" notice and without opening the last saved showfile
+- Auto Detect, in Add Devices: pings every address on each adapter's network, lists what answers, works out what each device is (Netgear switch, LS10, Nemo 96HD, amplifier, or ping-only) and its name, and adds the ticked ones in a column per adapter, pinned to the adapter they were found on; a new empty workspace opens Add Devices by itself — https://github.com/therealjackiewelles/Mping/issues/170
+
+**Bug fixes**
+- The pop-up that lists alerts while Mping is not in front sits at the top left of the screen; since the fonts change it had not been placed at all and sat at the bottom left corner, growing down off the screen
+- Undo back to the state the file was saved in no longer asks to save at quit: the app remembers how deep the undo history was at the last Save or Open — https://github.com/therealjackiewelles/Mping/issues/199
+- A showfile opened from the Finder while Mping is already running no longer leaves a second, hidden main window behind: there is only ever the one window, and monitoring is not paused when a stray window closes — https://github.com/therealjackiewelles/Mping/issues/165
+- The Network window shows a new or newly opened workspace at once; it used to keep the last showfile's virtual interfaces on screen for two or three seconds — https://github.com/therealjackiewelles/Mping/issues/203
+- Opening a showfile while Mping is running, a new workspace and Don't Save now move the map to that file's saved position and zoom; the map used to keep the last file's view and its next pan wrote that view into the new file. Undo keeps the view you are looking at — https://github.com/therealjackiewelles/Mping/issues/212
+- A pan or zoom on its own is written to the running save five seconds after the map stops moving, so Recover after a crash or a power cut opens where you were; it is not an edit, so no star and no undo step — https://github.com/therealjackiewelles/Mping/issues/215
+- The quit question no longer says there are unsaved changes on a showfile nobody edited: a name a switch sends, a port box the app moves clear of a tile at launch, or a device finishing its setup are kept in the running save but are not the user's edits, so they no longer mark the file unsaved or make an undo step — https://github.com/therealjackiewelles/Mping/issues/195
+- A brand new workspace no longer counts as edited from the moment it is made, so opening another showfile or quitting straight after File ▸ New Workspace no longer asks to save, and the sidebar shows no star until something is actually changed — https://github.com/therealjackiewelles/Mping/issues/204
+- File ▸ New Workspace clears the virtual interfaces the old showfile described, so a new workspace no longer carries another file's VLANs (they are taken down at the next adapter check or at quit) — https://github.com/therealjackiewelles/Mping/issues/203
+- The Network, Fix the Network, Switch Log, Telemetry Polling and Console Output windows open on the display Mping is on, carrying a remembered place over from another display by its offset, instead of opening on the display the app has left — https://github.com/therealjackiewelles/Mping/issues/201
+- Switching Monitoring on or off no longer marks the showfile as edited: the switch is an application setting, not part of the file
+- Link lines from one switch share one trunk while the switch is dragged (the farthest device is routed first and the others ride its line), a route never doubles back along its own track, and a switch dragged to where its usual way out is blocked keeps its column's rail instead of its lines wandering with it
+- Opening a showfile by double-clicking it while Mping is starting up, with unsaved changes in the one it restores, now asks "Save changes?" over the workspace once the splash has finished; the question used to be hidden behind the splash and then reappear, dead, after it was answered — https://github.com/therealjackiewelles/Mping/issues/187
+- The turning spinner (for example "Identifying device" in Auto Detect) no longer stutters while many rows are updating: it is now drawn by the system and keeps turning when the app is busy
+- Auto Detect no longer leaves a device it cannot identify saying "Identifying device" until the whole search ends: once its probes are done, or after 12 seconds, the row shows a ping-only device
+- A link on one of an LS10's two SFP ports (ports 6 and 7) is drawn as fibre, and the LS10 Inspector says the unit's hardware cannot read SFP light levels or module details instead of "No SFP modules detected" (L-Acoustics confirmed the LS10 cannot read them) — https://github.com/therealjackiewelles/Mping/issues/185
+- Right-clicking the workspace no longer stops monitoring while the menu is open (the menu was holding up every task on the main thread; pings, SNMP and alerts all waited) — https://github.com/therealjackiewelles/Mping/issues/184
+- Auto Detect looks again, a few seconds after the first sweep, near the devices it found on any adapter of a subnet, so devices on the second of two adapters on one subnet are no longer missed
+- Auto Detect sweeps the neighbourhoods that had an answer twice more for the addresses that did not answer, so a cold start (an empty workspace) no longer misses a few devices on the secondary management adapter; a /21 takes about 19 seconds instead of 11
+- A link that goes down while its loss alert (for example "9.2 dB") is showing no longer writes a false "Recovered" row for the loss alert: the loss alert stays until the link is back and its loss is fine
+- Auto Detect asks about the devices it already knows (the workspace's, and the ones the Mac holds in ARP) first on each adapter, before the bulk sweep, so a sweep of the rig now finds every device on every adapter run after run (the secondary management adapter used to find none, a few, or all)
+- LS10 port boxes no longer cut an LA7.16's model and number to "LA7.16…"
+- Auto Detect no longer puts secondary-network devices on the primary side: it orders the adapters from their names (Primary or PRI first, then Secondary or SEC, each network's two adapters side by side) so the primary network's device is the primary of a pair
+- Auto Detect no longer misses devices whose first ping is slow: after each adapter's sweep it asks again about the hosts the Mac already knows from ARP, so every device that monitoring can reach is found (the rig's first sweep missed 11)
+- A showfile saved with no fibre-label style (one made by another program) now draws its link labels at the normal size instead of large and faint
+- Routes now follow every edit while a showfile is being set up: typing or pasting a device's address after its adapter is chosen, adding, deleting, finishing a device's setup and undo re-pin the routes within half a second (before, only choosing an adapter or opening a file did), and nothing is sent when the pinned list has not changed
+
+**Other**
+- Changing one device (every ping result and every reading does) no longer copies the whole device list first; on a replay of a show night this measured about a third of a point of a core less, at the edge of what the test can tell apart — https://github.com/therealjackiewelles/Mping/issues/208
+- Rig Replay rebuilds the link map only when a fibre level changes by an amount the screen can show, as live monitoring always has; it used to rebuild on every reading, about once a second — https://github.com/therealjackiewelles/Mping/issues/208
+- Diagnostic: the first poll of each L-Acoustics LS10 in a session writes a line in the Console log listing anything the unit sends that Mping does not read (to find out whether an LS10 reports its SFP at all)
 ## v0.8.33 — 2026-10-26
 
 **Enhancements**
@@ -298,38 +372,6 @@ The application source is maintained in a private repository; this repository ho
 
 **Other**
 - The planning window is gone: File › New Workspace asks to save, then clears the one window to an empty map, and a showfile always opens in that one window — https://github.com/therealjackiewelles/Mping/issues/166
-## v0.8.31 — 2026-10-21
-
-**Map**
-- A tile or location box can no longer be dragged off the edge of the map, where it could not be clicked, selected or dragged back; a group dragged together stops as one at the edge, and a showfile with an item beyond the edge brings it back when opened — https://github.com/therealjackiewelles/Mping/issues/163
-
-**Pop-up windows**
-- Pop-up windows (Settings, Network, Fix the Network, the Port Status Box Editor, switch logs, About and the debug windows) stay above the main window while Mping is in front, and cannot be minimised — https://github.com/therealjackiewelles/Mping/issues/159
-- Escape closes the front-most pop-up whether or not it has focus; in a text field inside a pop-up the first Escape only leaves the field, and a sheet or help bubble on top keeps its own Escape — https://github.com/therealjackiewelles/Mping/issues/162
-- With no pop-up open, Escape clears the search whether or not the search box has focus (a text field being edited elsewhere keeps its own Escape)
-- Closing Settings with a changed amplifier username or password asks Apply / Don't Apply / Cancel instead of applying silently, on the close button, Escape, Quit and the update's Relaunch
-- Settings is now Mping's own window (⌘, as before)
-- The virtual-interface editor and Add Devices ask before Cancel or Escape throws away changes, and a Quit or the update's Relaunch also waits on the virtual-interface editor
-- A closed Port Status Box Editor is now let go instead of being kept alive; one left open still costs more the longer it stays open (that issue stays open) — https://github.com/therealjackiewelles/Mping/issues/160
-
-**Link lines**
-- Link lines from a switch to its ping-only devices and Nemo meters are routed round other tiles instead of behind them; a device boxed in on all four sides keeps its straight line — https://github.com/therealjackiewelles/Mping/issues/158
-- Link lines of different switches are kept off each other's stretches instead of lying on top of each other (they may still cross)
-- A link line from a ping device or Nemo meter no longer runs along or hidden under a link between switches, and leaves a busy switch between two links instead of across one; it may still cross one where there is no way round
-- Port boxes can sit closer to a ping-only device: the clear space around each tile now uses its real height, not the taller switch height
-- When the adapter that reaches a switch is unplugged, every amplifier row behind it goes stale at once (grey, with the time last read) instead of staying green for about four minutes
-- When a switch is confirmed offline, its amplifiers are pinged at once and the ones that do not answer go stale within seconds (grey, with the time last read) instead of staying green for about four minutes; no alert is raised for it
-- With the adapters unplugged (or a switch silent for 90 seconds), the link lines of the switches that can no longer be read turn red like a link that is down, with no moving dashes, traffic figures or stale readings, instead of looking live (no Link Down alert is raised for them)
-- Link lines are drawn twice as thick, in a stronger colour, with longer dashes
-- Traffic figures on a link line can sit beside a vertical stretch, with up and down arrows, when no horizontal stretch has room
-
-**Network window**
-- Adapters is now split into Physical Interfaces and, at the bottom, Virtual Interfaces; the separate Virtual Interfaces section is gone and everything it held (the showfile's VLAN cards, Add Virtual Interface, the other VLANs on this Mac, remove-at-quit) is in that bottom part; each virtual interface is one card, with the devices set to it behind Show devices
-
-**Under the hood**
-- The About window and the console's launch row name the shared core by build number and date only
-- The application log notes a Quit held for unapplied changes, and each Escape that closes a pop-up or is passed on, with the reason
-- Unused files were removed from the app
 
 **[Full changelog →](CHANGELOG.md)** — every release since v0.3.0.
 
