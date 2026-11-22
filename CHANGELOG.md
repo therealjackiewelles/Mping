@@ -6,7 +6,7 @@ Each release's notes are grouped under three headings, in this order: **Enhancem
 
 ---
 
-## v0.9.0 — 2026-11-21
+## v0.9.1 — 2026-11-22
 
 **Enhancements**
 - The Devices menu is now Config, and Network… and Preferences… (the window named Settings until now) have moved into it from the application menu, so both can be reached from the menus at the top of the sidebar
@@ -26,7 +26,7 @@ Each release's notes are grouped under three headings, in this order: **Enhancem
 - With Snap to Grid on, tiles land on a 10 point step instead of 20, so tiles bunched as close as the grid allows have the same 6 point gap across, down and next to a ping-only tile — https://github.com/therealjackiewelles/Mping/issues/193
 - The Inspector's device pane is tighter from top to bottom: 10 between sections instead of 16, the two checkboxes grouped, the Ping / SNMP cards and the Groups card with less padding, so more fits on a 14" screen
 - The ping-only tile's chip ("2.5 ms", "Waiting") is a size smaller, matching the switch tiles' badge text (9 pt, 2 of padding) and sits a little lower, clear of the name; the same as the Windows version
-- After a crash, a force quit or the Mac shutting down with unsaved changes, the next launch asks "Recover unsaved changes to X?" with Recover and Open Saved; Mping keeps a running save of the open showfile after every change, and only asks when that running save really differs from the showfile on disk (the running save is never shown as a file)
+- After a crash, a force quit or the Mac shutting down with unsaved changes, the next launch opens the showfile as last saved and says "An auto-save of X has been found", with the date and time each was last written (Auto-save and Saved File) and Open Auto-Save and Open Saved File; the auto-save is never opened by itself, and Mping only asks when it really differs from the saved showfile. Opening the showfile by hand asks the same; an auto-save of a different showfile, of a never-saved workspace, or of a showfile that has gone is offered with Open Auto-Save and Discard
 - Quitting with unsaved changes now asks "Save changes to X before quitting?" with Save, Don't Save and Cancel; Don't Save lets the changes go, so the next launch opens the showfile as last saved, and Cancel keeps Mping running (before, the changes were carried over to the next launch as if saved)
 - The View Master's OVERLAYS row has a Link legend chip that hides the LINK TYPES legend at the bottom left of the Overview; on by default, remembered with the other View Master switches (the Windows version has the same chip)
 - The adapters-don't-match card, the helper's first-launch card and the "update is ready" card sit in the exact middle of the Mping window (across and down) and follow it when it moves or is resized, until you drag a card aside yourself; the adapters card no longer sits 170 points low (it only drops beneath the helper's card while that card is showing) — https://github.com/therealjackiewelles/Mping/issues/188
@@ -49,6 +49,9 @@ Each release's notes are grouped under three headings, in this order: **Enhancem
 - Auto Detect, in Add Devices: pings every address on each adapter's network, lists what answers, works out what each device is (Netgear switch, LS10, Nemo 96HD, amplifier, or ping-only) and its name, and adds the ticked ones in a column per adapter, pinned to the adapter they were found on; a new empty workspace opens Add Devices by itself — https://github.com/therealjackiewelles/Mping/issues/170
 
 **Bug fixes**
+- File › Open Recent keeps its list: every launch used to cut it back to the one showfile it had just opened (or to nothing), so the list never held more than one file. It now holds the last eight, most recent first, for as long as the files exist
+- Open Saved File (it was Open Saved), at the question after a crash, now opens the saved showfile when it is kept outside Documents/Mping (the Desktop, for example); it used to leave the recovered changes on screen and say nothing. If the file cannot be read, Mping says so
+- A copy of Mping that was only ever opened in the evening never updated itself: a check held back for show hours (20:00 to 06:00) counted as that day's check, and its 06:05 catch-up was lost when the app was quit. A held-back check is now remembered and made at the next launch, at once outside show hours or at 06:05 inside them — https://github.com/therealjackiewelles/Mping/issues/223
 - The pop-up that lists alerts while Mping is not in front sits at the top left of the screen; since the fonts change it had not been placed at all and sat at the bottom left corner, growing down off the screen
 - Undo back to the state the file was saved in no longer asks to save at quit: the app remembers how deep the undo history was at the last Save or Open — https://github.com/therealjackiewelles/Mping/issues/199
 - A showfile opened from the Finder while Mping is already running no longer leaves a second, hidden main window behind: there is only ever the one window, and monitoring is not paused when a stray window closes — https://github.com/therealjackiewelles/Mping/issues/165
